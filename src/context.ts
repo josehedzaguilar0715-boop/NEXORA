@@ -6,9 +6,10 @@ import { bad, forbidden, unauthorized, iso, sha256, type Clock } from './util.js
 
 export interface Notifier {
   /** Envía un código por WhatsApp/SMS. En desarrollo solo se registra. */
-  sendCode(phone: string, code: string): void | Promise<void>
+  /** Devuelve false si no hay proveedor y el código solo quedó en el registro del servidor. */
+  sendCode(phone: string, code: string): void | boolean | Promise<void | boolean>
   /** Correo (opcional): se usa para la verificación del super panel. */
-  sendEmail?(to: string, subject: string, text: string): void | Promise<void>
+  sendEmail?(to: string, subject: string, text: string): void | boolean | Promise<void | boolean>
 }
 
 export interface Deps {

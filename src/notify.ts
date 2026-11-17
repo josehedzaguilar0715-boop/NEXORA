@@ -13,7 +13,10 @@ export function createNotifier(env: Record<string, string | undefined> = process
   return {
     async sendCode(phone, code) {
       const body = `NEXORA: tu código es ${code}. Vence en 10 minutos. No lo compartas.`
-      if (!sms) return void console.log(`[sms sin proveedor] ${phone}: ${code}`)
+      if (!sms) {
+        console.log(`[sms sin proveedor] ${phone}: ${code}`)
+        return false
+      }
       // Números de México: 10 dígitos → +52.
       const to = phone.startsWith('+') ? phone : `+52${phone}`
       const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`, {
@@ -22,15 +25,20 @@ export function createNotifier(env: Record<string, string | undefined> = process
         body: new URLSearchParams({ To: to, From: env.TWILIO_FROM!, Body: body }),
       })
       if (!res.ok) throw new Error(`No se pudo enviar el SMS (${res.status}).`)
+      return true
     },
     async sendEmail(to, subject, text) {
-      if (!mail) return void console.log(`[correo sin proveedor] ${to}: ${subject} — ${text}`)
+      if (!mail) {
+        console.log(`[correo sin proveedor] ${to}: ${subject} — ${text}`)
+        return false
+      }
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
         body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
       })
       if (!res.ok) throw new Error(`No se pudo enviar el correo (${res.status}).`)
+      return true
     },
   }
 }

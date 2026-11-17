@@ -12,6 +12,7 @@ export function Login({ onLogin, forceChange }: { onLogin: (m: Me) => void; forc
   const [recover, setRecover] = useState<null | true>(null)
   const [f, setF] = useState({ businessCode: linkCode, username: '', password: '', phone: '', businessName: '', ownerName: '', code: '', newPassword: '', newPassword2: '' })
   const [challenge, setChallenge] = useState<string | null>(null)
+  const [delivered, setDelivered] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
@@ -82,6 +83,7 @@ export function Login({ onLogin, forceChange }: { onLogin: (m: Me) => void; forc
             const r = mode === 'dueno'
               ? await api<{ challengeId: string }>('POST', '/auth/owner/login', { phone: f.phone, password: f.password, deviceId: deviceId(), deviceName: deviceName() })
               : await api<{ challengeId: string }>('POST', '/auth/register', { businessName: f.businessName, ownerName: f.ownerName, phone: f.phone, password: f.password, deviceId: deviceId(), deviceName: deviceName() })
+            setDelivered((r as { delivered?: boolean }).delivered !== false)
             setChallenge(r.challengeId)
           })}>
             {mode === 'registro' && (
@@ -102,7 +104,7 @@ export function Login({ onLogin, forceChange }: { onLogin: (m: Me) => void; forc
             const r = await api<{ token: string }>('POST', mode === 'dueno' ? '/auth/owner/verify' : '/auth/register/verify', { challengeId: challenge, code: f.code })
             await finish(r.token)
           })}>
-            <p>Te enviamos un código por WhatsApp o SMS al {f.phone}.</p>
+            {delivered ? <p>Te enviamos un código por SMS al {f.phone}.</p> : <p className="error">Los SMS todavía no están configurados, así que el código no se pudo enviar. Pídeselo a soporte.</p>}
             <label>Código de 6 dígitos<input inputMode="numeric" value={f.code} onChange={set('code')} autoFocus maxLength={6} /></label>
             {error && <p className="error">{error}</p>}
             <p><button className="primary big" style={{ width: '100%' }} disabled={busy}>Verificar</button></p>

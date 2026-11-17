@@ -41,7 +41,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
   if (ch) return (
     <form className="card login" onSubmit={async (e) => { e.preventDefault(); try { const r = await adm('POST', '/admin/verify', { challengeId: ch.challengeId, code: f.code }); localStorage.setItem(TOKEN, r.token); onLogin() } catch (er) { setErr((er as Error).message) } }}>
       <h1>Super panel</h1>
-      <p>Te enviamos un código por {ch.sentTo.join(' y ')}.</p>
+      {ch.sentTo.length ? <p>Te enviamos un código por {ch.sentTo.join(' y ')}.</p> : <p className="error">Todavía no hay SMS ni correo configurados, así que el código no se pudo enviar. Está en Cloudflare: Workers &amp; Pages → nexora-staging → Logs (línea «código del super panel»).</p>}
       <label>Código de 6 dígitos<input inputMode="numeric" autoFocus maxLength={6} value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} /></label>
       {err && <p className="error">{err}</p>}
       <p><button className="primary big" style={{ width: '100%' }}>Verificar</button></p>

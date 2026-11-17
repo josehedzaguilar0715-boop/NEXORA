@@ -27,6 +27,10 @@ function createSession(deps: Deps, user: UserRow, dev: { deviceId?: string; devi
   return { token, sessionId: id }
 }
 
+/** Si el último código de cada reto salió por SMS (false = solo quedó en el registro del servidor). */
+const lastDelivery = new Map<string, boolean>()
+export const wasDelivered = (challengeId: string) => { const v = lastDelivery.get(challengeId); lastDelivery.delete(challengeId); return v ?? true }
+
 export type CodePurpose = 'registro' | 'login' | 'recuperar' | 'identidad'
 
 export async function createChallenge(deps: Deps, user: UserRow, purpose: CodePurpose, dev: { deviceId?: string; deviceName?: string }) {
@@ -37,7 +41,8 @@ export async function createChallenge(deps: Deps, user: UserRow, purpose: CodePu
   db.prepare(
     'INSERT INTO verification_codes (id, user_id, purpose, code_hash, device_id, device_name, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?)',
   ).run(id, user.id, purpose, hashSecret(code), dev.deviceId ?? null, dev.deviceName ?? null, iso(new Date(t.getTime() + CODE_MINUTES * 60_000)), iso(t))
-  await notifier.sendCode(user.phone!, code)
+  const delivered = (await notifier.sendCode(user.phone!, code)) !== false
+  lastDelivery.set(id, delivered)
   return id
 }
 
@@ -122,7 +127,7 @@ publicAuth.post('/auth/register', async (c) => {
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow
   }
   const challengeId = await createChallenge(deps, user, 'registro', d)
-  return c.json({ challengeId }, 201)
+  return c.json({ challengeId, delivered: wasDelivered(challengeId) }, 201)
 })
 
 publicAuth.post('/auth/register/verify', async (c) => {
@@ -148,7 +153,7 @@ publicAuth.post('/auth/owner/login', async (c) => {
   const user = deps.db.prepare("SELECT * FROM users WHERE role = 'owner' AND phone = ? AND phone_verified = 1").get(phone) as UserRow | undefined
   checkLogin(deps, user, d.password)
   const challengeId = await createChallenge(deps, user!, 'login', d)
-  return c.json({ challengeId })
+  return c.json({ challengeId, delivered: wasDelivered(challengeId) })
 })
 
 publicAuth.post('/auth/owner/verify', async (c) => {

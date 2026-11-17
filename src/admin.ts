@@ -49,8 +49,9 @@ admin.post('/admin/login', async (c) => {
     const id = newId()
     db.prepare('INSERT INTO admin_challenges (id, admin_id, code_hash, expires_at, created_at) VALUES (?,?,?,?,?)').run(id, a.id, hashSecret(code), iso(new Date(now().getTime() + 10 * 60_000)), iso(now()))
     const sent: string[] = []
-    if (a.phone) { await deps.notifier.sendCode(a.phone, code); sent.push(`SMS al ${a.phone.slice(-4).padStart(10, '•')}`) }
-    if (a.email && deps.notifier.sendEmail) { await deps.notifier.sendEmail(a.email, 'NEXORA · código del super panel', `Tu código de acceso al super panel es ${code}. Vence en 10 minutos. Si no fuiste tú, cambia tu contraseña.`); sent.push(`correo ${a.email.replace(/^(.{2}).*(@.*)$/, '$1•••$2')}`) }
+    // Solo se anuncia lo que de verdad salió (sin proveedor, el código queda en el registro del servidor).
+    if (a.phone && (await deps.notifier.sendCode(a.phone, code)) !== false) sent.push(`SMS al ${a.phone.slice(-4).padStart(10, '•')}`)
+    if (a.email && deps.notifier.sendEmail && (await deps.notifier.sendEmail(a.email, 'NEXORA · código del super panel', `Tu código de acceso al super panel es ${code}. Vence en 10 minutos. Si no fuiste tú, cambia tu contraseña.`)) !== false) sent.push(`correo ${a.email.replace(/^(.{2}).*(@.*)$/, '$1•••$2')}`)
     return c.json({ challengeId: id, sentTo: sent })
   }
   return c.json({ token: issueAdminSession(c.get('deps'), a.id) })

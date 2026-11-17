@@ -280,3 +280,24 @@ describe('super panel: cambiar contraseña', () => {
     expect((await s.call('POST', '/admin/login', { body: { username: 'soporte', password: 'nuevaclave9' } })).json.token).toBeTruthy()
   })
 })
+
+describe('avisos sin proveedor', () => {
+  it('no anuncia "te enviamos" si el código solo quedó en el registro', async () => {
+    const { createAdmin } = await import('../src/admin.js')
+    const { createApp } = await import('../src/app.js')
+    const { openDb } = await import('../src/db-node.js')
+    const { createNotifier } = await import('../src/notify.js')
+    const log = console.log
+    console.log = () => {}
+    try {
+      const deps = { db: openDb(':memory:'), now: () => new Date('2026-11-17T15:00:00Z'), notifier: createNotifier({}) }
+      createAdmin(deps, { name: 'S', username: 'soporte', password: 'superpanel1', phone: '5500000001', email: 'a@b.c' })
+      const r = await createApp(deps).request('/admin/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'soporte', password: 'superpanel1' }) })
+      const j = (await r.json()) as any
+      expect(j.challengeId).toBeTruthy()
+      expect(j.sentTo).toEqual([])
+    } finally {
+      console.log = log
+    }
+  })
+})
