@@ -6,7 +6,7 @@ const at = (hm: string, date = '2026-11-17') => new Date(`${date}T${hm}:00-06:00
 async function unas() {
   const n = await negocioListo()
   const { s, o, T } = n
-  await s.call('PATCH', '/business', { token: T, body: { giro: 'unas' } })
+  s.setGiro('unas')
   const ana = await s.createStaff(T, o.business.code, 'anaunas', 'barbero')
   await s.call('PUT', `/staff/${ana.id}/agenda`, { token: T, body: { inAgenda: true, schedule: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, start: '09:00', end: '20:00' })) } })
   const gel = await n.product({ name: 'Gel UV (ml)', unit: 'litro', price: 0, sellable: false })

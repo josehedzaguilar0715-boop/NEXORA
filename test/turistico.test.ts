@@ -5,7 +5,7 @@ import { negocioListo } from './helpers.js'
 async function turistico() {
   const n = await negocioListo()
   const { s, T } = n
-  await s.call('PATCH', '/business', { token: T, body: { giro: 'turistico' } })
+  s.setGiro('turistico')
   await s.call('PUT', '/tourism/slots', { token: T, body: { slots: [0, 1, 2, 3, 4, 5, 6].flatMap((weekday) => [{ weekday, start: '10:00', end: '13:00', capacity: 10 }, { weekday, start: '13:00', end: '17:00', capacity: 10 }]) } })
   const t = async (name: string, price: number) => (await s.call('POST', '/services', { token: T, body: { name, price, category: 'boleto' } })).json.service
   const adulto = await t('Adulto', 12000)

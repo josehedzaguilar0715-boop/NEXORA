@@ -24,12 +24,13 @@ import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
 import { Productos } from './screens/Productos'
 import { Reportes } from './screens/Reportes'
-import { Usuarios } from './screens/Usuarios'
+import { MiAsistencia, Usuarios } from './screens/Usuarios'
 import { Finanzas } from './screens/Finanzas'
 import { Importar } from './screens/Importar'
+import { Configurar } from './screens/Configurar'
 import {
-  Armchair, Boxes, CalendarDays, ChartColumn, ChefHat, ClipboardCheck, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
-  LifeBuoy, LogOut, Menu, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
+  Armchair, Boxes, CalendarDays, ChartColumn, ChefHat, ClipboardCheck, Clock, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
+  LifeBuoy, LogOut, Menu, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
 } from 'lucide-react'
 
 export interface Me {
@@ -40,6 +41,9 @@ export interface Me {
   modules?: string[]
 }
 /** 'owner' = solo el dueño. Un permiso no marcado no aparece en pantalla. */
+/** Giros que manejan fiado o cuenta de crédito (spec: abarrotes, ferretería, papelería, comedor y verdulería). */
+export const FIADO_GIROS = ['abarrotes', 'ferreteria', 'papeleria', 'comedor', 'verduleria']
+
 /** ¿El negocio tiene alguno de estos giros? (negocio mixto: principal + adicionales) */
 export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.business.giro]).some((x) => g.includes(x))
 /** Ver reportes lo tiene todo usuario (solo lectura), igual que en el servidor. */
@@ -57,16 +61,16 @@ const SCREENS: Screen[] = [
   { key: 'taquilla', label: 'Taquilla', perm: 'sell', C: Taquilla, giros: ['turistico'], group: 'Operación', icon: Ticket },
   { key: 'acceso', label: 'Acceso', perm: 'sell', C: Acceso, giros: ['turistico'], group: 'Operación', icon: ScanLine, ownTitle: true },
   { key: 'mesas', label: 'Mesas', perm: 'sell', C: Mesas, giros: ['palapa', 'restaurante', 'taqueria'], group: 'Operación', icon: Armchair },
-  { key: 'pedidos', label: 'Pedidos', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'comedor', 'verduleria'], group: 'Operación', icon: ClipboardList },
+  { key: 'pedidos', label: 'Pedidos', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'verduleria'], group: 'Operación', icon: ClipboardList },
   { key: 'cocina', label: 'Cocina', perm: 'sell', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria'], group: 'Operación', icon: ChefHat },
   { key: 'menu', label: 'Menú del día', perm: 'sell', C: MenuDia, giros: ['comedor', 'taqueria'], group: 'Operación', icon: UtensilsCrossed },
   { key: 'carne', label: 'Carne', perm: 'sell', C: Trompo, giros: ['taqueria'], group: 'Operación', icon: Flame },
-  { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria', 'papeleria'], group: 'Operación', icon: FileText },
+  { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria'], group: 'Operación', icon: FileText },
   { key: 'encargos', label: 'Encargos', perm: 'sell', C: Encargos, giros: ['papeleria'], group: 'Operación', icon: Package },
-  { key: 'devoluciones', label: 'Devoluciones', perm: 'cancel_discount', C: Devoluciones, giros: ['ferreteria', 'perfumeria', 'papeleria'], group: 'Operación', icon: Undo2 },
+  { key: 'devoluciones', label: 'Devoluciones', perm: 'cancel_discount', C: Devoluciones, giros: ['ferreteria', 'perfumeria'], group: 'Operación', icon: Undo2 },
   { key: 'escanear', label: 'Escanear QR', perm: 'sell', C: Escanear, group: 'Operación', icon: QrCode },
   { key: 'productos', label: 'Productos', perm: 'view_inventory', C: Productos, group: 'Inventario', icon: Boxes },
-  { key: 'precios', label: 'Precio del día', perm: 'change_prices', C: PrecioDia, giros: ['verduleria', 'palapa'], group: 'Inventario', icon: Tag },
+  { key: 'precios', label: 'Precio del día', perm: 'change_prices', C: PrecioDia, giros: ['verduleria', 'palapa', 'taqueria'], group: 'Inventario', icon: Tag },
   { key: 'compras', label: 'Compras', perm: 'edit_inventory', C: Compras, group: 'Inventario', icon: Truck },
   { key: 'cierre', label: 'Cierre del día', perm: 'edit_inventory', C: CierreDia, giros: ['verduleria', 'abarrotes'], group: 'Inventario', icon: ClipboardCheck },
   { key: 'clientes', label: 'Clientes y fiado', perm: 'customers_credit', C: Clientes, group: 'Clientes', icon: Users },
@@ -74,6 +78,8 @@ const SCREENS: Screen[] = [
   { key: 'finanzas', label: 'Finanzas', perm: 'view_reports', C: Finanzas, group: 'Finanzas', icon: Landmark, ownTitle: true },
   { key: 'reportes', label: 'Ventas y retiro', perm: 'view_reports', C: Reportes, group: 'Finanzas', icon: ChartColumn },
   { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria'], group: 'Finanzas', icon: Percent },
+  { key: 'configurar', label: 'Configurar negocio', perm: 'configure_catalog', C: Configurar, group: 'Administración', icon: SlidersHorizontal },
+  { key: 'asistencia', label: 'Mi asistencia', perm: 'attendance', C: MiAsistencia, group: 'Administración', icon: Clock },
   { key: 'usuarios', label: 'Personal', perm: 'create_employees', C: Usuarios, group: 'Administración', icon: UserCog },
   { key: 'buzon', label: 'Soporte', perm: 'owner', C: Buzon, group: 'Administración', icon: LifeBuoy },
   { key: 'importar', label: 'Importar datos', perm: 'owner', C: Importar, group: 'Administración', icon: Upload },
@@ -158,7 +164,14 @@ function Privada() {
   const giroOk = (s: Screen) => !s.giros || hasGiro(me, ...s.giros) || (s.key === 'mesas' && hasGiro(me, 'comedor') && !!me.settings?.tablesEnabled)
   const needsModule: Record<string, string[]> = { escanear: ['membresias', 'asistencia', 'fidelidad'] }
   const moduleOk = (s: Screen) => !needsModule[s.key] || needsModule[s.key]!.some((m) => me.modules?.includes(m))
-  const allowed = SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s))
+  // Algunos nombres cambian según el giro, para que cada sistema hable de su negocio.
+  const fiado = hasGiro(me, ...FIADO_GIROS)
+  const rename = (s: Screen): Screen =>
+    s.key === 'clientes' ? { ...s, label: fiado ? 'Clientes y fiado' : 'Clientes' }
+    : s.key === 'menu' ? { ...s, label: hasGiro(me, 'comedor') ? 'Menú del día' : 'Guisados del día' }
+    : s.key === 'precios' ? { ...s, label: hasGiro(me, 'verduleria') ? 'Precio del día' : 'Precio por kilo' }
+    : s
+  const allowed = SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s) && !(s.key === 'asistencia' && can(me, 'create_employees'))).map(rename)
   // El personal que cobra entra directo a la caja; el dueño, al inicio.
   const current = allowed.find((s) => s.key === hash) ?? (me.user.role === 'staff' ? allowed.find((s) => s.key === 'caja') : undefined) ?? allowed[0]
   const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'

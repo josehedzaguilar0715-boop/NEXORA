@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import { hasGiro, type Me } from '../App'
+import { giroLabel } from '../giros'
 
-const GIROS: Record<string, string> = { abarrotes: 'Abarrotes', ferreteria: 'Ferretería', papeleria: 'Papelería', barberia: 'Barbería', unas: 'Estudio de uñas', perfumeria: 'Perfumería', banos: 'Baños públicos', turistico: 'Lugar turístico', palapa: 'Palapa', restaurante: 'Restaurante', comedor: 'Comedor', taqueria: 'Taquería', verduleria: 'Verdulería' }
 const MODULES: Record<string, string> = { membresias: 'Membresías y paquetes', promociones: 'Promociones', fidelidad: 'Puntos o sellos', asistencia: 'Asistencia con QR', reservas: 'Reservas y venta por link', recordatorios: 'Recordatorios (solo prepara el mensaje)' }
 
 /** Ajustes del negocio (solo el dueño): datos del ticket, giro, módulos y opciones. Todo lo opcional viene apagado. */
 export function Ajustes({ me }: { me: Me }) {
-  const [biz, setBiz] = useState({ name: me.business.name, phone: me.business.phone ?? '', logoUrl: '', giro: me.business.giro, extraGiros: (me.business.giros ?? []).slice(1), forcePasswordChange: true })
+  const [biz, setBiz] = useState({ name: me.business.name, phone: me.business.phone ?? '', logoUrl: '', forcePasswordChange: true })
   const [mods, setMods] = useState<string[]>([])
   const [addons, setAddons] = useState<string[]>([])
   const [st, setSt] = useState<Record<string, any>>({})
@@ -31,11 +31,10 @@ export function Ajustes({ me }: { me: Me }) {
         <label>Nombre<input value={biz.name} onChange={(e) => setBiz({ ...biz, name: e.target.value })} /></label>
         <label>Teléfono en el ticket<input inputMode="tel" value={biz.phone} onChange={(e) => setBiz({ ...biz, phone: e.target.value })} /></label>
         <label>Logo (dirección de la imagen)<input value={biz.logoUrl} onChange={(e) => setBiz({ ...biz, logoUrl: e.target.value })} placeholder="https://…" /></label>
-        <label>Giro principal<select value={biz.giro} onChange={(e) => setBiz({ ...biz, giro: e.target.value, extraGiros: biz.extraGiros.filter((g) => g !== e.target.value) })}>{Object.entries(GIROS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-        <p style={{ marginBottom: 4 }}><b>Negocio mixto</b> <span className="muted">— marca los otros giros que también maneja tu negocio (p. ej. abarrotes con papelería).</span></p>
-        <div className="checks">{Object.entries(GIROS).filter(([k]) => k !== biz.giro).map(([k, v]) => <label key={k} style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={biz.extraGiros.includes(k)} onChange={() => setBiz({ ...biz, extraGiros: biz.extraGiros.includes(k) ? biz.extraGiros.filter((x) => x !== k) : [...biz.extraGiros, k] })} />{v}</label>)}</div>
+        <div className="info-row"><span className="muted">Tipo de negocio</span><b>{(me.business.giros ?? [me.business.giro]).map(giroLabel).join(' + ')}</b></div>
+        <p className="muted small">Se eligió al crear la cuenta. Si necesitas cambiarlo, pídelo a soporte desde el Buzón.</p>
         <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={biz.forcePasswordChange} onChange={(e) => setBiz({ ...biz, forcePasswordChange: e.target.checked })} />Pedir cambio de contraseña en el primer ingreso</label>
-        <p><button className="primary" onClick={run(() => api('PATCH', '/business', { name: biz.name, phone: biz.phone, logoUrl: biz.logoUrl || undefined, giro: biz.giro, extraGiros: biz.extraGiros, forcePasswordChange: biz.forcePasswordChange }).then(() => setTimeout(() => location.reload(), 900)), 'Guardado. Cargando las pantallas de tus giros…')}>Guardar</button></p>
+        <p><button className="primary" onClick={run(() => api('PATCH', '/business', { name: biz.name, phone: biz.phone, logoUrl: biz.logoUrl || undefined, forcePasswordChange: biz.forcePasswordChange }), 'Guardado.')}>Guardar</button></p>
         <h2 style={{ marginTop: 16 }}>Módulos</h2>
         {Object.entries(MODULES).map(([k, v]) => {
           // El link de reservas se contrata con instalación: lo habilita soporte.

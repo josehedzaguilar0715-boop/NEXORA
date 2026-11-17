@@ -42,7 +42,7 @@ export function Mesas({ me }: { me: Me }) {
           ))}</div>
         </section>
       ))}
-      {tables.length === 0 && <p className="card">No hay mesas. El dueño las da de alta.</p>}
+      {tables.length === 0 && <p className="card">Todavía no hay mesas. {me.user.role === 'owner' ? <>Dalas de alta en <a href="#/configurar">Configurar negocio → Mesas</a>.</> : 'Pídele al dueño que las dé de alta.'}</p>}
     </div>
   )
 }

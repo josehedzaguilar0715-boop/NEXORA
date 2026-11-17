@@ -4,7 +4,7 @@ import { negocioListo } from './helpers.js'
 async function verduleria() {
   const n = await negocioListo()
   const { s, o, T } = n
-  await s.call('PATCH', '/business', { token: T, body: { giro: 'verduleria' } })
+  s.setGiro('verduleria')
   const enc = await s.createStaff(T, o.business.code, 'encargado', 'encargado')
   // El encargado cambia precios del día: necesita ese permiso y un código.
   await s.call('PATCH', `/users/${enc.id}`, { token: T, body: { permissions: ['sell', 'open_close_cash', 'edit_inventory', 'view_inventory', 'change_prices', 'customers_credit'] } })

@@ -4,7 +4,7 @@ import { negocioListo } from './helpers.js'
 async function banos() {
   const n = await negocioListo()
   const { s, T } = n
-  await s.call('PATCH', '/business', { token: T, body: { giro: 'banos' } })
+  s.setGiro('banos')
   const svc = async (body: object) => (await s.call('POST', '/services', { token: T, body: { category: 'banos', ...body } })).json.service
   const sanitario = await svc({ name: 'Sanitario', price: 700 })
   const regadera = await svc({ name: 'Regadera', price: 3000 })

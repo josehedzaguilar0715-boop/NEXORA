@@ -4,7 +4,7 @@ import { negocioListo } from './helpers.js'
 async function perfumeria() {
   const n = await negocioListo()
   const { s, T } = n
-  await s.call('PATCH', '/business', { token: T, body: { giro: 'perfumeria' } })
+  s.setGiro('perfumeria')
   const v = (name: string, attrs: object, price: number, extra: object = {}) => n.product({ name, unit: 'pieza', price, attrs, ...extra })
   const sauvage100 = await v('Sauvage EDT 100 ml', { brand: 'Dior', fragrance: 'Sauvage', sizeMl: 100, presentation: 'regular' }, 280000, { barcode: '3348901250153' })
   const sauvage10 = await v('Sauvage decant 10 ml', { brand: 'Dior', fragrance: 'Sauvage', sizeMl: 10, presentation: 'decant' }, 45000)

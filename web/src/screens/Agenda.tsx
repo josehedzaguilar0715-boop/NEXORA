@@ -61,8 +61,8 @@ export function Agenda({ me }: { me: Me }) {
           </section>
         ))}
       </div>
-      <Retoques />
-      {staff.length === 0 && <p className="card">Nadie está en la agenda todavía. En Personal, el dueño marca quién atiende y su horario.</p>}
+      {me.modules?.includes('recordatorios') && <Retoques />}
+      {staff.length === 0 && <p className="card">Nadie está en la agenda todavía. En <a href="#/usuarios">Personal</a> abre a cada persona → «Horario de agenda» y marca «Atiende citas». Los servicios se dan de alta en <a href="#/configurar">Configurar negocio</a>.</p>}
       {form && <NuevaCita walkIn={form.walkIn} date={date} staff={staff} services={services} onClose={() => setForm(null)} onSaved={() => { setForm(null); setMsg({ ok: 'Cita guardada.' }); void load() }} />}
       {checkout && <Cobro appt={checkout} onClose={() => setCheckout(null)} onDone={(t) => { setCheckout(null); setMsg({ ok: `Cobrado: ${mxn(t)}.` }); void load() }} />}
     </div>

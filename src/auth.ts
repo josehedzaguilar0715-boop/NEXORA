@@ -103,13 +103,16 @@ function checkLogin(deps: Deps, user: UserRow | undefined, password: string): Us
   return user
 }
 
+/** Giros adicionales sin repetir ni incluir el principal. */
+export const extraOf = (giro: string, extra?: string[]) => JSON.stringify([...new Set(extra ?? [])].filter((g) => g !== giro))
+
 export const publicAuth = new Hono<Env>()
 
 publicAuth.post('/auth/register', async (c) => {
   const deps = c.get('deps')
   const { db, now } = deps
   const d = parse(
-    z.object({ businessName: z.string().trim().min(2).max(100), ownerName: z.string().trim().min(2).max(100), phone: z.string(), password: z.string(), giro: z.enum(GIROS).optional() }).extend(device.shape),
+    z.object({ businessName: z.string().trim().min(2).max(100), ownerName: z.string().trim().min(2).max(100), phone: z.string(), password: z.string(), giro: z.enum(GIROS).optional(), extraGiros: z.array(z.enum(GIROS)).max(GIROS.length).optional() }).extend(device.shape),
     await body(c),
   )
   const phone = normalizePhone(d.phone)
@@ -121,7 +124,7 @@ publicAuth.post('/auth/register', async (c) => {
   if (existing) {
     // Registro sin verificar: se reutiliza y se manda un código nuevo.
     db.prepare('UPDATE users SET name = ?, password_hash = ? WHERE id = ?').run(d.ownerName, hashSecret(d.password), existing.id)
-    db.prepare('UPDATE businesses SET name = ? WHERE id = ?').run(d.businessName, existing.business_id)
+    db.prepare('UPDATE businesses SET name = ?, giro = ?, extra_giros = ? WHERE id = ?').run(d.businessName, d.giro ?? 'abarrotes', extraOf(d.giro ?? 'abarrotes', d.extraGiros), existing.business_id)
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(existing.id) as UserRow
   } else {
     const t = iso(now())
@@ -130,8 +133,8 @@ publicAuth.post('/auth/register', async (c) => {
     const userId = newId()
     db.transaction(() => {
       const trialDays = setting(db, 'default_trial_days')
-      db.prepare('INSERT INTO businesses (id, code, name, phone, trial_days, trial_ends_at, giro, created_at) VALUES (?,?,?,?,?,?,?,?)').run(
-        bizId, businessCode(), d.businessName, phone, trialDays, iso(new Date(now().getTime() + trialDays * 86_400_000)), d.giro ?? 'abarrotes', t,
+      db.prepare('INSERT INTO businesses (id, code, name, phone, trial_days, trial_ends_at, giro, extra_giros, created_at) VALUES (?,?,?,?,?,?,?,?,?)').run(
+        bizId, businessCode(), d.businessName, phone, trialDays, iso(new Date(now().getTime() + trialDays * 86_400_000)), d.giro ?? 'abarrotes', extraOf(d.giro ?? 'abarrotes', d.extraGiros), t,
       )
       db.prepare('INSERT INTO branches (id, business_id, name, created_at) VALUES (?,?,?,?)').run(branchId, bizId, 'Principal', t)
       db.prepare(
@@ -224,15 +227,17 @@ publicAuth.post('/auth/owner/recover/verify', async (c) => {
   return c.json({ ok: true })
 })
 
-// Empleado: código del negocio + usuario + contraseña.
+// Empleado: usuario + contraseña. El código del negocio ya no se pide; solo desempata usuarios
+// antiguos que se repiten entre negocios (los nuevos son únicos en todo NEXORA).
 publicAuth.post('/auth/login', async (c) => {
   const deps = c.get('deps')
   const { db } = deps
-  const d = parse(z.object({ businessCode: z.string(), username: z.string(), password: z.string() }).extend(device.shape), await body(c))
-  const biz = db.prepare('SELECT id FROM businesses WHERE code = ?').get(d.businessCode.trim().toUpperCase()) as { id: string } | undefined
-  const user = biz
-    ? (db.prepare("SELECT * FROM users WHERE business_id = ? AND username = ? AND role = 'staff'").get(biz.id, normalizeUsername(d.username)) as UserRow | undefined)
-    : undefined
+  const d = parse(z.object({ businessCode: z.string().optional(), username: z.string(), password: z.string() }).extend(device.shape), await body(c))
+  const code = d.businessCode?.trim().toUpperCase()
+  const candidates = db.prepare(`SELECT u.* FROM users u ${code ? 'JOIN businesses b ON b.id = u.business_id AND b.code = ?' : ''} WHERE u.username = ? AND u.role = 'staff'`)
+    .all(...[...(code ? [code] : []), normalizeUsername(d.username)]) as UserRow[]
+  // Con usuarios repetidos, entra el que tenga esa contraseña.
+  const user = candidates.length > 1 ? (candidates.find((u) => verifySecret(d.password, u.password_hash)) ?? candidates[0]) : candidates[0]
   checkLogin(deps, user, d.password)
   const { token } = createSession(deps, user!, d)
   return c.json({ token, mustChangePassword: !!user!.must_change_password })

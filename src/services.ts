@@ -123,6 +123,17 @@ services.put('/products/:id/combo', requirePerm('configure_catalog'), async (c) 
 
 services.get('/machines', (c) => c.json({ machines: c.get('deps').db.prepare('SELECT id, branch_id AS branchId, name, active FROM machines WHERE business_id = ? ORDER BY name').all(c.get('session').user.business_id) }))
 
+services.patch('/machines/:id', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const m = db.prepare('SELECT * FROM machines WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; name: string; active: number } | undefined
+  if (!m) throw bad('Ese equipo no existe.')
+  const d = parse(z.object({ name: z.string().trim().min(1).max(60).optional(), active: z.boolean().optional() }), await body(c))
+  db.prepare('UPDATE machines SET name = ?, active = ? WHERE id = ?').run(d.name ?? m.name, d.active === undefined ? m.active : d.active ? 1 : 0, m.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'equipo.cambio', entity: 'machine', entityId: m.id, oldValue: m, newValue: d })
+  return c.json({ ok: true })
+})
+
 services.post('/machines', ownerOnly, async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, ApiError, cache, flush, mxn, outbox, toCents } from '../api'
-import { can, type Me, hasGiro } from '../App'
+import { can, FIADO_GIROS, type Me, hasGiro } from '../App'
 
 export interface Product {
   id: string; name: string; barcode: string | null; unit: 'pieza' | 'kg' | 'metro' | 'litro'; price: number; stock?: number
@@ -48,12 +48,15 @@ export function Caja({ me }: { me: Me }) {
         setShift(cur.shift)
         cache.set('shift', cur.shift)
       }
-      const p = await api<{ products: Product[] }>('GET', '/products')
-      setCatalog(p.products)
-      cache.set('catalog', p.products)
+      // Solo lo que se vende: sin productos eliminados ni boletos (esos se venden en Taquilla).
+      const p = await api<{ products: (Product & { active?: boolean })[] }>('GET', '/products')
+      const live = p.products.filter((x) => x.active !== false)
+      setCatalog(live)
+      cache.set('catalog', live)
       const sv = await api<{ services: Service[] }>('GET', '/services')
-      setServices(sv.services.filter((x) => x.active))
-      cache.set('services', sv.services.filter((x) => x.active))
+      const svLive = sv.services.filter((x) => x.active && x.category !== 'boleto')
+      setServices(svLive)
+      cache.set('services', svLive)
       if (can(me, 'customers_credit')) {
         const c = await api<{ customers: Customer[] }>('GET', '/customers')
         setCustomers(c.customers)
@@ -212,7 +215,7 @@ export function Caja({ me }: { me: Me }) {
           <button className="primary big" disabled={!cart.length} onClick={() => setModal({ kind: 'pago', method: 'efectivo' })}>Efectivo</button>
           <button className="big" disabled={!cart.length} onClick={() => charge('transferencia')}>Transferencia</button>
           <button className="big" disabled={!cart.length} onClick={() => charge('tarjeta')}>Tarjeta</button>
-          {can(me, 'customers_credit') && <button className="big" disabled={!cart.length} onClick={() => setModal({ kind: 'pago', method: 'fiado' })}>Fiado</button>}
+          {can(me, 'customers_credit') && hasGiro(me, ...FIADO_GIROS) && <button className="big" disabled={!cart.length} onClick={() => setModal({ kind: 'pago', method: 'fiado' })}>Fiado</button>}
         </div>
         <div className="pay" style={{ marginTop: 12 }}>
           {can(me, 'cancel_discount') && <button disabled={!cart.length} onClick={() => setModal({ kind: 'descuento' })}>Descuento</button>}
@@ -249,14 +252,29 @@ export function Caja({ me }: { me: Me }) {
   )
 }
 
+/**
+ * Monto escrito como lo escribe la gente: "1000", "1,000", "$10 000", "1.000" o "1,500.50" → centavos.
+ * Vacío o inválido → null.
+ */
+export function parseAmount(v: string): number | null {
+  let t = v.replace(/[$\s]/g, '')
+  if (!t) return null
+  if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '') // 1.000 o 10.000: punto de miles
+  else if (/^\d+,\d{1,2}$/.test(t)) t = t.replace(',', '.') // 12,50: coma decimal
+  else t = t.replace(/,/g, '')
+  const n = Number(t)
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null
+}
+
 function OpenShift({ onOpen, meals }: { onOpen: (s: Shift) => void; meals?: boolean }) {
   const [amount, setAmount] = useState('')
   const [meal, setMeal] = useState(() => { const h = new Date().getHours(); return h < 12 ? 'desayuno' : h < 18 ? 'comida' : 'cena' })
   const [err, setErr] = useState('')
   const open = async () => {
-    if (amount.trim() === '' || Number.isNaN(toCents(amount))) return setErr('Escribe el fondo inicial (puede ser 0).')
+    const cents = parseAmount(amount)
+    if (cents == null) return setErr('Escribe con cuánto dinero abres (puede ser 0).')
     const id = crypto.randomUUID()
-    const body = { id, openingFloat: toCents(amount), at: new Date().toISOString(), ...(meals ? { meal } : {}) }
+    const body = { id, openingFloat: cents, at: new Date().toISOString(), ...(meals ? { meal } : {}) }
     try {
       const r = await api<{ shift: Shift }>('POST', '/shifts/open', body, { 'idempotency-key': id })
       onOpen(r.shift)
@@ -273,7 +291,9 @@ function OpenShift({ onOpen, meals }: { onOpen: (s: Shift) => void; meals?: bool
       <h1>Abrir caja</h1>
       <p className="muted">Cuenta el dinero con el que empiezas el turno.</p>
       {meals && <div className="tabs">{['desayuno', 'comida', 'cena'].map((m) => <button key={m} className={meal === m ? 'on' : ''} onClick={() => setMeal(m)}>{m[0]!.toUpperCase() + m.slice(1)}</button>)}</div>}
-      <label>Fondo inicial<input inputMode="decimal" placeholder="$0.00" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus onKeyDown={(e) => e.key === 'Enter' && open()} /></label>
+      <label>Fondo inicial (lo que hay en la caja al empezar)<input inputMode="decimal" placeholder="$0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setErr('') }} autoFocus onKeyDown={(e) => e.key === 'Enter' && open()} /></label>
+      <div className="quick">{[0, 500, 1000, 2000, 5000, 10000].map((v) => <button key={v} type="button" className={parseAmount(amount) === v * 100 ? 'on' : ''} onClick={() => setAmount(String(v))}>{mxn(v * 100).replace('.00', '')}</button>)}</div>
+      {parseAmount(amount) != null && amount.trim() !== '' && <div className="total">{mxn(parseAmount(amount)!)}</div>}
       {err && <p className="error">{err}</p>}
       <p><button className="primary big" style={{ width: '100%' }} onClick={open}>Abrir caja</button></p>
     </div>

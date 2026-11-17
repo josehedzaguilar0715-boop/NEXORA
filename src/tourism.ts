@@ -92,6 +92,9 @@ tourism.put('/tourism/slots', ownerOnly, async (c) => {
   return c.json({ ok: true })
 })
 
+/** Horarios fijos por día de la semana (lo que el dueño configura). */
+tourism.get('/tourism/slot-templates', (c) => c.json({ slots: c.get('deps').db.prepare('SELECT weekday, start, end, capacity FROM slot_templates WHERE business_id = ? ORDER BY weekday, start').all(c.get('session').user.business_id) }))
+
 tourism.get('/tourism/slots', (c) => {
   const { db, now } = c.get('deps')
   const date = c.req.query('date') ?? localDate(now())

@@ -324,6 +324,18 @@ inventory.post('/products/:id/presentations', requirePerm('configure_catalog'), 
   return c.json({ id }, 201)
 })
 
+/** Quitar una presentación (paquete, caja…): deja de venderse y se conserva su historial. */
+inventory.delete('/products/:id/presentations/:presId', requirePerm('configure_catalog'), (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const p = getProduct(db, u.business_id, c.req.param('id'))
+  const r = db.prepare('UPDATE presentations SET active = 0 WHERE id = ? AND product_id = ?').run(c.req.param('presId'), p.id)
+  if (!r.changes) throw notFound('Esa presentación no existe.')
+  db.prepare('UPDATE products SET version = version + 1, updated_at = ? WHERE id = ?').run(iso(now()), p.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'presentacion.baja', entity: 'product', entityId: p.id, newValue: { presentationId: c.req.param('presId') } })
+  return c.json({ ok: true })
+})
+
 inventory.get('/products/:id/lots', requirePerm('view_inventory'), (c) => {
   const { db } = c.get('deps')
   const p = getProduct(db, c.get('session').user.business_id, c.req.param('id'))
@@ -386,7 +398,7 @@ inventory.post('/inventory/waste', requirePerm('edit_inventory'), async (c) => {
 inventory.post('/inventory/count', requirePerm('edit_inventory'), async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
-  const d = parse(z.object({ productId: z.string(), counted: z.number().min(0), reason: z.string().trim().min(3).max(200), branchId: z.string().optional() }), await body(c))
+  const d = parse(z.object({ productId: z.string(), counted: z.number().min(0), reason: z.string().trim().min(3).max(200), branchId: z.string().optional(), /** Costo por unidad de lo que se suma (inventario inicial). */ unitCost: z.number().min(0).optional() }), await body(c))
   const branchId = branchOf(c, d.branchId)
   const p = getProduct(db, u.business_id, d.productId)
   const ctx = { db, now, businessId: u.business_id, branchId, userId: u.id }
@@ -395,7 +407,8 @@ inventory.post('/inventory/count', requirePerm('edit_inventory'), async (c) => {
   const id = newId()
   db.transaction(() => {
     if (diff < 0) consume(ctx, p.id, -diff, 'ajuste', id, d.reason)
-    if (diff > 0) addLot(ctx, { productId: p.id, qtyMilli: diff, unitCost: p.last_cost, price: currentPrice(db, branchId, p), type: 'ajuste', refId: id })
+    if (diff > 0) addLot(ctx, { productId: p.id, qtyMilli: diff, unitCost: d.unitCost ?? p.last_cost, price: currentPrice(db, branchId, p), type: 'ajuste', refId: id })
+    if (diff > 0 && d.unitCost != null && !p.last_cost) db.prepare('UPDATE products SET last_cost = ? WHERE id = ?').run(d.unitCost, p.id)
   })()
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'inventario.conteo', entity: 'product', entityId: p.id, oldValue: { stock: fromMilli(before) }, newValue: { stock: d.counted }, reason: d.reason })
   return c.json({ before: fromMilli(before), after: d.counted, difference: fromMilli(diff) })

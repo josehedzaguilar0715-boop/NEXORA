@@ -38,14 +38,17 @@ export function Taquilla(_: { me: Me }) {
         <div className="results">{slots.map((s) => (
           <button key={s.start} disabled={s.closed || s.available === 0} className={start === s.start ? 'primary' : ''} onClick={() => setStart(s.start)}>{s.start}–{s.end}<small>{s.closed ? 'Cerrado' : `${s.available} lugares`}</small></button>
         ))}</div>
+        {slots.length === 0 && <p className="muted">No hay horarios para este día. Configúralos en <a href="#/configurar">Configurar negocio → Horarios y aforo</a>.</p>}
         <h3 style={{ marginTop: 12 }}>Boletos</h3>
         <table className="list"><tbody>{types.map((t) => (
           <tr key={t.id}><td>{t.name}<br /><small className="muted">{mxn(t.price)}</small></td>
             <td><div className="qty"><button onClick={() => setQty({ ...qty, [t.id]: Math.max(0, (qty[t.id] ?? 0) - 1) })}>−</button><b style={{ minWidth: 40, textAlign: 'center' }}>{qty[t.id] ?? 0}</b><button onClick={() => setQty({ ...qty, [t.id]: (qty[t.id] ?? 0) + 1 })}>+</button></div></td></tr>
         ))}</tbody></table>
+        {types.length === 0 && <p className="muted">No hay tipos de boleto. Agrégalos en <a href="#/configurar">Configurar negocio → Tipos de boleto</a>.</p>}
         <div className="total">{mxn(total)}</div>
         <div className="pay">
           <button className="primary big" disabled={!start || !total} onClick={() => sell('efectivo')}>Efectivo</button>
+          <button className="big" disabled={!start || !total} onClick={() => sell('transferencia')}>Transferencia</button>
           <button className="big" disabled={!start || !total} onClick={() => sell('tarjeta')}>Tarjeta</button>
         </div>
         {msg.err && <p className="error">{msg.err}</p>}

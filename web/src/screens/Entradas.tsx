@@ -49,6 +49,7 @@ export function Entradas(_: { me: Me }) {
             {s.name}{sel[s.id] ? ` × ${sel[s.id]}` : ''}<small>{timed(s) ? `${mxn(s.attrs.timeRate.blockPrice)} cada ${s.attrs.timeRate.blockMin} min` : mxn(s.price)}</small>
           </button>
         ))}</div>
+        {services.length === 0 && <p className="muted">Todavía no hay tarifas. Agrégalas en <a href="#/configurar">Configurar negocio → Tarifas</a> (sanitario, regadera, casillero…).</p>}
         <div className="total">{mxn(total)}</div>
         <div className="pay">
           <button className="primary big" disabled={!Object.keys(sel).length} onClick={() => charge('efectivo')}>Efectivo</button>

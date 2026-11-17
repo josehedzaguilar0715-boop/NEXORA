@@ -25,44 +25,56 @@ export function Reportes({ me }: { me: Me }) {
   useEffect(() => { void load() }, [from, to])
   const run = (fn: () => Promise<unknown>) => async () => { try { await fn(); await load(); setErr('') } catch (e) { setErr((e as Error).message) } }
 
+  // Resta sin mostrar "−$0.00".
+  const minus = (n: number) => mxn(n ? -n : 0)
   return (
-    <div className="grid2">
+    <div className="grid2 config">
       <section className="card">
-        <div className="row"><div><label>Desde<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label></div><div><label>Hasta<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label></div></div>
+        <div className="card-head"><h2>Ventas del periodo</h2></div>
+        <div className="row"><label>Desde<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label>Hasta<input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label></div>
         {err && <p className="error">{err}</p>}
         {r && (
-          <table className="list"><tbody>
-            <tr><td>Ventas ({r.sales.tickets} tickets)</td><td className="num"><b>{mxn(r.sales.total)}</b></td></tr>
-            {(['efectivo', 'transferencia', 'tarjeta', 'fiado'] as const).map((k) => <tr key={k} className="muted"><td style={{ paddingLeft: 22 }}>{k[0]!.toUpperCase() + k.slice(1)}</td><td className="num">{mxn(r.sales[k])}</td></tr>)}
-            <tr><td>Costo de lo vendido</td><td className="num">−{mxn(r.costOfSales)}</td></tr>
-            <tr><td>Mermas</td><td className="num">−{mxn(r.waste)}</td></tr>
-            <tr><td>Gastos</td><td className="num">−{mxn(r.expenses)}</td></tr>
-            {r.commissions > 0 && <tr><td>Comisiones del personal</td><td className="num">−{mxn(r.commissions)}</td></tr>}
-            <tr><td><b>Utilidad</b></td><td className="num"><b>{mxn(r.profit)}</b></td></tr>
-            <tr><td className="muted">Cancelaciones</td><td className="num muted">{r.cancelled}</td></tr>
+          <table className="list statement"><tbody>
+            <tr><td>Ventas ({r.sales.tickets} {r.sales.tickets === 1 ? 'ticket' : 'tickets'})</td><td className="num"><b>{mxn(r.sales.total)}</b></td></tr>
+            {(['efectivo', 'transferencia', 'tarjeta', 'fiado'] as const).filter((k) => k !== 'fiado' || r.sales.fiado).map((k) => <tr key={k} className="indent"><td>{k[0]!.toUpperCase() + k.slice(1)}</td><td className="num muted">{mxn(r.sales[k])}</td></tr>)}
+            <tr><td>Costo de lo vendido</td><td className="num">{minus(r.costOfSales)}</td></tr>
+            {r.waste > 0 && <tr><td>Mermas</td><td className="num">{minus(r.waste)}</td></tr>}
+            <tr><td>Gastos</td><td className="num">{minus(r.expenses)}</td></tr>
+            {r.commissions > 0 && <tr><td>Comisiones del personal</td><td className="num">{minus(r.commissions)}</td></tr>}
+            <tr className={`total ${r.profit < 0 ? 'neg' : ''}`}><td>Utilidad</td><td className="num">{mxn(r.profit)}</td></tr>
+            {r.cancelled > 0 && <tr className="muted"><td>Ventas canceladas</td><td className="num">{r.cancelled}</td></tr>}
           </tbody></table>
         )}
-        <h3 style={{ marginTop: 14 }}>Más vendidos</h3>
-        <table className="list"><tbody>{r?.topProducts.map((t: any, i: number) => <tr key={i}><td>{t.description}</td><td className="num">{t.qty}</td><td className="num">{mxn(t.total)}</td></tr>)}</tbody></table>
+        <h3 style={{ marginTop: 18 }}>Más vendidos</h3>
+        <table className="list"><tbody>
+          {r?.topProducts.map((t: any, i: number) => <tr key={i}><td>{t.description}</td><td className="num muted">{t.qty}</td><td className="num">{mxn(t.total)}</td></tr>)}
+          {r && r.topProducts.length === 0 && <tr><td className="empty">Sin ventas en este periodo.</td></tr>}
+        </tbody></table>
         <p className="muted small" style={{ marginTop: 14 }}>Los gastos se registran en <a href="#/finanzas">Finanzas → Gastos</a>.</p>
       </section>
       {owner && (
         <section className="card">
           <h2>Retiro sugerido del mes</h2>
+          <p className="muted small">Cuánto puedes sacar sin descapitalizar el negocio: utilidad − reserva para gastos fijos − lo que cuesta reponer el inventario.</p>
           {w && w.suggested != null && <Cascada profit={w.profit} reserve={w.reserve} restock={w.restock} suggested={w.suggested} />}
-          {w && (w.suggested == null ? <p>{w.message}</p> : (
-            <table className="list"><tbody>
-              <tr><td>Utilidad del periodo</td><td className="num">{mxn(w.profit)}</td></tr>
-              <tr><td>Reserva ({w.reserveDays} días de gastos fijos)</td><td className="num">−{mxn(w.reserve)}</td></tr>
-              <tr><td>Reponer inventario al mínimo</td><td className="num">−{mxn(w.restock)}</td></tr>
-              <tr><td><b>Puedes retirar</b></td><td className="num"><b style={{ fontSize: '1.4rem' }}>{mxn(w.suggested)}</b></td></tr>
+          {w && w.suggested != null && (
+            <table className="list statement"><tbody>
+              <tr><td>Utilidad del mes</td><td className="num">{mxn(w.profit)}</td></tr>
+              <tr><td>Reserva ({w.reserveDays} días de gastos fijos)</td><td className="num">{minus(w.reserve)}</td></tr>
+              <tr><td>Reponer inventario al mínimo</td><td className="num">{minus(w.restock)}</td></tr>
+              <tr className="total"><td>Puedes retirar</td><td className="num">{mxn(w.suggested)}</td></tr>
             </tbody></table>
-          ))}
-          <div className="row"><input aria-label="Días de reserva" inputMode="numeric" placeholder={String(fixed?.reserveDays ?? '')} value={f.days} onChange={(e) => setF({ ...f, days: e.target.value })} /><button onClick={run(() => api('PUT', '/reserve-days', { days: Number(f.days) }))}>Guardar</button></div>
-          <h3 style={{ marginTop: 14 }}>Gastos fijos al mes</h3>
-          <table className="list"><tbody>{fixed?.fixedExpenses.map((x: any) => <tr key={x.id}><td>{x.concept}</td><td className="num">{mxn(x.monthlyAmount)}</td></tr>)}</tbody></table>
-          <div className="row"><input placeholder="Renta, luz, agua…" value={f.concept} onChange={(e) => setF({ ...f, concept: e.target.value })} /><input inputMode="decimal" placeholder="$0.00" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></div>
-          <p><button disabled={!(toCents(f.amount) > 0 && f.concept.trim().length >= 2)} onClick={run(async () => { await api('POST', '/fixed-expenses', { concept: f.concept, monthlyAmount: toCents(f.amount) }); setF({ ...f, concept: '', amount: '' }) })}>Agregar gasto fijo</button></p>
+          )}
+          <h3 style={{ marginTop: 18 }}>Días de reserva</h3>
+          <p className="muted small">Cuántos días de gastos fijos quieres tener guardados siempre.{fixed?.reserveDays != null ? ` Hoy: ${fixed.reserveDays} días.` : ''}</p>
+          <div className="row"><input aria-label="Días de reserva" inputMode="numeric" placeholder={fixed?.reserveDays != null ? String(fixed.reserveDays) : 'Ej. 30'} value={f.days} onChange={(e) => setF({ ...f, days: e.target.value })} /><button style={{ flex: '0 0 auto' }} disabled={f.days.trim() === ''} onClick={run(async () => { await api('PUT', '/reserve-days', { days: Number(f.days) }); setF({ ...f, days: '' }) })}>Guardar días</button></div>
+          <h3 style={{ marginTop: 18 }}>Gastos fijos al mes</h3>
+          <table className="list"><tbody>
+            {fixed?.fixedExpenses.map((x: any) => <tr key={x.id}><td>{x.concept}</td><td className="num">{mxn(x.monthlyAmount)}</td></tr>)}
+            {fixed && fixed.fixedExpenses.length === 0 && <tr><td className="muted">Renta, luz, agua, internet, sueldos fijos…</td></tr>}
+          </tbody></table>
+          <label>Concepto<input placeholder="Ej. Renta del local" value={f.concept} onChange={(e) => setF({ ...f, concept: e.target.value })} /></label>
+          <div className="row"><label>Cuánto al mes<input inputMode="decimal" placeholder="$0.00" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label><button style={{ flex: '0 0 auto', alignSelf: 'end' }} disabled={!(toCents(f.amount) > 0 && f.concept.trim().length >= 2)} onClick={run(async () => { await api('POST', '/fixed-expenses', { concept: f.concept, monthlyAmount: toCents(f.amount) }); setF({ ...f, concept: '', amount: '' }) })}>Agregar</button></div>
         </section>
       )}
     </div>
@@ -89,7 +101,7 @@ function Cascada({ profit, reserve, restock, suggested }: { profit: number; rese
         return (
           <g key={s.label}>
             <rect x={pad + i * bw + bw * 0.15} y={top} width={bw * 0.7} height={h} rx={8} fill={s.color} opacity={0.9} />
-            <text x={pad + i * bw + bw / 2} y={top - 6} textAnchor="middle" fill="#F1F5F9" fontSize="14" fontWeight="700">{i === 1 || i === 2 ? '−' : ''}{mxn(Math.abs(s.to - s.from))}</text>
+            <text x={pad + i * bw + bw / 2} y={top - 6} textAnchor="middle" fill="#F1F5F9" fontSize="14" fontWeight="700">{(i === 1 || i === 2) && s.to !== s.from ? '−' : ''}{mxn(Math.abs(s.to - s.from))}</text>
             <text x={pad + i * bw + bw / 2} y={H + 26} textAnchor="middle" fill="#7C8799" fontSize="14">{s.label}</text>
           </g>
         )

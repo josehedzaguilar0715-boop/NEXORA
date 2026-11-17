@@ -116,7 +116,8 @@ export const authenticate: MiddlewareHandler<Env> = async (c, next) => {
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(s.user_id) as UserRow
   if (!user.active) throw unauthorized('Tu usuario está desactivado.')
   db.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').run(iso(now()), s.id)
-  if (user.must_change_password && !PASSWORD_CHANGE_OK.includes(new URL(c.req.url).pathname)) {
+  // Con o sin el prefijo /api (el servidor local lo conserva; en la nube se quita antes).
+  if (user.must_change_password && !PASSWORD_CHANGE_OK.includes(new URL(c.req.url).pathname.replace(/^\/api(?=\/)/, ''))) {
     throw forbidden('Debes cambiar tu contraseña antes de continuar.')
   }
   c.set('session', { id: s.id, user })

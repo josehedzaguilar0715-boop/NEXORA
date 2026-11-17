@@ -67,7 +67,8 @@ users.post('/users', requirePerm('create_employees'), async (c) => {
   const branchId = d.branchId ?? actor.branch_id
   if (d.branchId && !db.prepare('SELECT 1 FROM branches WHERE id = ? AND business_id = ? AND active = 1').get(d.branchId, actor.business_id)) throw bad('Esa sucursal no existe.')
   const username = normalizeUsername(d.username)
-  if (db.prepare('SELECT 1 FROM users WHERE business_id = ? AND username = ?').get(actor.business_id, username)) throw conflict('Ese usuario ya existe.', 'usuario_repetido')
+  // Los empleados entran solo con usuario y contraseña: el usuario no se puede repetir en todo NEXORA.
+  if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) throw conflict(`El usuario "${username}" ya lo usa otra persona. Prueba con otro, por ejemplo "${username}.${(db.prepare('SELECT name FROM businesses WHERE id = ?').get(actor.business_id) as { name: string }).name.split(/\s+/).pop()!.toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '').slice(0, 10) || '2'}".`, 'usuario_repetido')
   const biz = db.prepare('SELECT force_password_change FROM businesses WHERE id = ?').get(actor.business_id) as { force_password_change: number }
   const id = newId()
   db.prepare(
@@ -161,24 +162,16 @@ users.patch('/business', ownerOnly, async (c) => {
       phone: z.string().trim().max(30).optional(),
       logoUrl: z.string().url().max(500).nullable().optional(),
       forcePasswordChange: z.boolean().optional(),
-      giro: z.enum(GIROS).optional(),
-      extraGiros: z.array(z.enum(GIROS)).max(GIROS.length).optional(),
     }),
     await body(c),
   )
   const old = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange, giro, extra_giros AS extraGiros FROM businesses WHERE id = ?').get(actor.business_id) as Record<string, unknown>
-  const giro = d.giro ?? (old.giro as string)
-  // Si el nuevo principal era uno de los adicionales, el principal anterior pasa a adicional (se intercambian).
-  const oldExtra = JSON.parse(old.extraGiros as string) as string[]
-  const extraList = d.extraGiros ?? (oldExtra.includes(giro) ? oldExtra.map((g) => (g === giro ? (old.giro as string) : g)) : oldExtra)
-  const extra = JSON.stringify([...new Set(extraList)].filter((g) => g !== giro))
-  db.prepare('UPDATE businesses SET name = ?, phone = ?, logo_url = ?, force_password_change = ?, giro = ?, extra_giros = ? WHERE id = ?').run(
+  // El giro y los giros adicionales se eligen al crear el negocio; después solo los cambia soporte.
+  db.prepare('UPDATE businesses SET name = ?, phone = ?, logo_url = ?, force_password_change = ? WHERE id = ?').run(
     d.name ?? old.name,
     d.phone ?? old.phone,
     d.logoUrl === undefined ? old.logoUrl : d.logoUrl,
     d.forcePasswordChange === undefined ? old.forcePasswordChange : d.forcePasswordChange ? 1 : 0,
-    giro,
-    extra,
     actor.business_id,
   )
   const fresh = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange, giro, extra_giros AS extraGiros FROM businesses WHERE id = ?').get(actor.business_id)

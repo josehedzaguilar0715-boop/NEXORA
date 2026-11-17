@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { audit } from './audit.js'
 import { businessGiros, enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, refreshStatus, setting, type BusinessRow, type Plan } from './billing.js'
 import { body, LOCK_MINUTES, MAX_FAILED, parse, smsOn, type Deps, type UserRow } from './context.js'
-import { consumeChallenge, createChallenge, forgetDevices } from './auth.js'
+import { consumeChallenge, createChallenge, extraOf, forgetDevices } from './auth.js'
 import { ticketView } from './support.js'
 import { exportAll, runBackup } from './backup.js'
 import {
@@ -97,7 +97,7 @@ const adminAuth = createMiddleware<AdminEnv>(async (c, next) => {
   c.set('admin', a)
   await next()
 })
-admin.use('/admin/*', async (c, next) => (['/admin/login', '/admin/verify'].includes(c.req.path) ? next() : adminAuth(c, next)))
+admin.use('/admin/*', async (c, next) => (['/admin/login', '/admin/verify'].includes(c.req.path.replace(/^\/api(?=\/)/, '')) ? next() : adminAuth(c, next)))
 
 function businessView(db: Deps['db'], b: BusinessRow, now: Date = new Date()) {
   const cfg = { plan: b.plan, extraBranches: b.extra_branches, extraUserPacks: b.extra_user_packs }
@@ -178,10 +178,17 @@ admin.patch('/admin/businesses/:id', async (c) => {
       extraBranches: z.number().int().min(0).max(100).optional(),
       extraUserPacks: z.number().int().min(0).max(100).optional(),
       applyNow: z.boolean().optional(),
+      giro: z.enum(GIROS).optional(),
+      extraGiros: z.array(z.enum(GIROS)).max(GIROS.length).optional(),
     }),
     await body(c),
   )
   const old = businessView(db, b)
+  if (d.giro !== undefined || d.extraGiros !== undefined) {
+    const giro = d.giro ?? (b as BusinessRow & { giro: string }).giro
+    const extra = d.extraGiros ?? (JSON.parse((b as BusinessRow & { extra_giros: string }).extra_giros) as string[])
+    db.prepare('UPDATE businesses SET giro = ?, extra_giros = ? WHERE id = ?').run(giro, extraOf(giro, extra), b.id)
+  }
   if (d.trialDays !== undefined) {
     if (b.status !== 'prueba' && !(b.status === 'vencido' && !b.paid_until)) throw bad('Solo se cambian los días de prueba de un negocio en prueba.')
     const endsAt = iso(new Date(Date.parse(b.created_at) + d.trialDays * 86_400_000))

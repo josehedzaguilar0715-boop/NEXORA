@@ -149,7 +149,7 @@ try {
   check(true, 'reportes del día')
 
   // Ferretería: cotizar, vender la cotización y devolver con ticket.
-  await call('PATCH', '/business', { giro: 'ferreteria' }, token)
+  apiDb.prepare("UPDATE businesses SET giro = 'ferreteria'").run() // el giro lo cambia soporte
   await page.goto(`${base}/#/caja`)
   await page.reload()
   await page.getByLabel('Fondo inicial').fill('0')
@@ -181,7 +181,7 @@ try {
   check(true, 'ferretería: devolución con ticket y código')
 
   // Papelería: copias por hoja desde la caja.
-  await call('PATCH', '/business', { giro: 'papeleria' }, token)
+  apiDb.prepare("UPDATE businesses SET giro = 'papeleria'").run() // el giro lo cambia soporte
   await call('POST', '/services', { name: 'Copia carta B/N', price: 100 }, token)
   await page.goto(`${base}/#/caja`)
   await page.reload()
@@ -195,7 +195,8 @@ try {
   await page.screenshot({ path: `${shots}/8-papeleria.png` })
 
   // Barbería: el cliente reserva por link, el negocio confirma y cobra desde la agenda.
-  await call('PATCH', '/business', { giro: 'barberia', forcePasswordChange: false }, token)
+  apiDb.prepare("UPDATE businesses SET giro = 'barberia'").run() // el giro lo cambia soporte
+  await call('PATCH', '/business', { forcePasswordChange: false }, token)
   apiDb.prepare(`UPDATE businesses SET addons = '["reservas"]'`).run() // lo habilita el super panel con la instalación
   await call('PUT', '/modules', { active: ['reservas'] }, token)
   const barbero = (await call('POST', '/users', { name: 'Juan Barbero', username: 'juanb', password: 'inicial123', template: 'barbero' }, token)).user
@@ -229,7 +230,7 @@ try {
   check(true, 'barbería: confirma y cobra desde la agenda; el cliente ve "Atendida"')
 
   // Restaurante: mesa → cocina → lista → cobro con propina → limpieza → libre.
-  await call('PATCH', '/business', { giro: 'restaurante' }, token)
+  apiDb.prepare("UPDATE businesses SET giro = 'restaurante'").run() // el giro lo cambia soporte
   await call('POST', '/tables', { name: '7', area: 'terraza', seats: 4 }, token)
   await call('POST', '/products', { name: 'Tacos de arrachera', unit: 'pieza', price: 16000, trackStock: false, attrs: { station: 'cocina_caliente' } }, token)
   page.removeAllListeners('dialog')

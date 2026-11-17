@@ -122,7 +122,7 @@ function Resumen({ from, to, onErr, go }: { from: string; to: string; onErr: (e:
               <tr><td>Efectivo en cajas abiertas</td><td className="num">{mxn(bal.cashInRegisters)}</td></tr>
               <tr><td>Mercancía (a costo)</td><td className="num">{mxn(bal.inventory)}</td></tr>
               <tr><td>Te deben (fiado)</td><td className="num">{mxn(bal.receivables)}</td></tr>
-              <tr><td>Debes a proveedores</td><td className="num neg">−{mxn(bal.payables)}</td></tr>
+              <tr><td>Debes a proveedores</td><td className={`num ${bal.payables ? "neg" : ""}`}>{mxn(bal.payables ? -bal.payables : 0)}</td></tr>
               <tr className="total"><td>Valor del negocio</td><td className="num">{mxn(bal.equity)}</td></tr>
             </tbody></table>
           )}

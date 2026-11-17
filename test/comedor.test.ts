@@ -4,7 +4,7 @@ import { negocioListo } from './helpers.js'
 async function comedor() {
   const n = await negocioListo()
   const { s, o, T } = n
-  await s.call('PATCH', '/business', { token: T, body: { giro: 'comedor' } })
+  s.setGiro('comedor')
   const enc = await s.createStaff(T, o.business.code, 'encargada', 'encargado')
   await s.call('PUT', `/users/${enc.id}/auth-code`, { token: T, body: { code: '7777' } })
   const pollo = await n.product({ name: 'Pollo (kg)', unit: 'kg', price: 0, sellable: false })

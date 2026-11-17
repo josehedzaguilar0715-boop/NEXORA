@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ApiError, mxn, toCents } from '../api'
 import { Logo } from '../Brand'
+import { GIROS, giroLabel } from '../giros'
 
 // El super panel tiene su propio acceso, separado del de los negocios.
 const TOKEN = 'nx_admin_token'
@@ -72,7 +73,7 @@ function Negocios() {
         <div className="tabs">{['', 'prueba', 'activo', 'vencido', 'suspendido'].map((s) => <button key={s} className={filter === s ? 'on' : ''} onClick={() => setFilter(s)}>{s ? STATUS[s] : 'Todos'}</button>)}</div>
         <table className="list"><tbody>{list.map((b) => (
           <tr key={b.id} onClick={() => setSel(b)} style={{ cursor: 'pointer' }}>
-            <td><b>{b.name}</b> <small className="muted">{b.code} · {(b.giros ?? [b.giro]).join(' + ')}</small><br /><small className="muted">{b.owner?.name} · {b.owner?.phone}{b.unreadTickets ? ` · ✉ ${b.unreadTickets}` : ''}</small></td>
+            <td><b>{b.name}</b> <small className="muted">{b.code} · {(b.giros ?? [b.giro]).map(giroLabel).join(' + ')}</small><br /><small className="muted">{b.owner?.name} · {b.owner?.phone}{b.unreadTickets ? ` · ✉ ${b.unreadTickets}` : ''}</small></td>
             <td style={{ color: COLOR[b.status], fontWeight: 700 }}>{STATUS[b.status]}{b.overdueDays != null ? ` (${b.overdueDays} d)` : ''}</td>
             <td className="num">{mxn(b.monthlyFee)}</td>
           </tr>
@@ -91,6 +92,8 @@ function Negocios() {
             {['prueba', 'vencido'].includes(sel.status) && !sel.paidUntil && <button className="big" onClick={() => { const d = Number(prompt('Días de prueba (desde el alta):', String(sel.trialDays ?? 14))); if (d >= 0) void run(() => adm('PATCH', `/admin/businesses/${sel.id}`, { trialDays: d }), 'Días de prueba cambiados.')() }}>Días de prueba</button>}
             {sel.status === 'vencido' && <button className="danger big" onClick={() => { const r = prompt('Motivo de la suspensión:'); if (r) void run(() => adm('POST', `/admin/businesses/${sel.id}/suspend`, { reason: r }), 'Suspendido. Sus datos quedan intactos.')() }}>Suspender</button>}
           </div>
+          <h3 style={{ marginTop: 14 }}>Tipo de negocio</h3>
+          <Giros b={sel} onSave={(body) => run(() => adm('PATCH', `/admin/businesses/${sel.id}`, body), 'Tipo de negocio guardado. El cliente lo verá al volver a entrar.')()} />
           <h3 style={{ marginTop: 14 }}>Extras</h3>
           {sel.addons.includes('reservas')
             ? <p className="muted">Link de reservas habilitado.</p>
@@ -151,20 +154,35 @@ function Plan({ b, onSave }: { b: any; onSave: (body: any) => void }) {
   )
 }
 
-const GIRO_KEYS = ['abarrotes', 'ferreteria', 'papeleria', 'barberia', 'unas', 'perfumeria', 'banos', 'turistico', 'palapa', 'restaurante', 'comedor', 'taqueria', 'verduleria']
+const GIRO_KEYS = Object.keys(GIROS)
+
+/** Cambiar el giro principal y los adicionales de un negocio (solo soporte). */
+function Giros({ b, onSave }: { b: any; onSave: (body: { giro: string; extraGiros: string[] }) => void }) {
+  const [giro, setGiro] = useState<string>(b.giro)
+  const [extra, setExtra] = useState<string[]>((b.giros ?? [b.giro]).slice(1))
+  useEffect(() => { setGiro(b.giro); setExtra((b.giros ?? [b.giro]).slice(1)) }, [b.id])
+  return (
+    <div>
+      <label>Giro principal<select value={giro} onChange={(e) => { setGiro(e.target.value); setExtra(extra.filter((g) => g !== e.target.value)) }}>{GIRO_KEYS.map((g) => <option key={g} value={g}>{giroLabel(g)}</option>)}</select></label>
+      <p className="muted small" style={{ margin: '6px 0' }}>Giros adicionales (negocio mixto)</p>
+      <div className="checks">{GIRO_KEYS.filter((g) => g !== giro).map((g) => <label key={g} className="check"><input type="checkbox" checked={extra.includes(g)} onChange={() => setExtra(extra.includes(g) ? extra.filter((x) => x !== g) : [...extra, g])} />{giroLabel(g)}</label>)}</div>
+      <button onClick={() => onSave({ giro, extraGiros: extra })}>Guardar tipo de negocio</button>
+    </div>
+  )
+}
 
 function Alta({ onDone }: { onDone: () => void }) {
   const [f, setF] = useState({ businessName: '', ownerName: '', phone: '', tempPassword: '', trialDays: '', giro: 'abarrotes', extraGiros: [] as string[] })
   const [err, setErr] = useState('')
   const [done, setDone] = useState<any>(null)
-  if (done) return <div className="card login"><h2>Negocio creado</h2><p>Entrégale al dueño: teléfono <b>{f.phone}</b>, contraseña temporal <b>{f.tempPassword}</b>. Código del negocio para sus empleados: <b>{done.code}</b>.</p><button className="primary" onClick={onDone}>Listo</button></div>
+  if (done) return <div className="card login"><h2>Negocio creado</h2><p>Entrégale al dueño: teléfono <b>{f.phone}</b>, contraseña temporal <b>{f.tempPassword}</b>. Sus empleados entrarán con el usuario y la contraseña que el dueño les cree.</p><button className="primary" onClick={onDone}>Listo</button></div>
   return (
     <div className="card login">
       <h2>Alta asistida</h2>
       <label>Nombre del negocio<input value={f.businessName} onChange={(e) => setF({ ...f, businessName: e.target.value })} /></label>
-      <label>Giro principal<select value={f.giro} onChange={(e) => setF({ ...f, giro: e.target.value, extraGiros: f.extraGiros.filter((g) => g !== e.target.value) })}>{GIRO_KEYS.map((g) => <option key={g} value={g}>{g}</option>)}</select></label>
+      <label>Giro principal<select value={f.giro} onChange={(e) => setF({ ...f, giro: e.target.value, extraGiros: f.extraGiros.filter((g) => g !== e.target.value) })}>{GIRO_KEYS.map((g) => <option key={g} value={g}>{giroLabel(g)}</option>)}</select></label>
       <p style={{ marginBottom: 4 }}><b>Negocio mixto</b> <span className="muted">— otros giros que también maneja (opcional)</span></p>
-      <div className="checks">{GIRO_KEYS.filter((g) => g !== f.giro).map((g) => <label key={g} style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={f.extraGiros.includes(g)} onChange={() => setF({ ...f, extraGiros: f.extraGiros.includes(g) ? f.extraGiros.filter((x) => x !== g) : [...f.extraGiros, g] })} />{g}</label>)}</div>
+      <div className="checks">{GIRO_KEYS.filter((g) => g !== f.giro).map((g) => <label key={g} style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={f.extraGiros.includes(g)} onChange={() => setF({ ...f, extraGiros: f.extraGiros.includes(g) ? f.extraGiros.filter((x) => x !== g) : [...f.extraGiros, g] })} />{giroLabel(g)}</label>)}</div>
       <label>Nombre del dueño<input value={f.ownerName} onChange={(e) => setF({ ...f, ownerName: e.target.value })} /></label>
       <label>Teléfono del dueño<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
       <label>Contraseña temporal<input value={f.tempPassword} onChange={(e) => setF({ ...f, tempPassword: e.target.value })} /></label>

@@ -166,6 +166,16 @@ baths.post('/cleaning/tasks', ownerOnly, async (c) => {
   return c.json({ id }, 201)
 })
 
+baths.patch('/cleaning/tasks/:id', ownerOnly, async (c) => {
+  const { db } = c.get('deps')
+  const u = c.get('session').user
+  const t = db.prepare('SELECT * FROM cleaning_tasks WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; name: string; active: number } | undefined
+  if (!t) throw bad('Esa tarea no existe.')
+  const d = parse(z.object({ name: z.string().trim().min(2).max(100).optional(), active: z.boolean().optional() }), await body(c))
+  db.prepare('UPDATE cleaning_tasks SET name = ?, active = ? WHERE id = ?').run(d.name ?? t.name, d.active === undefined ? t.active : d.active ? 1 : 0, t.id)
+  return c.json({ ok: true })
+})
+
 /** Quién hizo cada tarea y a qué hora. */
 baths.post('/cleaning/log', async (c) => {
   const { db, now } = c.get('deps')
