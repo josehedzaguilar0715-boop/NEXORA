@@ -26,9 +26,10 @@ import { Productos } from './screens/Productos'
 import { Reportes } from './screens/Reportes'
 import { Usuarios } from './screens/Usuarios'
 import { Finanzas } from './screens/Finanzas'
+import { Importar } from './screens/Importar'
 import {
   Armchair, Boxes, CalendarDays, ChartColumn, ChefHat, ClipboardCheck, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
-  LifeBuoy, LogOut, Menu, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, Tag, Ticket, Truck, Undo2, UserCog, Users, UtensilsCrossed,
+  LifeBuoy, LogOut, Menu, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
 } from 'lucide-react'
 
 export interface Me {
@@ -74,6 +75,7 @@ const SCREENS: Screen[] = [
   { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria'], group: 'Finanzas', icon: Percent },
   { key: 'usuarios', label: 'Personal', perm: 'create_employees', C: Usuarios, group: 'Administración', icon: UserCog },
   { key: 'buzon', label: 'Soporte', perm: 'owner', C: Buzon, group: 'Administración', icon: LifeBuoy },
+  { key: 'importar', label: 'Importar datos', perm: 'owner', C: Importar, group: 'Administración', icon: Upload },
   { key: 'ajustes', label: 'Ajustes', perm: 'owner', C: Ajustes, group: 'Administración', icon: Settings },
 ]
 

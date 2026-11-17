@@ -228,3 +228,15 @@ main, .page, .card, .grid2 > *, .sell > *, .kpis > * { min-width: 0; }
   .kpi .value { font-size: 1.2rem; }
   .kpi .label, .kpi .hint { font-size: 0.75rem; }
 }
+
+/* ---------- Importar datos ---------- */
+.drop { position: relative; display: grid; place-items: center; text-align: center; min-height: 130px; border: 2px dashed #34405a; border-radius: var(--radius); background: var(--input); cursor: pointer; font-weight: 600; padding: 16px; }
+.drop:hover { border-color: var(--cyan); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.drop:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.25); }
+.mapgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 0 14px; }
+.mapgrid label { margin: 8px 0 4px; font-size: 0.85rem; }
+.mapgrid select { min-height: 48px; }
+tr.row-err td { color: var(--danger); }
+.seg.wrap { flex-wrap: wrap; overflow: visible; }
+table.preview td, table.preview th { font-size: 0.8rem; padding: 7px 5px; }

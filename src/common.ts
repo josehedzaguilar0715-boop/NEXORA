@@ -25,7 +25,7 @@ export const requireModule = (m: Module) =>
   })
 
 /** Código de cliente: 20 caracteres aleatorios (no consecutivo, no adivinable). */
-const customerCode = () => 'NX' + randomBytes(12).toString('base64url').replace(/[-_]/g, '').toUpperCase().slice(0, 18).padEnd(18, '7')
+export const customerCode = () => 'NX' + randomBytes(12).toString('base64url').replace(/[-_]/g, '').toUpperCase().slice(0, 18).padEnd(18, '7')
 
 export const common = new Hono<Env>()
 
