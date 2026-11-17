@@ -983,6 +983,72 @@ const MIGRATIONS: Migration[] = [
   );
   CREATE TRIGGER cleaning_log_no_delete BEFORE DELETE ON cleaning_log BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
   `,
+  `
+  -- Lugar turístico: horarios con aforo, cierres, visitas guiadas y boletos (uno por persona, con QR).
+  CREATE TABLE slot_templates (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+    start TEXT NOT NULL,
+    end TEXT NOT NULL,
+    capacity INTEGER NOT NULL CHECK (capacity > 0)
+  );
+  CREATE TABLE slot_closures (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    date TEXT NOT NULL,
+    start TEXT,
+    reason TEXT NOT NULL,
+    authorized_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE tours (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    date TEXT NOT NULL,
+    start TEXT NOT NULL,
+    capacity INTEGER NOT NULL CHECK (capacity > 0),
+    guide_id TEXT REFERENCES users(id),
+    service_id TEXT NOT NULL REFERENCES services(id),
+    status TEXT NOT NULL DEFAULT 'abierta' CHECK (status IN ('abierta','cancelada')),
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE entry_tickets (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    code TEXT NOT NULL UNIQUE,
+    service_id TEXT NOT NULL REFERENCES services(id),
+    type_name TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    start TEXT NOT NULL,
+    tour_id TEXT REFERENCES tours(id),
+    channel TEXT NOT NULL CHECK (channel IN ('taquilla','en_linea')),
+    status TEXT NOT NULL CHECK (status IN ('por_pagar','pagado','usado','cancelado')),
+    sale_id TEXT REFERENCES sales(id),
+    order_token TEXT,
+    buyer_name TEXT,
+    phone TEXT,
+    used_at TEXT,
+    cancel_reason TEXT,
+    cancelled_by TEXT,
+    refunded INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX entry_tickets_slot ON entry_tickets(business_id, date, start);
+  CREATE INDEX entry_tickets_order ON entry_tickets(order_token);
+  CREATE TRIGGER entry_tickets_no_delete BEFORE DELETE ON entry_tickets BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  CREATE TABLE occupancy_events (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('entrada','salida')),
+    ticket_id TEXT,
+    count INTEGER NOT NULL DEFAULT 1,
+    at TEXT NOT NULL,
+    created_by TEXT NOT NULL
+  );
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {

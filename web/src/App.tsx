@@ -8,6 +8,7 @@ import { Devoluciones } from './screens/Devoluciones'
 import { Encargos } from './screens/Encargos'
 import { Agenda } from './screens/Agenda'
 import { Entradas } from './screens/Entradas'
+import { Acceso, MisBoletos, Taquilla, TiendaBoletos } from './screens/Taquilla'
 import { Comisiones } from './screens/Comisiones'
 import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
@@ -26,6 +27,8 @@ type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => 
 const SCREENS: Screen[] = [
   { key: 'agenda', label: 'Agenda', perm: 'sell', C: Agenda, giros: ['barberia', 'unas'] },
   { key: 'entradas', label: 'Entradas', perm: 'sell', C: Entradas, giros: ['banos'] },
+  { key: 'taquilla', label: 'Taquilla', perm: 'sell', C: Taquilla, giros: ['turistico'] },
+  { key: 'acceso', label: 'Acceso', perm: 'sell', C: Acceso, giros: ['turistico'] },
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
   { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria'] },
   { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria', 'papeleria'] },
@@ -73,6 +76,8 @@ export function App() {
   const path = location.pathname
   if (path.startsWith('/reservar/')) return <Reservar code={path.split('/')[2] ?? ''} />
   if (path.startsWith('/cita/')) return <EstadoCita token={path.split('/')[2] ?? ''} />
+  if (path.startsWith('/boletos/')) return <TiendaBoletos code={path.split('/')[2] ?? ''} />
+  if (path.startsWith('/mis-boletos/')) return <MisBoletos token={path.split('/')[2] ?? ''} />
   return <Privada />
 }
 

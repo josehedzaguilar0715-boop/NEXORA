@@ -14,6 +14,7 @@ import { commissions } from './commissions.js'
 import { settings } from './settings.js'
 import { perfume } from './perfume.js'
 import { baths } from './baths.js'
+import { publicTourism, tourism } from './tourism.js'
 import { cash } from './cash.js'
 import type { Deps, Env } from './context.js'
 import { sales } from './sales.js'
@@ -31,6 +32,7 @@ export function createApp(deps: Deps) {
   app.route('/', publicAuth)
   app.route('/', publicCommon)
   app.route('/', publicAgenda)
+  app.route('/', publicTourism)
   app.route('/', admin as unknown as Hono<Env>)
   // Todo lo demás exige sesión (authed ya aplica `authenticate`).
   const protectedApp = new Hono<Env>()
@@ -52,6 +54,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', settings)
   protectedApp.route('/', perfume)
   protectedApp.route('/', baths)
+  protectedApp.route('/', tourism)
   protectedApp.route('/', inventory)
   protectedApp.route('/', finance)
   app.route('/', protectedApp)

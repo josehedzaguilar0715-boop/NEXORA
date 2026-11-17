@@ -16,7 +16,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 9 (estudio de uñas)**: agenda por técnica con tiempo de secado que bloquea; consumibles por técnica; comisiones por técnica (categoría) y propinas aparte; paquetes de sesiones (N usos en su vigencia); notas libres que solo escribe el dueño; a domicilio (todos o algunos servicios, dirección privada, traslado que bloquea la agenda, cargo opcional apagado y fuera de comisión); recordatorio de retoque opcional y apagado, que solo prepara el mensaje. ✅ con pruebas.
 - **Bloque 10 (perfumería)**: variantes por marca, fragancia, ml y presentación (cada una con código de barras y costo); decants que abren frascos, descuentan ml y crean los chicos con costo proporcional (más envase); testers y muestras como inventario de uso; devoluciones solo de sellados, con ticket y código; sets con un precio y empaque como consumible; comisiones por asesora, marca o categoría. ✅ con pruebas.
 - **Bloque 11 (baños públicos)**: tarifas editables combinadas en una entrada con ticket y hora; pases por día, semana o mes con QR que también registra asistencia; conteo de accesos por hora, día y servicio; insumos de uso descontados por acceso según la referencia del dueño; control de limpieza por turno; gastos fijos para la reserva; cobro por tiempo activable por servicio. ✅ con pruebas.
-- Siguiente: Bloque 12 (lugar turístico).
+- **Bloque 12 (lugar turístico)**: boletos por tipo con precio editable, por fecha y horario con aforo (nunca se vende de más); aforo en tiempo real; venta anticipada por link con QR por boleto (queda por pagar y cuenta para el aforo); acceso con QR que rechaza repetidos, vencidos, cancelados y sin pagar; taquilla con corte por tipo de boleto; visitas guiadas con cupo y guía; tienda y estacionamiento aparte; cierre temporal con código que prepara avisos y cancela los afectados; reembolsos solo con código del dueño; grupos vía promociones; reportes por día, horario, tipo y canal. ✅ con pruebas.
+- Siguiente: Bloque 13 (palapa).
 
 ## Desarrollo local
 
@@ -133,3 +134,11 @@ Importes siempre en centavos enteros (MXN).
 - Pases: plan de membresía `kind: 'pase'` con periodo día/semana/mes. `POST /baths/pass-entry` valida el QR, cuenta el acceso y registra asistencia (una por día). No vuelve a entrar dentro de `passReentryMin` minutos (30 por defecto, en `/settings`).
 - Insumos por acceso: `PUT /baths/access-supplies` (ej. 0.025 rollo por acceso = uno cada 40), descontados con acumulación exacta.
 - Limpieza: tareas del dueño, y cada quien marca la que hizo con hora y turno. No se muestra fuera del negocio.
+
+## Lugar turístico (Bloque 12)
+
+- Tipos de boleto = servicios con `category: 'boleto'`. Horarios con aforo por día de la semana (`PUT /tourism/slots`).
+- Cada persona tiene su boleto con código propio (`entry_tickets`). `POST /tourism/scan` lo marca usado y suma al aforo; `POST /tourism/exit` resta salidas.
+- Venta anticipada: `/boletos/<código del negocio>` (módulo `reservas`). Los boletos quedan "por pagar" (sin pasarela de pago en línea: se cobran en taquilla con el folio). No entran sin pagar.
+- Cierres (`POST /tourism/closures`) y cancelaciones (`POST /tickets/cancel`) exigen el código del dueño; reembolsar es decisión explícita, nunca automática.
+- Pendiente: cobro en línea (requiere elegir una pasarela de pago).
