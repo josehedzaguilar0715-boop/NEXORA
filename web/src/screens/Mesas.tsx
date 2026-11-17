@@ -150,7 +150,7 @@ export function Cocina(_: { me: Me }) {
       <div className="results" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>{list.map((k) => (
         <div key={k.id} className="card" style={{ borderColor: k.minutes >= 20 ? 'var(--danger)' : k.minutes >= 10 ? 'var(--accent)' : 'var(--line)', borderWidth: 3 }}>
           <h2>{k.where}</h2>
-          <p className="muted">{k.station} · hace {k.minutes} min</p>
+          <p className="muted">{k.station.replace(/_/g, ' ')} · hace {k.minutes} min</p>
           <ul style={{ fontSize: '1.2rem' }}>{k.items.map((i: any, n: number) => <li key={n}><b>{i.quantity}</b> {i.description}{i.notes ? ` — ${i.notes}` : ''}</li>)}</ul>
           <button className="primary big" style={{ width: '100%' }} onClick={async () => { await api('POST', `/comandas/${k.id}/ready`); void load() }}>Lista</button>
         </div>
