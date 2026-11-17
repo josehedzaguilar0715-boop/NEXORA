@@ -13,5 +13,13 @@ class_name = "Nexora"
 tag = "v1"
 new_sqlite_classes = ["Nexora"]
 
+# Respaldo diario: 09:17 UTC = 3:17 a. m. en el centro de México.
+[triggers]
+crons = ["17 9 * * *"]
+
+[[kv_namespaces]]
+binding = "BACKUPS"
+id = "8c083b72601f4fb6978bb83ac9864feb"
+
 [observability]
 enabled = true

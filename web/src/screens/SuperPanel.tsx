@@ -193,9 +193,8 @@ function AjustesAdmin() {
       {msg && <p className="muted">{msg}</p>}
       <h2 style={{ marginTop: 16 }}>Cambiar mi contraseña</h2>
       <CambiarClave />
-      <h2 style={{ marginTop: 16 }}>Respaldo</h2>
-      <p className="muted">Descarga toda la base y guárdala fuera del servidor (por ejemplo, una vez por semana).</p>
-      <p><button onClick={async () => { const d = await adm('GET', '/admin/export'); const url = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `nexora-${d.exportedAt.slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url) }}>Descargar respaldo</button></p>
+      <h2 style={{ marginTop: 16 }}>Respaldos</h2>
+      <Respaldos />
       <p className="muted">Precios de planes: {mxn(50000)} / {mxn(70000)} / {mxn(90000)}; sucursal extra {mxn(30000)}; paquete de 5 usuarios {mxn(toCents('200'))}.</p>
     </div>
   )
@@ -215,6 +214,33 @@ function CambiarClave() {
         if (f.b !== f.c) return setMsg({ err: 'Las contraseñas nuevas no coinciden.' })
         try { await adm('POST', '/admin/password', { currentPassword: f.a, newPassword: f.b }); setF({ a: '', b: '', c: '' }); setMsg({ ok: 'Contraseña cambiada.' }) } catch (e) { setMsg({ err: (e as Error).message }) }
       }}>Cambiar contraseña</button></p>
+    </>
+  )
+}
+
+/** Respaldos automáticos (cada noche, 30 días) y descarga completa al momento. */
+function Respaldos() {
+  const [list, setList] = useState<{ name: string; size: number }[]>([])
+  const [enabled, setEnabled] = useState(true)
+  const [msg, setMsg] = useState('')
+  const load = () => adm('GET', '/admin/backups').then((r) => { setList(r.backups); setEnabled(r.enabled) }).catch((e) => setMsg(e.message))
+  useEffect(() => { void load() }, [])
+  const download = async (name: string) => {
+    const res = await fetch(`/api/admin/backups/${name}`, { headers: { authorization: `Bearer ${localStorage.getItem(TOKEN)}` } })
+    if (!res.ok) return setMsg('No se pudo descargar.')
+    const url = URL.createObjectURL(await res.blob())
+    const a = document.createElement('a'); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url)
+  }
+  return (
+    <>
+      <p className="muted">Se hace uno solo cada noche (3:17 a. m.) y se guardan 30 días. Si hay correo configurado, también te llega a tu correo.</p>
+      {enabled && <p><button className="primary" onClick={async () => { try { const r = await adm('POST', '/admin/backups'); setMsg(`Respaldo listo: ${r.name}${r.emailed ? ' (enviado a tu correo)' : ''}`); void load() } catch (e) { setMsg((e as Error).message) } }}>Respaldar ahora</button></p>}
+      {msg && <p className="muted">{msg}</p>}
+      <table className="list"><tbody>{list.map((b) => (
+        <tr key={b.name}><td>{b.name.slice(7, 17)} {b.name.slice(18, 23).replace('-', ':')} UTC<br /><small className="muted">{(b.size / 1024).toFixed(0)} KB</small></td><td><button onClick={() => download(b.name)}>Descargar</button></td></tr>
+      ))}</tbody></table>
+      {enabled && list.length === 0 && <p className="muted">Todavía no hay respaldos.</p>}
+      <p><button onClick={async () => { const d = await adm('GET', '/admin/export'); const url = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `nexora-${d.exportedAt.slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url) }}>Descargar todo ahora (sin comprimir)</button></p>
     </>
   )
 }

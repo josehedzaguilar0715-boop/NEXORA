@@ -9,12 +9,14 @@ export interface Notifier {
   /** Devuelve false si no hay proveedor y el código solo quedó en el registro del servidor. */
   sendCode(phone: string, code: string): void | boolean | Promise<void | boolean>
   /** Correo (opcional): se usa para la verificación del super panel. */
-  sendEmail?(to: string, subject: string, text: string): void | boolean | Promise<void | boolean>
+  sendEmail?(to: string, subject: string, text: string, attachments?: { filename: string; content: string }[]): void | boolean | Promise<void | boolean>
 }
 
 export interface Deps {
   db: Db
   notifier: Notifier
+  /** Donde se guardan los respaldos automáticos (opcional). */
+  backups?: import('./backup.js').BackupStore
   now: Clock
 }
 

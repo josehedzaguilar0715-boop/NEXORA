@@ -6,6 +6,7 @@ import { enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, refreshStatus, set
 import { body, LOCK_MINUTES, MAX_FAILED, parse, type Deps, type UserRow } from './context.js'
 import { consumeChallenge, createChallenge, forgetDevices } from './auth.js'
 import { ticketView } from './support.js'
+import { exportAll, runBackup } from './backup.js'
 import {
   bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone, notFound, numericCode, sha256, unauthorized, verifySecret,
 } from './util.js'
@@ -308,10 +309,33 @@ admin.delete('/admin/businesses/:id/addons/:addon', (c) => {
 /** Respaldo completo (todas las tablas) para descargar y guardar fuera del servidor. */
 admin.get('/admin/export', (c) => {
   const { db, now } = c.get('deps')
-  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").all() as { name: string }[]).map((t) => t.name)
-  const data = Object.fromEntries(tables.map((t) => [t, db.prepare(`SELECT * FROM "${t}"`).all()]))
+  const data = exportAll(db, now())
   audit(db, now, { businessId: null, userId: c.get('admin').id, action: 'admin.respaldo' })
-  return c.json({ exportedAt: iso(now()), version: (db.prepare('SELECT MAX(version) v FROM _migrations').get() as { v: number }).v, tables: data }, 200, { 'content-disposition': `attachment; filename="nexora-${iso(now()).slice(0, 10)}.json"` })
+  return c.json(data, 200, { 'content-disposition': `attachment; filename="nexora-${data.exportedAt.slice(0, 10)}.json"` })
+})
+
+/** Respaldos automáticos guardados (30 días). */
+admin.get('/admin/backups', async (c) => {
+  const store = c.get('deps').backups
+  if (!store) return c.json({ backups: [], enabled: false })
+  const list = (await store.list()).sort((x, y) => (x.name < y.name ? 1 : -1))
+  return c.json({ backups: list, enabled: true })
+})
+
+admin.post('/admin/backups', async (c) => {
+  const deps = c.get('deps')
+  if (!deps.backups) throw bad('Los respaldos automáticos no están configurados en este servidor.')
+  return c.json(await runBackup(deps, deps.backups, `manual (${c.get('admin').username})`), 201)
+})
+
+admin.get('/admin/backups/:name', async (c) => {
+  const store = c.get('deps').backups
+  const name = c.req.param('name')
+  if (!store || !/^nexora-[\d-T]+\.json\.gz$/.test(name)) throw notFound()
+  const bytes = await store.get(name)
+  if (!bytes) throw notFound('Ese respaldo ya no existe.')
+  audit(c.get('deps').db, c.get('deps').now, { businessId: null, userId: c.get('admin').id, action: 'admin.descarga_respaldo', newValue: { name } })
+  return new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/gzip', 'content-disposition': `attachment; filename="${name}"` } })
 })
 
 /** Cambiar la contraseña propia del super panel (cierra las demás sesiones). */

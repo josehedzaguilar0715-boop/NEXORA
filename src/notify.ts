@@ -27,15 +27,15 @@ export function createNotifier(env: Record<string, string | undefined> = process
       if (!res.ok) throw new Error(`No se pudo enviar el SMS (${res.status}).`)
       return true
     },
-    async sendEmail(to, subject, text) {
+    async sendEmail(to, subject, text, attachments) {
       if (!mail) {
-        console.log(`[correo sin proveedor] ${to}: ${subject} — ${text}`)
+        console.log(`[correo sin proveedor] ${to}: ${subject} — ${text}${attachments?.length ? ` (+${attachments.length} adjunto)` : ''}`)
         return false
       }
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text }),
+        body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text, ...(attachments?.length ? { attachments } : {}) }),
       })
       if (!res.ok) throw new Error(`No se pudo enviar el correo (${res.status}).`)
       return true

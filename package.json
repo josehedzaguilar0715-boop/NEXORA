@@ -16,7 +16,8 @@
     "backup": "tsx scripts/backup.ts",
     "smoke": "tsx scripts/smoke.ts",
     "build:worker": "npm run build && tsx scripts/embed-assets.ts && tsc --noEmit -p tsconfig.worker.json",
-    "deploy": "npm run build:worker && wrangler deploy"
+    "deploy": "npm run build:worker && wrangler deploy",
+    "restore": "tsx scripts/restore.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.8",
