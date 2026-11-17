@@ -43,7 +43,7 @@ export class Outbox {
   }
 
   /**
-   * Envía en orden. Sin señal, error del servidor, sesión vencida o bloqueo: se detiene y todo queda pendiente.
+   * Envía en orden. Sin señal, error del servidor, sesión vencida, cuenta vencida o bloqueo: se detiene y todo queda pendiente.
    * Rechazo definitivo (datos no válidos, caja cerrada…): se marca "rechazado" para revisión y se sigue.
    */
   async flush(send: Transport): Promise<{ sent: number; rejected: number; stopped: boolean }> {
@@ -60,7 +60,7 @@ export class Outbox {
       if (res.status >= 200 && res.status < 300) {
         this.db.prepare("UPDATE outbox SET status = 'enviado', error = NULL WHERE id = ?").run(r.id)
         sent++
-      } else if (res.status >= 500 || res.status === 401 || res.status === 423) {
+      } else if (res.status >= 500 || res.status === 401 || res.status === 402 || res.status === 423) {
         return { sent, rejected, stopped: true }
       } else {
         const msg = (res.json as { error?: { message?: string } } | undefined)?.error?.message ?? `Error ${res.status}`

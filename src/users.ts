@@ -1,11 +1,19 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
+import { limits, type BusinessRow } from './billing.js'
 import { body, hasPerm, type C, ownerOnly, parse, requirePerm, type Env, type UserRow } from './context.js'
 import { PERMISSIONS, PERMISSION_KEYS, TEMPLATES, type Permission } from './permissions.js'
 import { bad, checkPassword, conflict, forbidden, hashSecret, iso, newId, normalizeUsername, notFound, verifySecret } from './util.js'
 
 export const users = new Hono<Env>()
+
+function ensureUserSlot(db: import('./db.js').Db, businessId: string) {
+  const b = db.prepare('SELECT * FROM businesses WHERE id = ?').get(businessId) as BusinessRow
+  const max = limits({ plan: b.plan, extraBranches: b.extra_branches, extraUserPacks: b.extra_user_packs }).users
+  const n = (db.prepare('SELECT COUNT(*) n FROM users WHERE business_id = ? AND active = 1').get(businessId) as { n: number }).n
+  if (n >= max) throw conflict(`Tu plan incluye ${max} usuarios activos. Desactiva uno o pide un paquete de usuarios extra desde el buzón.`, 'limite_usuarios')
+}
 
 const perms = z.array(z.enum(PERMISSION_KEYS))
 
@@ -50,13 +58,14 @@ users.post('/users', requirePerm('create_employees'), async (c) => {
     await body(c),
   )
   checkPassword(d.password)
+  ensureUserSlot(db, actor.business_id)
   const tpl = d.template ? TEMPLATES[d.template] : undefined
   if (d.template && !tpl) throw bad('Esa plantilla no existe.')
   const granted = [...new Set<Permission>(d.permissions ?? tpl?.permissions ?? [])]
   // Quien no es dueño solo puede dar permisos que él mismo tiene.
   for (const p of granted) if (!hasPerm(actor, p)) throw forbidden('No puedes dar un permiso que tú no tienes.')
   const branchId = d.branchId ?? actor.branch_id
-  if (d.branchId && !db.prepare('SELECT 1 FROM branches WHERE id = ? AND business_id = ?').get(d.branchId, actor.business_id)) throw bad('Esa sucursal no existe.')
+  if (d.branchId && !db.prepare('SELECT 1 FROM branches WHERE id = ? AND business_id = ? AND active = 1').get(d.branchId, actor.business_id)) throw bad('Esa sucursal no existe.')
   const username = normalizeUsername(d.username)
   if (db.prepare('SELECT 1 FROM users WHERE business_id = ? AND username = ?').get(actor.business_id, username)) throw conflict('Ese usuario ya existe.', 'usuario_repetido')
   const biz = db.prepare('SELECT force_password_change FROM businesses WHERE id = ?').get(actor.business_id) as { force_password_change: number }
@@ -86,6 +95,7 @@ users.patch('/users/:id', requirePerm('create_employees'), async (c) => {
     await body(c),
   )
   const old = publicUser(target)
+  if (d.active === true && !target.active) ensureUserSlot(db, actor.business_id)
   const granted = d.permissions ? [...new Set<Permission>(d.permissions)] : undefined
   if (granted) for (const p of granted) if (!hasPerm(actor, p)) throw forbidden('No puedes dar un permiso que tú no tienes.')
   if (d.branchId && !db.prepare('SELECT 1 FROM branches WHERE id = ? AND business_id = ?').get(d.branchId, actor.business_id)) throw bad('Esa sucursal no existe.')

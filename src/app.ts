@@ -1,6 +1,9 @@
 import { Hono } from 'hono'
 import { authed, publicAuth } from './auth.js'
+import { admin } from './admin.js'
+import { businessGate } from './billing.js'
 import { authenticate } from './context.js'
+import { branches, support } from './support.js'
 import { cash } from './cash.js'
 import type { Deps, Env } from './context.js'
 import { sales } from './sales.js'
@@ -16,15 +19,19 @@ export function createApp(deps: Deps) {
   })
   app.get('/health', (c) => c.json({ ok: true }))
   app.route('/', publicAuth)
+  app.route('/', admin as unknown as Hono<Env>)
   // Todo lo demás exige sesión (authed ya aplica `authenticate`).
   const protectedApp = new Hono<Env>()
   protectedApp.use('*', authenticate)
+  protectedApp.use('*', businessGate)
   protectedApp.use('*', idempotency)
   protectedApp.route('/', authed)
   protectedApp.route('/', sync)
   protectedApp.route('/', users)
   protectedApp.route('/', cash)
   protectedApp.route('/', sales)
+  protectedApp.route('/', support)
+  protectedApp.route('/', branches)
   app.route('/', protectedApp)
 
   app.onError((err, c) => {

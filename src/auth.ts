@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
+import { setting } from './billing.js'
 import { body, parse, LOCK_MINUTES, MAX_FAILED, type Deps, type Env, type UserRow } from './context.js'
 import {
   bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone,
@@ -106,7 +107,10 @@ publicAuth.post('/auth/register', async (c) => {
     const branchId = newId()
     const userId = newId()
     db.transaction(() => {
-      db.prepare('INSERT INTO businesses (id, code, name, phone, created_at) VALUES (?,?,?,?,?)').run(bizId, businessCode(), d.businessName, phone, t)
+      const trialDays = setting(db, 'default_trial_days')
+      db.prepare('INSERT INTO businesses (id, code, name, phone, trial_days, trial_ends_at, created_at) VALUES (?,?,?,?,?,?,?)').run(
+        bizId, businessCode(), d.businessName, phone, trialDays, iso(new Date(now().getTime() + trialDays * 86_400_000)), t,
+      )
       db.prepare('INSERT INTO branches (id, business_id, name, created_at) VALUES (?,?,?,?)').run(branchId, bizId, 'Principal', t)
       db.prepare(
         "INSERT INTO users (id, business_id, branch_id, role, name, phone, password_hash, created_at) VALUES (?,?,?,'owner',?,?,?,?)",
@@ -172,7 +176,7 @@ export const authed = new Hono<Env>()
 authed.get('/auth/me', (c) => {
   const { user } = c.get('session')
   const { db } = c.get('deps')
-  const biz = db.prepare('SELECT id, code, name, phone, logo_url, status FROM businesses WHERE id = ?').get(user.business_id)
+  const biz = db.prepare('SELECT id, code, name, phone, logo_url, status, trial_ends_at AS trialEndsAt, paid_until AS paidUntil FROM businesses WHERE id = ?').get(user.business_id)
   const permissions = user.role === 'owner' ? 'todos' : JSON.parse(user.permissions)
   return c.json({
     user: { id: user.id, name: user.name, username: user.username, role: user.role, branchId: user.branch_id, mustChangePassword: !!user.must_change_password },

@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { createApp } from '../src/app.js'
 import { openDb } from '../src/db.js'
+import { createAdmin } from '../src/admin.js'
 
 export function setup() {
   const db = openDb(':memory:')
   const codes: Record<string, string> = {}
   const clock = { t: new Date('2026-11-17T15:00:00Z') }
-  const app = createApp({ db, now: () => new Date(clock.t), notifier: { sendCode: (p, c) => void (codes[p] = c) } })
+  const deps = { db, now: () => new Date(clock.t), notifier: { sendCode: (p: string, c: string) => void (codes[p] = c) } }
+  const app = createApp(deps)
   const call = async (method: string, path: string, opts: { token?: string; body?: unknown } = {}) => {
     const res = await app.request(path, {
       method,
@@ -27,5 +29,11 @@ export function setup() {
     const l = await call('POST', '/auth/login', { body: { businessCode, username, password: 'inicial123' } })
     return { id: r.json.user?.id as string, token: l.json.token as string }
   }
-  return { app, db, call, codes, advance, registerOwner, createStaff, uuid: randomUUID }
+  let adminCreated = false
+  async function adminToken() {
+    if (!adminCreated) createAdmin(deps, { name: 'Soporte', username: 'soporte', password: 'superpanel1' })
+    adminCreated = true
+    return (await call('POST', '/admin/login', { body: { username: 'soporte', password: 'superpanel1' } })).json.token as string
+  }
+  return { adminToken, app, db, call, codes, advance, registerOwner, createStaff, uuid: randomUUID }
 }

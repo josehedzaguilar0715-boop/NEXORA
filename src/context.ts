@@ -59,7 +59,7 @@ export function parse<T>(schema: ZodType<T>, data: unknown): T {
   return r.data
 }
 
-export async function body(c: C): Promise<unknown> {
+export async function body(c: { req: { json: () => Promise<unknown> } }): Promise<unknown> {
   try {
     return await c.req.json()
   } catch {

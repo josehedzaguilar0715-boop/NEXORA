@@ -72,6 +72,7 @@ cash.post('/shifts/open', requirePerm('open_close_cash'), async (c) => {
     }
   }
   if (!u.branch_id) throw bad('Tu usuario no tiene sucursal asignada.')
+  if (!db.prepare('SELECT 1 FROM branches WHERE id = ? AND active = 1').get(u.branch_id)) throw conflict('Tu sucursal está desactivada.', 'sucursal_inactiva')
   const open = db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'abierto'").get(u.id)
   if (open) throw conflict('Ya tienes un turno abierto. Ciérralo antes de abrir otro.', 'turno_abierto')
   const t = clampTime(d.at, now())

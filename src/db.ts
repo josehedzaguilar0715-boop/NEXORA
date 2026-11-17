@@ -208,6 +208,79 @@ const MIGRATIONS: string[] = [
   CREATE TRIGGER sync_changes_no_delete BEFORE DELETE ON sync_changes BEGIN SELECT RAISE(ABORT, 'Los cambios no se pueden borrar'); END;
   CREATE TRIGGER sync_conflicts_no_delete BEFORE DELETE ON sync_conflicts BEGIN SELECT RAISE(ABORT, 'Los conflictos no se pueden borrar'); END;
   `,
+  `
+  CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  INSERT INTO settings (key, value) VALUES ('default_trial_days', '14'), ('suspend_after_days', '30');
+  ALTER TABLE businesses ADD COLUMN trial_ends_at TEXT;
+  ALTER TABLE businesses ADD COLUMN paid_until TEXT;
+  ALTER TABLE businesses ADD COLUMN overdue_since TEXT;
+  ALTER TABLE businesses ADD COLUMN suspended_reason TEXT;
+  ALTER TABLE businesses ADD COLUMN plan TEXT NOT NULL DEFAULT 'inicial';
+  ALTER TABLE businesses ADD COLUMN extra_branches INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE businesses ADD COLUMN extra_user_packs INTEGER NOT NULL DEFAULT 0;
+  -- Cambio de plan que se aplica al siguiente periodo de cobro.
+  ALTER TABLE businesses ADD COLUMN pending_plan TEXT;
+  ALTER TABLE branches ADD COLUMN active INTEGER NOT NULL DEFAULT 1;
+  UPDATE businesses SET trial_days = 14 WHERE trial_days IS NULL;
+  UPDATE businesses SET trial_ends_at = strftime('%Y-%m-%dT%H:%M:%fZ', created_at, '+' || trial_days || ' days') WHERE trial_ends_at IS NULL;
+
+  CREATE TABLE admins (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE admin_sessions (
+    id TEXT PRIMARY KEY,
+    admin_id TEXT NOT NULL REFERENCES admins(id),
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT
+  );
+  CREATE TABLE payments (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    months INTEGER NOT NULL CHECK (months > 0),
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    note TEXT,
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    recorded_by TEXT NOT NULL REFERENCES admins(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE TRIGGER payments_no_delete BEFORE DELETE ON payments BEGIN SELECT RAISE(ABORT, 'Los pagos no se pueden borrar'); END;
+
+  -- Buzón: soporte y solicitudes de cambio. Privado por negocio.
+  CREATE TABLE tickets (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    type TEXT NOT NULL CHECK (type IN ('soporte','cambio')),
+    subject TEXT NOT NULL,
+    module TEXT,
+    status TEXT NOT NULL,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    unread_by_client INTEGER NOT NULL DEFAULT 0,
+    unread_by_support INTEGER NOT NULL DEFAULT 1
+  );
+  CREATE INDEX tickets_business ON tickets(business_id, updated_at);
+  CREATE TABLE ticket_messages (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL REFERENCES tickets(id),
+    author_type TEXT NOT NULL CHECK (author_type IN ('cliente','soporte')),
+    author_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TRIGGER tickets_no_delete BEFORE DELETE ON tickets BEGIN SELECT RAISE(ABORT, 'El buzón no se puede borrar'); END;
+  CREATE TRIGGER ticket_messages_no_delete BEFORE DELETE ON ticket_messages BEGIN SELECT RAISE(ABORT, 'El buzón no se puede borrar'); END;
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {
