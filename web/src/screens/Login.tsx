@@ -120,6 +120,7 @@ export function Login({ onLogin, forceChange }: { onLogin: (m: Me) => void; forc
           </form>
         )}
       </div>
+      <p className="muted" style={{ textAlign: 'center', marginTop: 16 }}><a href="/privacidad">Aviso de privacidad</a></p>
     </div>
   )
 }

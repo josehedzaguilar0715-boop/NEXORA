@@ -17,7 +17,8 @@
     "smoke": "tsx scripts/smoke.ts",
     "build:worker": "npm run build && tsx scripts/embed-assets.ts && tsc --noEmit -p tsconfig.worker.json",
     "deploy": "npm run build:worker && wrangler deploy",
-    "restore": "tsx scripts/restore.ts"
+    "restore": "tsx scripts/restore.ts",
+    "deploy:prod": "npm run build:worker && wrangler deploy --env production"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.8",

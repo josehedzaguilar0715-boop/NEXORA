@@ -205,3 +205,10 @@ Importes siempre en centavos enteros (MXN).
 - Intro con el logo al abrir (fundido y escala, unos 2.5 s, botón Omitir, una vez por sesión; sin animación si el equipo pide movimiento reducido).
 - Menú lateral (en celular se despliega con ☰). Inicio con indicadores, gráfica de la semana y movimientos recientes; finanzas con la cascada del retiro sugerido; clientes con su QR para descargar; personal con asistencia del día.
 - El logo es provisional (hexágono con N) y la fuente de marca está pendiente. El archivo de Figma no se pudo leer (límite del plan gratuito de Figma), así que el diseño sale de los tokens y la descripción de la spec.
+
+## Antes de clientes reales
+
+- **Equipos de confianza**: el dueño verifica con SMS una vez por equipo; ese equipo no vuelve a pedir código en 30 días (`trusted_devices`). Se olvidan al cambiar o recuperar la contraseña, y el dueño puede quitarlos en Ajustes.
+- **Respaldos automáticos**: cada noche (3:17 a. m.) toda la base comprimida, 30 días en Cloudflare KV y copia al correo del super panel si hay Resend. Lista, descarga y "Respaldar ahora" en el super panel. Restaurar: `npm run restore -- respaldo.json.gz nueva.db`.
+- **Producción separada** (`wrangler.toml` → `[env.production]`, Worker `nexora`, base y respaldos propios): `npm run deploy:prod`. Staging (`npm run deploy`) queda para pruebas.
+- **Aviso de privacidad**: borrador en `docs/aviso-de-privacidad.md`, visible en `/privacidad` y enlazado desde el acceso. Completar los datos entre corchetes y hacerlo revisar por un abogado.

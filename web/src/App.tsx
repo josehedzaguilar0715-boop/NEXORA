@@ -17,6 +17,7 @@ import { Ajustes, Buzon } from './screens/Ajustes'
 import { Escanear, Lealtad } from './screens/Lealtad'
 import { SuperPanel } from './screens/SuperPanel'
 import { Inicio } from './screens/Inicio'
+import { Privacidad } from './screens/Privacidad'
 import { Intro, Logo } from './Brand'
 import { Comisiones } from './screens/Comisiones'
 import { EstadoCita, Reservar } from './screens/Reservar'
@@ -98,6 +99,7 @@ function PendingBadge({ main = false }: { main?: boolean }) {
 export function App() {
   // Páginas públicas (sin iniciar sesión): reservar y ver el estado de la cita.
   const path = location.pathname
+  if (path.startsWith('/privacidad')) return <Privacidad />
   if (path.startsWith('/admin')) return <SuperPanel />
   if (path.startsWith('/reservar/')) return <Reservar code={path.split('/')[2] ?? ''} />
   if (path.startsWith('/cita/')) return <EstadoCita token={path.split('/')[2] ?? ''} />
