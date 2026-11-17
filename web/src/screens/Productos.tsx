@@ -3,7 +3,7 @@ import { api, mxn, toCents } from '../api'
 import { can, type Me } from '../App'
 import type { Product } from './Caja'
 
-type P = Product & { minStock: number; lastCost: number; suggestedPrice: number | null; categoryId: string | null; version: number }
+type P = Product & { attrs?: Record<string, any>; sellable?: boolean; minStock: number; lastCost: number; suggestedPrice: number | null; categoryId: string | null; version: number }
 
 export function Productos({ me }: { me: Me }) {
   const [list, setList] = useState<P[]>([])
@@ -64,14 +64,16 @@ export function Productos({ me }: { me: Me }) {
 }
 
 function Editor({ me, p, onClose, onSaved }: { me: Me; p: P | null; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ name: p?.name ?? '', barcode: p?.barcode ?? '', unit: p?.unit ?? 'pieza', price: p ? String(p.price / 100) : '', minStock: String(p?.minStock ?? 0), authCode: '', waste: '', wasteReason: '' })
+  const [f, setF] = useState({ name: p?.name ?? '', barcode: p?.barcode ?? '', unit: p?.unit ?? 'pieza', price: p ? String(p.price / 100) : '', minStock: String(p?.minStock ?? 0), authCode: '', waste: '', wasteReason: '', brand: p?.attrs?.brand ?? '', fragrance: p?.attrs?.fragrance ?? '', sizeMl: p?.attrs?.sizeMl ? String(p.attrs.sizeMl) : '', presentation: p?.attrs?.presentation ?? 'regular' })
   const [err, setErr] = useState('')
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  const perfume = me.business.giro === 'perfumeria'
+  const attrs = perfume ? { brand: f.brand || undefined, fragrance: f.fragrance || undefined, sizeMl: Number(f.sizeMl) || undefined, presentation: f.presentation } : undefined
   const priceChanged = p && toCents(f.price) !== p.price
   const save = async () => {
     try {
-      if (!p) await api('POST', '/products', { name: f.name, barcode: f.barcode || null, unit: f.unit, price: toCents(f.price), minStock: Number(f.minStock) || 0 })
-      else await api('PATCH', `/products/${p.id}`, { name: f.name, barcode: f.barcode || null, price: toCents(f.price), minStock: Number(f.minStock) || 0, ...(priceChanged ? { authCode: f.authCode } : {}), baseVersion: p.version, updatedAt: new Date().toISOString() })
+      if (!p) await api('POST', '/products', { name: f.name, barcode: f.barcode || null, unit: f.unit, price: toCents(f.price), minStock: Number(f.minStock) || 0, ...(attrs ? { attrs, sellable: !['tester', 'muestra', 'envase'].includes(f.presentation) } : {}) })
+      else await api('PATCH', `/products/${p.id}`, { name: f.name, barcode: f.barcode || null, price: toCents(f.price), minStock: Number(f.minStock) || 0, ...(attrs ? { attrs } : {}), ...(priceChanged ? { authCode: f.authCode } : {}), baseVersion: p.version, updatedAt: new Date().toISOString() })
       onSaved()
     } catch (e) {
       setErr((e as Error).message)
@@ -91,6 +93,11 @@ function Editor({ me, p, onClose, onSaved }: { me: Me; p: P | null; onClose: () 
         <h2>{p ? p.name : 'Nuevo producto'}</h2>
         <label>Nombre<input value={f.name} onChange={set('name')} autoFocus /></label>
         <label>Código de barras<input value={f.barcode} onChange={set('barcode')} placeholder="Escanéalo aquí" /></label>
+        {perfume && (<>
+          <div className="row"><label>Marca<input value={f.brand} onChange={set('brand')} /></label><label>Fragancia<input value={f.fragrance} onChange={set('fragrance')} /></label></div>
+          <div className="row"><label>Mililitros<input inputMode="numeric" value={f.sizeMl} onChange={set('sizeMl')} /></label>
+            <label>Presentación<select value={f.presentation} onChange={set('presentation')}><option value="regular">Regular</option><option value="decant">Decant</option><option value="set">Set</option><option value="tester">Tester (uso interno)</option><option value="muestra">Muestra (uso interno)</option><option value="envase">Envase (uso interno)</option></select></label></div>
+        </>)}
         {!p && (<><label>Se vende por<select value={f.unit} onChange={set('unit')}><option value="pieza">Pieza</option><option value="kg">Kilo (granel)</option><option value="litro">Litro</option><option value="metro">Metro</option></select></label></>)}
         <div className="row">
           <div><label>Precio de venta<input inputMode="decimal" value={f.price} onChange={set('price')} /></label></div>
@@ -101,6 +108,7 @@ function Editor({ me, p, onClose, onSaved }: { me: Me; p: P | null; onClose: () 
         {err && <p className="error">{err}</p>}
         <p className="row"><button onClick={onClose}>Cancelar</button><button className="primary" onClick={save}>Guardar</button></p>
         {p && ['ferreteria', 'papeleria'].includes(me.business.giro) && <Escalas p={p} />}
+        {p && perfume && p.attrs?.sizeMl >= 30 && <Decants p={p} onDone={onSaved} />}
         {p && can(me, 'edit_inventory') && (
           <div style={{ borderTop: '2px solid var(--line)', marginTop: 12 }}>
             <h3 style={{ marginTop: 12 }}>Registrar merma</h3>
@@ -139,6 +147,40 @@ function Escalas({ p }: { p: P }) {
         </div>
       ))}
       <p className="row"><button onClick={() => setTiers([...tiers, { minQuantity: '', price: '' }])}>+ Escala</button><button className="primary" onClick={save}>Guardar escalas</button></p>
+      {msg && <p className="muted">{msg}</p>}
+    </div>
+  )
+}
+
+/** Perfumería: fraccionar este frasco en decants. */
+function Decants({ p, onDone }: { p: P; onDone: () => void }) {
+  const [targets, setTargets] = useState<P[]>([])
+  const [f, setF] = useState({ targetId: '', quantity: '1' })
+  const [msg, setMsg] = useState('')
+  useEffect(() => {
+    api<{ products: P[] }>('GET', `/products?q=${encodeURIComponent(p.attrs?.fragrance ?? '')}`).then((r) => {
+      const t = r.products.filter((x) => x.id !== p.id && x.attrs?.presentation === 'decant')
+      setTargets(t)
+      setF((v) => ({ ...v, targetId: t[0]?.id ?? '' }))
+    }).catch(() => {})
+  }, [p.id])
+  const run = async () => {
+    try {
+      const r = await api<any>('POST', '/decants', { sourceProductId: p.id, targetProductId: f.targetId, quantity: Number(f.quantity) })
+      setMsg(`Listo: ${r.quantity} decants (${r.ml} ml), costo ${mxn(r.unitCost)} c/u.`)
+      onDone()
+    } catch (e) { setMsg((e as Error).message) }
+  }
+  return (
+    <div style={{ borderTop: '2px solid var(--line)', marginTop: 12 }}>
+      <h3 style={{ marginTop: 12 }}>Hacer decants</h3>
+      {targets.length === 0 ? <p className="muted">Da de alta el decant (misma fragancia, presentación "Decant" y sus ml).</p> : (
+        <div className="row">
+          <label>Decant<select value={f.targetId} onChange={(e) => setF({ ...f, targetId: e.target.value })}>{targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+          <label style={{ flex: '0 0 140px' }}>Cuántos<input inputMode="numeric" value={f.quantity} onChange={(e) => setF({ ...f, quantity: e.target.value })} /></label>
+        </div>
+      )}
+      <p><button disabled={!f.targetId || !(Number(f.quantity) > 0)} onClick={run}>Fraccionar</button></p>
       {msg && <p className="muted">{msg}</p>}
     </div>
   )

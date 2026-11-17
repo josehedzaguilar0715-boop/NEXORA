@@ -14,7 +14,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 7 (papelería)**: servicios por hoja con precio por tamaño y color, consumibles de uso (tinta, tóner, papel) con costo vía recetas, contador de copiadoras por turno contra hojas cobradas, combos de temporada con un solo precio, encargos con anticipo (la devolución la decide el dueño con código) y mayoreo con escalas y crédito. ✅ con pruebas y prueba en navegador.
 - **Bloque 8 (barbería)**: agenda por barbero con horarios, días de descanso y bloqueos; citas en mostrador y clientes sin cita en la misma agenda; combos con precio repartido; comisiones por barbero y servicio/producto/categoría sin valores predeterminados (sobre precio final, cada venta guarda su %); propinas aparte; productos en la misma cuenta; reserva pública por link con "el primero disponible", solo horas libres, pendiente hasta confirmar y estado visible. Sin recordatorios automáticos (botón para preparar WhatsApp). ✅ con pruebas y prueba en navegador.
 - **Bloque 9 (estudio de uñas)**: agenda por técnica con tiempo de secado que bloquea; consumibles por técnica; comisiones por técnica (categoría) y propinas aparte; paquetes de sesiones (N usos en su vigencia); notas libres que solo escribe el dueño; a domicilio (todos o algunos servicios, dirección privada, traslado que bloquea la agenda, cargo opcional apagado y fuera de comisión); recordatorio de retoque opcional y apagado, que solo prepara el mensaje. ✅ con pruebas.
-- Siguiente: Bloque 10 (perfumería).
+- **Bloque 10 (perfumería)**: variantes por marca, fragancia, ml y presentación (cada una con código de barras y costo); decants que abren frascos, descuentan ml y crean los chicos con costo proporcional (más envase); testers y muestras como inventario de uso; devoluciones solo de sellados, con ticket y código; sets con un precio y empaque como consumible; comisiones por asesora, marca o categoría. ✅ con pruebas.
+- Siguiente: Bloque 11 (baños públicos).
 
 ## Desarrollo local
 
@@ -116,3 +117,11 @@ Importes siempre en centavos enteros (MXN).
 - Paquetes de sesiones: plan con `kind: 'paquete'`, `usesPerPeriod` sesiones en total y `validityDays`.
 - A domicilio: la clienta puede tener `homeAll` (todas sus citas a domicilio) o elegir en cada cita. La dirección se guarda en el cliente y nunca sale en el link público. El traslado (`travelMin`) bloquea antes y después de la cita. Cargo por traslado en `PUT /settings { travelFee }` (apagado por defecto), sin comisión.
 - Retoque: `attrs.retouchDays` en el servicio y módulo `recordatorios` (apagado). `GET /reminders/retouch` lista a quién le toca y prepara el WhatsApp; no envía nada.
+
+## Perfumería (Bloque 10)
+
+- Variantes = productos con `attrs` (`brand`, `fragrance`, `sizeMl`, `presentation`). La búsqueda también busca en marca y fragancia.
+- Decants (`POST /decants`): usa primero frascos ya abiertos (`GET /open-bottles`) y abre los que falten; el costo por ml sale del costo del frasco. Envase opcional como consumible.
+- Testers y muestras: productos de uso interno (`sellable: false`); su gasto se registra con `POST /testers/use`. No se venden ni se devuelven.
+- Devoluciones: en perfumería exigen ticket y que el renglón venga marcado `sealed: true`.
+- Comisiones: nueva regla `brand` (por marca), además de producto, categoría y persona.

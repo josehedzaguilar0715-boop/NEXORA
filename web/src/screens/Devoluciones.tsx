@@ -3,7 +3,9 @@ import { api, mxn } from '../api'
 import type { Me } from '../App'
 
 /** Devoluciones con ticket original (por folio) o sin ticket. Siempre piden código. */
-export function Devoluciones(_: { me: Me }) {
+export function Devoluciones({ me }: { me: Me }) {
+  const perfume = me.business.giro === 'perfumeria'
+  const [sealed, setSealed] = useState<Record<string, boolean>>({})
   const [folio, setFolio] = useState('')
   const [sale, setSale] = useState<any>(null)
   const [qty, setQty] = useState<Record<string, string>>({})
@@ -14,7 +16,7 @@ export function Devoluciones(_: { me: Me }) {
   }
   const save = async () => {
     try {
-      const items = sale.items.filter((i: any) => Number(qty[i.id]) > 0).map((i: any) => ({ saleItemId: i.id, quantity: Number(qty[i.id]) }))
+      const items = sale.items.filter((i: any) => Number(qty[i.id]) > 0).map((i: any) => ({ saleItemId: i.id, quantity: Number(qty[i.id]), ...(perfume ? { sealed: !!sealed[i.id] } : {}) }))
       const r = await api<any>('POST', '/returns', { id: crypto.randomUUID(), saleId: sale.id, items, refundMethod: sale.paymentMethod === 'fiado' ? 'saldo' : f.method, reason: f.reason, authCode: f.code })
       setMsg({ ok: `Devolución registrada: ${mxn(r.amount)}.` })
       setSale(null); setFolio(''); setF({ ...f, reason: '', code: '' })
@@ -28,7 +30,7 @@ export function Devoluciones(_: { me: Me }) {
         <>
           <p className="muted">Folio {sale.folio} · {new Date(sale.createdAt).toLocaleString('es-MX')} · {sale.paymentMethod} · {mxn(sale.total)}</p>
           <table className="list"><tbody>{sale.items.map((i: any) => (
-            <tr key={i.id}><td>{i.description}<br /><small className="muted">vendió {i.quantity}</small></td><td style={{ width: 140 }}><input aria-label={`Devolver de ${i.description}`} inputMode="decimal" placeholder="0" value={qty[i.id] ?? ''} onChange={(e) => setQty({ ...qty, [i.id]: e.target.value })} /></td></tr>
+            <tr key={i.id}><td>{i.description}<br /><small className="muted">vendió {i.quantity}</small></td><td style={{ width: 140 }}><input aria-label={`Devolver de ${i.description}`} inputMode="decimal" placeholder="0" value={qty[i.id] ?? ''} onChange={(e) => setQty({ ...qty, [i.id]: e.target.value })} />{perfume && <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 6 }} checked={!!sealed[i.id]} onChange={(e) => setSealed({ ...sealed, [i.id]: e.target.checked })} />Sellado</label>}</td></tr>
           ))}</tbody></table>
           {sale.paymentMethod !== 'fiado' ? (
             <label>Se devuelve en<select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })}><option value="efectivo">Efectivo (sale de la caja)</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta</option></select></label>

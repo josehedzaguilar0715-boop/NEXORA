@@ -170,7 +170,7 @@ const returnBody = z.object({
   id: z.string().uuid().optional(),
   /** Con ticket: la venta original. Sin ticket: se omite y se indican producto y monto. */
   saleId: z.string().optional(),
-  items: z.array(z.object({ saleItemId: z.string().optional(), productId: z.string().optional(), quantity: z.number().positive(), amount: z.number().int().min(0).optional(), restock: z.boolean().default(true) })).min(1).max(100),
+  items: z.array(z.object({ saleItemId: z.string().optional(), productId: z.string().optional(), quantity: z.number().positive(), amount: z.number().int().min(0).optional(), restock: z.boolean().default(true), /** Perfumería: el producto regresa sellado / sin usar. */ sealed: z.boolean().optional() })).min(1).max(100),
   refundMethod: z.enum(['efectivo', 'transferencia', 'tarjeta', 'saldo']),
   customerId: z.string().optional(),
   reason: z.string().trim().min(3).max(300),

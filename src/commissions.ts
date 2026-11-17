@@ -10,7 +10,7 @@ import { bad, iso, localDate, newId } from './util.js'
  * Comisiones por persona y por servicio, producto o categoría. Sin valores predeterminados:
  * si no hay regla, no hay comisión. Cada venta guarda el porcentaje aplicado.
  */
-export function rateFor(db: Db, businessId: string, staffId: string, t: { serviceId?: string | null; productId?: string | null; category?: string | null }): number | null {
+export function rateFor(db: Db, businessId: string, staffId: string, t: { serviceId?: string | null; productId?: string | null; category?: string | null; brand?: string | null }): number | null {
   const rules = db.prepare('SELECT staff_id, target_type, target_id, rate_bp FROM commission_rules WHERE business_id = ? AND (staff_id = ? OR staff_id IS NULL)').all(businessId, staffId) as { staff_id: string | null; target_type: string; target_id: string | null; rate_bp: number }[]
   const match = (staff: string | null, type: string, id: string | null | undefined) => rules.find((r) => r.staff_id === staff && r.target_type === type && (type === 'all' || r.target_id === id))
   // De lo más específico a lo más general.
@@ -18,6 +18,7 @@ export function rateFor(db: Db, businessId: string, staffId: string, t: { servic
     const r =
       (t.serviceId ? match(staff, 'service', t.serviceId) : undefined) ??
       (t.productId ? match(staff, 'product', t.productId) : undefined) ??
+      (t.brand ? match(staff, 'brand', t.brand) : undefined) ??
       (t.category ? match(staff, 'category', t.category) : undefined) ??
       match(staff, 'all', null)
     if (r) return r.rate_bp
@@ -49,7 +50,7 @@ saleHooks.push(({ deps, user, saleId, shiftId, input, lines, total }) => {
     const comboPrice = parts.reduce((a, p) => a + p.share, 0)
     const pieces = parts.length && comboPrice
       ? parts.map((p) => ({ target: { serviceId: p.service_id, category: p.category }, base: Math.round(((l.total * p.share) / comboPrice) * factor) }))
-      : [{ target: { serviceId: l.serviceId, productId: l.productId, category: l.category }, base: Math.round(l.total * factor) }]
+      : [{ target: { serviceId: l.serviceId, productId: l.productId, category: l.category, brand: l.productId ? ((JSON.parse((db.prepare('SELECT attrs FROM products WHERE id = ?').get(l.productId) as { attrs: string }).attrs) as { brand?: string }).brand ?? null) : null }, base: Math.round(l.total * factor) }]
     for (const pc of pieces) {
       const rate = rateFor(db, user.business_id, staff, pc.target)
       if (rate == null) continue
@@ -81,9 +82,9 @@ commissions.get('/commission-rules', requirePerm('view_commissions'), (c) => {
 commissions.put('/commission-rules', ownerOnly, async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
-  const d = parse(z.object({ rules: z.array(z.object({ staffId: z.string().nullable().optional(), targetType: z.enum(['service', 'product', 'category', 'all']), targetId: z.string().nullable().optional(), rateBp: z.number().int().min(0).max(10_000) })).max(500) }), await body(c))
+  const d = parse(z.object({ rules: z.array(z.object({ staffId: z.string().nullable().optional(), targetType: z.enum(['service', 'product', 'category', 'brand', 'all']), targetId: z.string().nullable().optional(), rateBp: z.number().int().min(0).max(10_000) })).max(500) }), await body(c))
   for (const r of d.rules) {
-    if (r.targetType !== 'all' && !r.targetId) throw bad('Cada regla necesita a qué servicio, producto o categoría aplica.')
+    if (r.targetType !== 'all' && !r.targetId) throw bad('Cada regla necesita a qué servicio, producto, categoría o marca aplica.')
     if (r.staffId && !db.prepare('SELECT 1 FROM users WHERE id = ? AND business_id = ?').get(r.staffId, u.business_id)) throw bad('Esa persona no es de este negocio.')
   }
   const old = db.prepare('SELECT staff_id, target_type, target_id, rate_bp FROM commission_rules WHERE business_id = ?').all(u.business_id)

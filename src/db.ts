@@ -917,6 +917,34 @@ const MIGRATIONS: Migration[] = [
     PRIMARY KEY (business_id, key)
   );
   `,
+  `
+  -- Perfumería: variantes (marca, fragancia, ml, presentación) y frascos abiertos para decants.
+  ALTER TABLE products ADD COLUMN attrs TEXT NOT NULL DEFAULT '{}';
+  CREATE TABLE open_bottles (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    ml_total REAL NOT NULL,
+    ml_remaining REAL NOT NULL CHECK (ml_remaining >= 0),
+    cost_per_ml REAL NOT NULL,
+    opened_by TEXT NOT NULL,
+    opened_at TEXT NOT NULL
+  );
+  -- Comisiones también por marca.
+  CREATE TABLE commission_rules_new (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    staff_id TEXT REFERENCES users(id),
+    target_type TEXT NOT NULL CHECK (target_type IN ('service','product','category','brand','all')),
+    target_id TEXT,
+    rate_bp INTEGER NOT NULL CHECK (rate_bp BETWEEN 0 AND 10000),
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO commission_rules_new SELECT * FROM commission_rules;
+  DROP TABLE commission_rules;
+  ALTER TABLE commission_rules_new RENAME TO commission_rules;
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {
