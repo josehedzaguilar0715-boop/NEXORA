@@ -53,11 +53,13 @@ page.on('dialog', (d: any) => void d.accept(d.type() === 'prompt' ? '4321' : und
 try {
   // Entrar como dueño con verificación en dos pasos.
   await page.goto(base)
-  // Intro con el logo: aparece al abrir y se puede omitir.
+  // Intro obligatoria con el logo: unos 4 segundos, sin botón para omitirla, y luego el acceso.
   await page.getByTestId('intro').waitFor()
+  await page.waitForTimeout(2800)
   await page.screenshot({ path: `${shots}/0-intro.png` })
-  await page.getByRole('button', { name: 'Omitir' }).click()
-  check(true, 'intro con logo que se puede omitir')
+  check((await page.getByRole('button', { name: 'Omitir' }).count()) === 0, 'intro sin botón para omitir')
+  await page.getByTestId('intro').waitFor({ state: 'detached', timeout: 6000 })
+  check(true, 'intro obligatoria que termina sola')
   await page.getByRole('button', { name: 'Dueño' }).click()
   await page.getByLabel('Teléfono (10 dígitos)').fill(phone)
   await page.getByLabel('Contraseña').fill('secreto123')

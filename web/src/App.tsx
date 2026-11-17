@@ -169,7 +169,7 @@ function Privada() {
         <PendingBadge />
       </header>
       <aside className={`side ${menu ? 'open' : ''}`} onClick={() => setMenu(false)}>
-        <div className="brand"><Logo size={30} /><span className="word">NEXORA</span></div>
+        <div className="brand"><Logo size={36} /><span className="word">NEXORA</span></div>
         <div className="biz">{me.business.name}</div>
         {/* Un permiso no marcado no aparece en pantalla. */}
         <nav>

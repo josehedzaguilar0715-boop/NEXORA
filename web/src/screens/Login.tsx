@@ -61,8 +61,8 @@ export function Login({ onLogin, forceChange }: { onLogin: (m: Me) => void; forc
   return (
     <div className="login">
       <div style={{ display: 'grid', justifyItems: 'center', gap: 10, marginBottom: 20 }}>
-        <Logo size={72} />
-        <div className="brand" style={{ padding: 0 }}><span className="word" style={{ fontSize: '1.6rem', letterSpacing: '0.3em' }}>NEXORA</span></div>
+        {/* Spec §16: en el acceso va el ícono sin nombre. */}
+        <Logo size={84} />
       </div>
       {mode === 'dueno' && recover !== null && <Recuperar phone={f.phone} onDone={() => { setRecover(null); setError(''); }} />}
       <div className="tabs">

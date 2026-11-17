@@ -1,50 +1,70 @@
 import { useEffect, useId, useState } from 'react'
 
-/** Marca provisional (spec §15: el logo definitivo está pendiente). Hexágono con degradado cian → violeta. */
-export function Logo({ size = 32 }: { size?: number }) {
-  // Un degradado por instancia: si una copia está oculta, las demás no pierden el color.
-  const id = `nx-g-${useId().replace(/:/g, '')}`
+/** Lema de la intro (spec §15). */
+export const TAGLINE = 'Todo tu negocio, conectado.'
+
+/**
+ * Logo oficial (spec §16): cuadro redondeado con degradado cian → violeta, brillo suave,
+ * "N" en trazo blanco y el nodo que representa un sistema que conecta todo el negocio.
+ * No cambiar proporciones, colores ni la posición del nodo.
+ */
+export function Logo({ size = 32, title = 'NEXORA' }: { size?: number; title?: string }) {
+  // Ids propios por instancia: si una copia está oculta, las demás no pierden el degradado.
+  const uid = useId().replace(/:/g, '')
+  const grad = `nx-grad-${uid}`, glow = `nx-glow-${uid}`
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label="NEXORA">
+    <svg width={size} height={size} viewBox="0 0 512 512" role="img" aria-label={title} className="nx-mark">
       <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#22D3EE" />
-          <stop offset="1" stopColor="#8B5CF6" />
-        </linearGradient>
+        <linearGradient id={grad} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#22D3EE" /><stop offset="1" stopColor="#8B5CF6" /></linearGradient>
+        <radialGradient id={glow} cx="0.3" cy="0.25" r="0.8"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.22" /><stop offset="1" stopColor="#FFFFFF" stopOpacity="0" /></radialGradient>
       </defs>
-      <path d="M32 4 56 18v28L32 60 8 46V18Z" fill="none" stroke={`url(#${id})`} strokeWidth="4" strokeLinejoin="round" />
-      <path d="M22 44V20l20 24V20" fill="none" stroke={`url(#${id})`} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="32" y="32" width="448" height="448" rx="120" fill={`url(#${grad})`} />
+      <rect x="32" y="32" width="448" height="448" rx="120" fill={`url(#${glow})`} />
+      <path d="M168 352 V160 L344 352 V160" fill="none" stroke="#FFFFFF" strokeWidth="46" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="344" cy="160" r="30" fill="#07090F" />
+      <circle cx="344" cy="160" r="14" fill="#FFFFFF" />
     </svg>
   )
 }
 
+/** Logo horizontal: el ícono y el nombre NEXORA (Inter 800, degradado #F1F5F9 → #C4B5FD). */
+export function LogoHorizontal({ size = 36 }: { size?: number }) {
+  return (
+    <span className="nx-logo" style={{ fontSize: size * 0.5 }}>
+      <Logo size={size} />
+      <span className="nx-word">NEXORA</span>
+    </span>
+  )
+}
+
+const reduced = () => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false }
+}
+
 /**
- * Intro al abrir el enlace: el logo aparece con fundido y escala suave (unos 2.5 s) y luego pasa al acceso
- * o al panel. Se puede omitir y solo sale una vez por sesión del navegador.
+ * Intro obligatoria al abrir el enlace (spec §15): el logo aparece con un resplandor en degradado,
+ * el nombre se revela letra por letra y después el lema. Dura unos 4 segundos, sin botón ni tecla
+ * para saltarla. Con movimiento reducido se acorta, pero sigue saliendo.
  */
 export function Intro() {
   const [show, setShow] = useState(() => {
-    try {
-      return !sessionStorage.getItem('nx_intro')
-    } catch {
-      return false
-    }
+    try { return !sessionStorage.getItem('nx_intro') } catch { return true }
   })
   useEffect(() => {
     if (!show) return
     try { sessionStorage.setItem('nx_intro', '1') } catch { /* sin almacenamiento: no pasa nada */ }
-    const t = setTimeout(() => setShow(false), 2800)
+    const t = setTimeout(() => setShow(false), reduced() ? 1600 : 4000)
     return () => clearTimeout(t)
   }, [show])
   if (!show) return null
   return (
-    <div className="intro" role="presentation" data-testid="intro">
+    <div className="intro" role="presentation" aria-label={`NEXORA. ${TAGLINE}`} data-testid="intro">
       <div className="glow" />
       <div className="mark">
-        <Logo size={120} />
-        <div className="word">NEXORA</div>
+        <div className="intro-logo"><Logo size={132} /></div>
+        <div className="word" aria-hidden>{'NEXORA'.split('').map((ch, i) => <span key={i} style={{ animationDelay: `${1.1 + i * 0.16}s` }}>{ch}</span>)}</div>
+        <div className="tagline">{TAGLINE}</div>
       </div>
-      <button className="skip" onClick={() => setShow(false)}>Omitir</button>
     </div>
   )
 }
