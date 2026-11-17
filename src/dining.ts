@@ -156,6 +156,8 @@ dining.post('/tabs/:id/items', requirePerm('sell'), async (c) => {
   const t = loadTab(c)
   if (!['abierta', 'por_cobrar'].includes(t.status)) throw conflict('Esa cuenta ya está cerrada.', 'cuenta_cerrada')
   const d = parse(z.object({ items: z.array(itemBody).min(1).max(100), authCode: z.string().optional() }), await body(c))
+  // En giros de comida todo pasa por cocina (o la estación indicada); en los demás no hay comandas.
+  const food = ['palapa', 'restaurante', 'comedor', 'taqueria'].includes((db.prepare('SELECT giro FROM businesses WHERE id = ?').get(u.business_id) as { giro: string }).giro)
   const rows = d.items.map((it) => {
     if (it.id && db.prepare('SELECT 1 FROM tab_items WHERE id = ?').get(it.id)) return null // ya registrado (reenvío)
     for (const v of tabItemValidators) v({ db, user: u, productId: it.productId ?? null, quantity: it.quantity, now: now() })
@@ -175,7 +177,7 @@ dining.post('/tabs/:id/items', requirePerm('sell'), async (c) => {
         if (!hasPerm(u, 'change_prices')) throw forbidden('No tienes permiso para cambiar precios.')
         authorize(deps, u, d.authCode, 'change_prices', 'precio en cuenta')
       }
-      return { ...it, description: [p.name, ...mods.map((m) => m.name)].join(' · '), unitPrice: it.unitPrice ?? base, station: attrs.station ?? 'cocina', mods }
+      return { ...it, description: [p.name, ...mods.map((m) => m.name)].join(' · '), unitPrice: it.unitPrice ?? base, station: attrs.station ?? (food ? 'cocina' : null), mods }
     }
     if (it.serviceId) {
       const s = db.prepare('SELECT name, price FROM services WHERE id = ? AND business_id = ? AND active = 1').get(it.serviceId, u.business_id) as { name: string; price: number } | undefined
@@ -189,7 +191,7 @@ dining.post('/tabs/:id/items', requirePerm('sell'), async (c) => {
   db.transaction(() => {
     for (const r of rows) {
       db.prepare('INSERT INTO tab_items (id, tab_id, product_id, service_id, description, quantity, unit_price, modifiers, notes, station, person, status, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
-        r.id ?? newId(), t.id, r.productId ?? null, r.serviceId ?? null, r.description, r.quantity, r.unitPrice, JSON.stringify(r.mods), r.notes ?? null, r.station, r.person ?? null, r.station ? 'pendiente' : 'entregado', u.id, iso(now()),
+        r.id ?? newId(), t.id, r.productId ?? null, r.serviceId ?? null, r.description, r.quantity, r.unitPrice, JSON.stringify(r.mods), r.notes ?? null, r.station, r.person ?? null, r.station ? 'pendiente' : 'listo', u.id, iso(now()),
       )
     }
     if (t.status === 'por_cobrar') {
@@ -207,7 +209,7 @@ dining.post('/tabs/:id/send', requirePerm('sell'), (c) => {
   const t = loadTab(c)
   const pending = itemsOf(db, t.id).filter((i) => i.status === 'pendiente' || (t.kind !== 'mesa' && i.status === 'pagado' && i.station && !i.comanda_id))
   // Para llevar o recoger: se cobran al hacerlos, antes de pasar a cocina.
-  if (t.kind !== 'mesa' && itemsOf(db, t.id).some((i) => i.status === 'pendiente')) throw conflict('Los pedidos para llevar se cobran antes de mandarlos a cocina.', 'pedido_sin_pagar')
+  if (t.kind !== 'mesa' && itemsOf(db, t.id).some(open)) throw conflict('Los pedidos para llevar se cobran antes de mandarlos a cocina.', 'pedido_sin_pagar')
   if (!pending.length) throw bad('No hay nada nuevo que mandar.')
   const byStation = new Map<string, ItemRow[]>()
   for (const i of pending) byStation.set(i.station ?? 'cocina', [...(byStation.get(i.station ?? 'cocina') ?? []), i])
@@ -344,13 +346,29 @@ dining.post('/tabs/:id/checkout', requirePerm('sell'), async (c) => {
 })
 
 /** Pedidos para llevar o recoger: entrega final. */
-dining.post('/tabs/:id/deliver', requirePerm('sell'), (c) => {
-  const { db, now } = c.get('deps')
+/**
+ * Pedidos para llevar, recoger o por teléfono: entrega final. Si aún debe, se cobra al entregar
+ * (verdulería), salvo que el dueño exija cobrar antes (`phoneOrdersPrepaid`).
+ */
+dining.post('/tabs/:id/deliver', requirePerm('sell'), async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const u = c.get('session').user
   const t = loadTab(c)
   if (t.kind === 'mesa') throw bad('Solo para pedidos para llevar o recoger.')
-  if (itemsOf(db, t.id).some((i) => i.status === 'pendiente')) throw conflict('El pedido no está pagado.', 'pedido_sin_pagar')
-  db.prepare("UPDATE tabs SET order_status = 'entregado', status = 'cerrada', closed_at = ? WHERE id = ?").run(iso(now()), t.id)
-  return c.json({ ok: true })
+  if (t.status === 'cerrada') throw conflict('Ese pedido ya se entregó.', 'cuenta_cerrada')
+  const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+  const unpaid = itemsOf(db, t.id).some(open)
+  const result = db.transaction(() => {
+    let sale = null
+    if (unpaid) {
+      if ((getSettings(db, u.business_id) as { phoneOrdersPrepaid?: boolean }).phoneOrdersPrepaid || !raw.paymentMethod) throw conflict('El pedido no está pagado.', 'pedido_sin_pagar')
+      sale = checkoutPart(deps, u, t, parse(partBody, raw)).sale
+    }
+    db.prepare("UPDATE tabs SET order_status = 'entregado', status = 'cerrada', closed_at = ? WHERE id = ?").run(iso(now()), t.id)
+    return { ok: true, sale }
+  })()
+  return c.json(result)
 })
 
 /** Aviso de pedido listo: solo prepara el mensaje; nada se envía solo. */

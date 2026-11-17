@@ -53,6 +53,23 @@ finance.post('/customers/:id/credit-payments', requirePerm('customers_credit'), 
   return c.json({ balance: customerBalance(db, cu.id) }, 201)
 })
 
+/** Estado de cuenta de un periodo (p. ej. la semana de una fonda): saldo inicial, cargos, abonos y saldo final. */
+finance.get('/customers/:id/statement', requirePerm('customers_credit'), (c) => {
+  const { db, now } = c.get('deps')
+  const cu = loadCustomer(c)
+  const today = localDate(now())
+  const to = c.req.query('to') ?? today
+  const from = c.req.query('from') ?? localDate(new Date(Date.parse(`${to}T12:00:00-06:00`) - 6 * 86_400_000))
+  const start = new Date(`${from}T06:00:00.000Z`).toISOString()
+  const end = new Date(new Date(`${to}T06:00:00.000Z`).getTime() + 86_400_000).toISOString()
+  const opening = (db.prepare('SELECT COALESCE(SUM(delta),0) b FROM credit_ledger WHERE customer_id = ? AND created_at < ?').get(cu.id, start) as { b: number }).b
+  const moves = db.prepare('SELECT delta, kind, method, sale_id AS saleId, created_at AS createdAt FROM credit_ledger WHERE customer_id = ? AND created_at >= ? AND created_at < ? ORDER BY created_at').all(cu.id, start, end) as { delta: number }[]
+  const charges = moves.filter((m) => m.delta > 0).reduce((a, m) => a + m.delta, 0)
+  const payments = -moves.filter((m) => m.delta < 0).reduce((a, m) => a + m.delta, 0)
+  const limit = (db.prepare('SELECT credit_limit FROM customers WHERE id = ?').get(cu.id) as { credit_limit: number }).credit_limit
+  return c.json({ customer: cu.name, from, to, opening, charges, payments, closing: opening + charges - payments, limit, moves })
+})
+
 finance.get('/receivables', requirePerm('customers_credit'), (c) => {
   const rows = c.get('deps').db
     .prepare('SELECT c.id, c.name, c.phone, c.credit_limit AS creditLimit, SUM(l.delta) AS balance FROM credit_ledger l JOIN customers c ON c.id = l.customer_id WHERE l.business_id = ? GROUP BY c.id HAVING balance > 0 ORDER BY balance DESC')

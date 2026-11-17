@@ -21,7 +21,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 14 (restaurante)**: plano de mesas por área con estados y mapa en vivo; la mesa pasa a limpieza al cobrar y el mesero la libera; comandas por estación (cada una ve solo lo suyo) que se envían al confirmar, con tiempos de cocina; cuenta dividible; cancelaciones y cortesías con código del dueño; pedidos para llevar y recoger con número y estados, cobrados al hacerlos; reserva de hora para recoger con interruptor (apagada); aviso de pedido listo manual; propinas por mesero; menú editable con variantes y combos. ✅ con pruebas y prueba en navegador.
 - **Bloque 15 (comedor)**: menú del día (o corrido) por turno que el encargado publica con código; agotados que no se venden; venta rápida con botones grandes de lo más vendido; turnos de comida (desayuno, comida, cena) con corte por turno; platillos por porción con receta y costo; crédito a oficinas y talleres con límite (pasarlo pide código del dueño); mapa de mesas opcional (apagado); caja rápida con cambio; propinas opcionales (apagadas). ✅ con pruebas.
 - **Bloque 16 (taquería)**: venta por pieza y por kilo o importe con báscula; catálogo corto con botones grandes; recetas por guisado con insumos por kilo y costo por taco; carne del trompo o asada (lo que se empieza, lo vendido y el sobrante contado con código al cierre; el corte no se hace con carne abierta); guisados del día publicados en la mañana con agotados ocultos; cuenta por mesa o barra; pedidos para llevar por pieza o kilo con número; precio por kilo con código en bitácora. ✅ con pruebas.
-- Siguiente: Bloque 17 (verdulería).
+- **Bloque 17 (verdulería)**: venta por kilo, pieza, manojo o bolsa armada con equivalencias; báscula en caja; precio del día al abrir, en lote con código; compras al mercado como lote con fletes por kilo; merma diaria con motivo y código; clientes frecuentes con cuenta semanal, límite y saldo; pedidos por teléfono o WhatsApp cobrados al entregar (o antes, si el dueño lo decide); conteo rápido al cierre. ✅ con pruebas.
+- **Los 17 bloques de la especificación están construidos.** Siguiente: revisión de pendientes (sección 12) y subir a staging.
 
 ## Desarrollo local
 
@@ -168,3 +169,11 @@ Importes siempre en centavos enteros (MXN).
 - Carne: `POST /meat/batches { productId, kg }` al empezar; lo vendido se calcula de las recetas de los tacos y de la venta directa por kilo. `POST /meat/batches/:id/close { leftoverKg, reason, authCode }` cuenta el sobrante con código; la diferencia ajusta el inventario (faltante = merma) y queda en bitácora.
 - El corte de caja se rechaza (`trompo_abierto`) mientras haya carne sin contar en ese turno.
 - `GET /recipes/:id/cost` da el costo de un taco o platillo según su receta.
+
+## Verdulería (Bloque 17) y operaciones en lote
+
+- `POST /daily-prices { prices, authCode }`: precio del día en lote con un solo código; cada cambio queda en bitácora.
+- `POST /inventory/waste-batch { items, authCode }`: merma del día con motivo por producto, con código.
+- `POST /inventory/count-batch { items, reason }`: conteo rápido; compara contra lo esperado, ajusta y devuelve las diferencias con su costo.
+- `GET /customers/:id/statement?from&to`: estado de cuenta (por defecto, los últimos 7 días): saldo inicial, cargos, abonos y saldo final.
+- Pedidos por teléfono: cuenta `recoger` sin cocina; `POST /tabs/:id/deliver { paymentMethod }` cobra al entregar. Con `phoneOrdersPrepaid` (ajustes) se exige cobrar antes.

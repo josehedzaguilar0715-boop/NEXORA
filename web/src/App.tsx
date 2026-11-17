@@ -12,6 +12,7 @@ import { Acceso, MisBoletos, Taquilla, TiendaBoletos } from './screens/Taquilla'
 import { Cocina, Mesas, Pedidos } from './screens/Mesas'
 import { MenuDia } from './screens/MenuDia'
 import { Trompo } from './screens/Trompo'
+import { CierreDia, PrecioDia } from './screens/Verduleria'
 import { Comisiones } from './screens/Comisiones'
 import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
@@ -36,7 +37,9 @@ const SCREENS: Screen[] = [
   { key: 'mesas', label: 'Mesas', perm: 'sell', C: Mesas, giros: ['palapa', 'restaurante', 'taqueria'] },
   { key: 'menu', label: 'Menú del día', perm: 'sell', C: MenuDia, giros: ['comedor', 'taqueria'] },
   { key: 'carne', label: 'Carne', perm: 'sell', C: Trompo, giros: ['taqueria'] },
-  { key: 'pedidos', label: 'Para llevar', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'comedor'] },
+  { key: 'precios', label: 'Precio del día', perm: 'change_prices', C: PrecioDia, giros: ['verduleria', 'palapa'] },
+  { key: 'pedidos', label: 'Pedidos', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'comedor', 'verduleria'] },
+  { key: 'cierre', label: 'Cierre del día', perm: 'edit_inventory', C: CierreDia, giros: ['verduleria', 'abarrotes'] },
   { key: 'cocina', label: 'Cocina', perm: 'sell', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria'] },
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
   { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria'] },

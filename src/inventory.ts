@@ -561,3 +561,61 @@ inventory.post('/purchases/:id/payments', requirePerm('edit_inventory'), async (
   })()
   return c.json(purchaseBalance(db, p.id), 201)
 })
+
+// ---------- Operaciones en lote (verdulería y cierre diario) ----------
+
+/** Precio del día al abrir: una lista de precios con un solo código, cada cambio en bitácora. */
+inventory.post('/daily-prices', requirePerm('change_prices'), async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const u = c.get('session').user
+  const d = parse(z.object({ prices: z.array(z.object({ productId: z.string(), price: z.number().int().min(0) })).min(1).max(500), authCode: z.string().optional() }), await body(c))
+  const auth = authorize(deps, u, d.authCode, 'change_prices', 'precio del día')
+  const changed = db.transaction(() => d.prices.map((x) => {
+    const p = getProduct(db, u.business_id, x.productId)
+    if (p.price === x.price) return null
+    db.prepare('UPDATE products SET price = ?, version = version + 1, updated_at = ? WHERE id = ?').run(x.price, iso(now()), p.id)
+    db.prepare('UPDATE lots SET price = ? WHERE product_id = ? AND qty_remaining_milli > 0').run(x.price, p.id)
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'producto.cambio_precio', entity: 'product', entityId: p.id, oldValue: { price: p.price }, newValue: { price: x.price }, authorizedBy: auth.id, reason: 'Precio del día' })
+    return { productId: p.id, name: p.name, from: p.price, to: x.price }
+  }).filter(Boolean))()
+  return c.json({ changed })
+})
+
+/** Merma diaria al cierre: varios productos con su motivo, con código. */
+inventory.post('/inventory/waste-batch', requirePerm('edit_inventory'), async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const u = c.get('session').user
+  const d = parse(z.object({ items: z.array(z.object({ productId: z.string(), quantity: z.number().positive(), reason: z.string().trim().min(3).max(200) })).min(1).max(300), branchId: z.string().optional(), authCode: z.string().optional() }), await body(c))
+  const auth = authorize(deps, u, d.authCode, 'edit_inventory', 'merma diaria')
+  const branchId = branchOf(c, d.branchId)
+  const id = newId()
+  const out = db.transaction(() => d.items.map((it) => {
+    const p = getProduct(db, u.business_id, it.productId)
+    const r = consume({ db, now, businessId: u.business_id, branchId, userId: u.id }, p.id, toMilli(it.quantity), 'merma', id, it.reason)
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'inventario.merma', entity: 'product', entityId: p.id, newValue: { quantity: it.quantity, cost: r.cost }, authorizedBy: auth.id, reason: it.reason })
+    return { name: p.name, quantity: it.quantity, cost: r.cost }
+  }))()
+  return c.json({ items: out, cost: out.reduce((a, x) => a + x.cost, 0) }, 201)
+})
+
+/** Conteo rápido al cierre: compara lo contado contra lo que debería haber (compras − ventas − mermas). */
+inventory.post('/inventory/count-batch', requirePerm('edit_inventory'), async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ items: z.array(z.object({ productId: z.string(), counted: z.number().min(0) })).min(1).max(500), reason: z.string().trim().min(3).max(200), apply: z.boolean().default(true), branchId: z.string().optional() }), await body(c))
+  const branchId = branchOf(c, d.branchId)
+  const ctx = { db, now, businessId: u.business_id, branchId, userId: u.id }
+  const id = newId()
+  const out = db.transaction(() => d.items.map((it) => {
+    const p = getProduct(db, u.business_id, it.productId)
+    const before = stockOf(db, branchId, p.id)
+    const diff = toMilli(it.counted) - before
+    if (d.apply && diff < 0) consume(ctx, p.id, -diff, 'ajuste', id, d.reason)
+    if (d.apply && diff > 0) addLot(ctx, { productId: p.id, qtyMilli: diff, unitCost: p.last_cost, price: currentPrice(db, branchId, p), type: 'ajuste', refId: id })
+    return { productId: p.id, name: p.name, expected: fromMilli(before), counted: it.counted, difference: fromMilli(diff), cost: Math.round((diff * p.last_cost) / 1000) }
+  }))()
+  if (d.apply) audit(db, now, { businessId: u.business_id, userId: u.id, action: 'inventario.conteo_cierre', newValue: out, reason: d.reason })
+  return c.json({ items: out, differenceCost: out.reduce((a, x) => a + x.cost, 0) })
+})

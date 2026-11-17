@@ -104,7 +104,7 @@ export function Cuenta({ me, tab: initial, onClose }: { me: Me; tab: any; onClos
           {tab.kind === 'mesa' && <button className="big" onClick={() => run(() => api('POST', `/tabs/${tab.id}/request-bill`), 'Cuenta pedida.')}>Pedir cuenta</button>}
           {can(me, 'sell') && <button className="primary big" disabled={!tab.pending} onClick={() => setPay({})}>Cobrar todo</button>}
           {persons.map((n) => <button key={n} className="big" onClick={() => setPay({ person: n })}>Cobrar persona {n}</button>)}
-          {tab.kind !== 'mesa' && <button className="big" disabled={tab.pending > 0} onClick={() => run(() => api('POST', `/tabs/${tab.id}/send`), 'Enviado a cocina.')}>Mandar a cocina</button>}
+          {tab.kind !== 'mesa' && me.business.giro !== 'verduleria' && <button className="big" disabled={tab.pending > 0} onClick={() => run(() => api('POST', `/tabs/${tab.id}/send`), 'Enviado a cocina.')}>Mandar a cocina</button>}
         </div>
       </section>
       {pay && <Cobrar tab={tab} person={pay.person} onClose={() => setPay(null)} onDone={async (t) => { setPay(null); setMsg({ ok: `Cobrado ${mxn(t)}` }); const r = await api<any>('GET', `/tabs/${tab.id}`); setTab(r.tab); if (r.tab.status === 'cerrada') onClose() }} />}
@@ -191,7 +191,12 @@ export function Pedidos({ me }: { me: Me }) {
             <td>
               <button onClick={() => setTab(t)}>Abrir</button>
               {t.orderStatus === 'listo' && <button onClick={() => notice(t)}>Avisar</button>}
-              {t.orderStatus === 'listo' && <button className="primary" onClick={async () => { await api('POST', `/tabs/${t.id}/deliver`); void load() }}>Entregado</button>}
+              {(t.orderStatus === 'listo' || (me.business.giro === 'verduleria' && t.items.length > 0)) && <button className="primary" onClick={async () => {
+                // Verdulería: se cobra al entregar (salvo que el dueño cambie la regla).
+                const method = t.pending > 0 ? prompt(`Cobrar ${mxn(t.pending)} al entregar. Forma de pago (efectivo, transferencia, tarjeta, fiado):`, 'efectivo') : null
+                if (t.pending > 0 && !method) return
+                try { await api('POST', `/tabs/${t.id}/deliver`, method ? { paymentMethod: method.trim().toLowerCase(), customerId: undefined } : {}); void load() } catch (e) { setErr((e as Error).message) }
+              }}>Entregado</button>}
             </td>
           </tr>
         ))}</tbody></table>

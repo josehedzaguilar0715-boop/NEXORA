@@ -16,6 +16,8 @@ const SETTINGS = z.object({
   tipsEnabled: z.boolean(),
   /** Comedor: mapa de mesas (apagado por defecto). */
   tablesEnabled: z.boolean(),
+  /** Pedidos por teléfono: por defecto se cobran al entregar; con esto se cobran antes. */
+  phoneOrdersPrepaid: z.boolean(),
 }).partial()
 export type Settings = z.infer<typeof SETTINGS>
 
