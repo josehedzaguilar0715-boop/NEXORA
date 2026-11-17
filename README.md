@@ -63,8 +63,9 @@ Importes siempre en centavos enteros (MXN).
 - **Suspendido**: decisión del super panel, permitida solo tras `suspend_after_days` días vencido.
 - **Pago** (`/admin/businesses/:id/payments`): vuelve a Activo, extiende el periodo y aplica el plan pendiente.
 - Cambio de plan: se aplica al siguiente pago salvo `applyNow` (en prueba, al momento). Al bajar, los usuarios y sucursales sobrantes (los más nuevos) quedan desactivados, nunca borrados. El usuario del dueño cuenta dentro de los usuarios del plan.
-- Valores provisionales, editables en `/admin/settings`: prueba 14 días, suspensión tras 30 días vencido. Las solicitudes de cambio no registran costo.
-- Pendiente: verificación en dos pasos para el super panel; método para verificar identidad del dueño que perdió su teléfono (hoy el super panel escribe el motivo y queda en bitácora).
+- Valores provisionales, editables en `/admin/settings`: prueba 14 días, suspensión tras 30 días vencido. Las solicitudes de cambio no tienen costo (confirmado).
+- El super panel entra con contraseña y un código que llega por SMS y por correo (`/admin/verify`).
+- Pendiente: método para verificar la identidad del dueño que perdió su teléfono (hoy el super panel escribe el motivo y queda en bitácora).
 
 ## Módulo común (Bloque 4)
 
@@ -92,7 +93,7 @@ Importes siempre en centavos enteros (MXN).
 - Se sirven desde el mismo servidor; la API vive en `/api`. Navegación por permisos: lo que el usuario no puede hacer no aparece.
 - Link único para empleados: `/?negocio=CODIGO` llena el código del negocio.
 - Sin internet: la apertura, las ventas, los retiros y el corte se guardan en el equipo (cola local) y se envían solos al volver la señal. El botón verde/naranja de arriba es el contador de pendientes. Descuentos, cambios de precio y fiado necesitan señal porque el código se valida en el servidor.
-- Ticket: se imprime con la impresora térmica del sistema (58 mm). Abrir el cajón y leer la báscula directo desde el navegador quedan pendientes (se capturan a mano por ahora).
+- Ticket: se imprime con la impresora térmica del sistema (58 mm). El peso de la báscula se captura a mano (decidido). Abrir el cajón desde el navegador queda pendiente.
 
 ## Ferretería (Bloque 6)
 
@@ -147,7 +148,7 @@ Importes siempre en centavos enteros (MXN).
 - Cada persona tiene su boleto con código propio (`entry_tickets`). `POST /tourism/scan` lo marca usado y suma al aforo; `POST /tourism/exit` resta salidas.
 - Venta anticipada: `/boletos/<código del negocio>` (módulo `reservas`). Los boletos quedan "por pagar" (sin pasarela de pago en línea: se cobran en taquilla con el folio). No entran sin pagar.
 - Cierres (`POST /tourism/closures`) y cancelaciones (`POST /tickets/cancel`) exigen el código del dueño; reembolsar es decisión explícita, nunca automática.
-- Pendiente: cobro en línea (requiere elegir una pasarela de pago).
+- Decidido: sin pago en línea. Lo comprado por link queda por pagar y se liquida en efectivo o transferencia.
 
 ## Comida: núcleo común (Bloque 13, `src/dining.ts`)
 
@@ -190,4 +191,6 @@ Importes siempre en centavos enteros (MXN).
 - **Contenedor**: `docker build -t nexora .` y `docker run -p 3000:3000 -v nexora-data:/data nexora`. La base vive en el volumen `/data`; las pantallas y la API (`/api`) salen del mismo puerto. Crear el usuario del super panel dentro del contenedor: `ADMIN_PASSWORD=... npx tsx src/admin-cli.ts soporte "Soporte"`.
 - **Respaldos**: `npm run backup -- carpeta` copia la base en caliente y verifica su integridad. Programarlo (p. ej. cada noche) y guardar copias fuera del servidor.
 - **CI**: `.github/workflows/ci.yml` corre tipos, pruebas y build en cada push. La prueba en navegador (`npm run e2e`) se corre en local con `npm run check`.
-- Antes de producción falta: conectar el proveedor de WhatsApp/SMS para los códigos (hoy se imprimen en consola), HTTPS y el dominio, y elegir dónde se aloja.
+- **Staging en Fly.io** (`fly.toml`, región Dallas `dfw`, la más cercana a México): una máquina siempre encendida y un disco de 1 GB para la base, con copia diaria de Fly. Cada push a la rama `staging` corre las pruebas y, si pasan, despliega (`.github/workflows/deploy-staging.yml`, requiere el secreto `FLY_API_TOKEN`). Queda en `https://nexora-staging-mx.fly.dev`.
+- **Secretos del servidor** (`fly secrets set …`): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM` (SMS de verificación), `RESEND_API_KEY`, `MAIL_FROM` (correo del super panel). Sin ellos los códigos solo se imprimen en el registro.
+- **Super panel en el servidor**: `fly ssh console -C "env ADMIN_PASSWORD=… ADMIN_PHONE=… ADMIN_EMAIL=… npx tsx src/admin-cli.ts soporte Soporte"`. El teléfono y el correo del super panel no se guardan en el repositorio.
