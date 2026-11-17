@@ -252,12 +252,7 @@ tr.row-err td { color: var(--danger); }
 .seg.wrap { flex-wrap: wrap; overflow: visible; }
 table.preview td, table.preview th { font-size: 0.8rem; padding: 7px 5px; }
 
-/* ---------- Corte: arqueo por billete y moneda ---------- */
-.denoms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; }
-.denoms h3 { margin: 8px 0 4px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-label.denom { display: grid; grid-template-columns: 4.2em minmax(0, 1fr) 5.5em; align-items: center; gap: 8px; margin: 6px 0; font-weight: 700; }
-label.denom input { min-height: 46px; margin: 0; text-align: center; }
-label.denom small { font-size: 0.75rem; }
+/* ---------- Corte: verificación del dinero contra el sistema ---------- */
 .verdict { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; margin: 6px 0 12px; border: 1px solid; }
 .verdict.ok { background: rgba(52, 211, 153, 0.1); border-color: rgba(52, 211, 153, 0.45); }
 .verdict.bad { background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.45); }
@@ -265,4 +260,3 @@ label.denom small { font-size: 0.75rem; }
 .verdict .big-ico { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; font-weight: 800; flex: 0 0 auto; }
 .verdict.ok .big-ico { background: var(--ok); color: #052e1f; }
 .verdict.bad .big-ico { background: var(--danger); color: #2a0606; }
-@media (max-width: 520px) { .denoms { grid-template-columns: minmax(0, 1fr); } }

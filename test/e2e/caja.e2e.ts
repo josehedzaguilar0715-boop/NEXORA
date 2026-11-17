@@ -122,19 +122,16 @@ try {
   check(sales.sales.length === 2, 'al volver la señal se envía sin duplicar (2 ventas en el servidor)')
 
   // Corte de caja.
-  // Arqueo a ciegas: primero se cuenta por billete y moneda, sin ver cuánto dice el sistema.
+  // Verificación a ciegas: primero se cuenta el dinero, sin ver cuánto dice el sistema.
   await page.getByRole('button', { name: 'Corte de caja' }).click()
-  await page.getByRole('heading', { name: /1\. Cuenta el efectivo/ }).waitFor()
+  await page.getByRole('heading', { name: /1\. Cuenta el dinero/ }).waitFor()
   check(!(await page.getByText('Debe haber en caja').isVisible()), 'corte: se cuenta sin ver lo que espera el sistema')
-  await page.getByLabel('Billetes de $500', { exact: true }).fill('1')
+  await page.getByLabel('¿Cuánto dinero hay en la caja?').fill('500')
   await page.getByRole('button', { name: 'Verificar con el sistema' }).click()
   await page.getByText('Faltan $82.00').waitFor()
   check(true, 'corte: si falta dinero lo dice antes de cerrar')
   await page.getByRole('button', { name: 'Volver a contar' }).click()
-  await page.getByLabel('Billetes de $50', { exact: true }).fill('1')
-  await page.getByLabel('Billetes de $20', { exact: true }).fill('1')
-  await page.getByLabel('Monedas de $10', { exact: true }).fill('1')
-  await page.getByLabel('Monedas de $2', { exact: true }).fill('1')
+  await page.getByLabel('¿Cuánto dinero hay en la caja?').fill('582')
   await page.screenshot({ path: `${shots}/5-corte-conteo.png` })
   await page.getByRole('button', { name: 'Verificar con el sistema' }).click()
   await page.getByText('La caja cuadra').waitFor()

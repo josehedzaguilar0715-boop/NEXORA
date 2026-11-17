@@ -437,20 +437,12 @@ function VentasTurno({ shift, me, onClose }: { shift: Shift; me: Me; onClose: ()
   )
 }
 
-/** Billetes y monedas de México (centavos). */
-const DENOMS: { v: number; label: string; coin?: boolean }[] = [
-  { v: 100000, label: '$1,000' }, { v: 50000, label: '$500' }, { v: 20000, label: '$200' }, { v: 10000, label: '$100' }, { v: 5000, label: '$50' }, { v: 2000, label: '$20' },
-  { v: 2000, label: '$20', coin: true }, { v: 1000, label: '$10', coin: true }, { v: 500, label: '$5', coin: true }, { v: 200, label: '$2', coin: true }, { v: 100, label: '$1', coin: true }, { v: 50, label: '50¢', coin: true },
-]
-
 /**
- * Corte de caja con arqueo a ciegas: 1) se cuenta el efectivo por billete y moneda sin ver lo que dice el sistema;
+ * Corte de caja con verificación a ciegas: 1) se cuenta el dinero físico sin ver lo que dice el sistema;
  * 2) el sistema compara contra lo registrado (cuadra, sobra o falta) y se puede volver a contar; 3) se cierra.
  */
 function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void; onClosed: () => void }) {
   const [step, setStep] = useState<'contar' | 'verificar'>('contar')
-  const [qty, setQty] = useState<Record<string, string>>({})
-  const [direct, setDirect] = useState(false)
   const [typed, setTyped] = useState('')
   const [check, setCheck] = useState<any>(null)
   const [offline, setOffline] = useState(false)
@@ -458,17 +450,13 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<any>(null)
-  const key = (d: (typeof DENOMS)[number]) => `${d.coin ? 'm' : 'b'}${d.v}`
-  const fromDenoms = DENOMS.reduce((a, d) => a + d.v * (Number(qty[key(d)]) || 0), 0)
-  const counted = direct ? toCents(typed || '0') : fromDenoms
-  // Billetes y monedas del mismo valor ($20) se suman para el servidor.
-  const denominations = DENOMS.reduce((a: Record<string, number>, d) => { const n = Number(qty[key(d)]) || 0; if (n) a[d.v] = (a[d.v] ?? 0) + n; return a }, {})
+  const counted = toCents(typed || '0')
 
   const verify = async () => {
     setErr(''); setBusy(true)
     try {
       await flush()
-      setCheck(await api('POST', `/shifts/${shift.id}/verify`, direct ? { countedCash: counted } : { denominations }))
+      setCheck(await api('POST', `/shifts/${shift.id}/verify`, { countedCash: counted }))
       setOffline(false)
     } catch (e) {
       if ((e as { code?: string }).code === 'sin_red') { setOffline(true); setCheck(null) } else { setBusy(false); return setErr((e as Error).message) }
@@ -508,30 +496,12 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
   if (step === 'contar') {
     return (
       <Modal onClose={onClose}>
-        <h2>Corte de caja · 1. Cuenta el efectivo</h2>
-        <p className="muted">Cuenta el dinero que hay en la caja. Después el sistema te dice si cuadra con lo registrado.</p>
-        <div className="tabs"><button className={!direct ? 'on' : ''} onClick={() => setDirect(false)}>Por billete y moneda</button><button className={direct ? 'on' : ''} onClick={() => setDirect(true)}>Solo el total</button></div>
-        {direct ? (
-          <label>Total contado<input inputMode="decimal" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="$0.00" /></label>
-        ) : (
-          <div className="denoms">
-            {(['Billetes', 'Monedas'] as const).map((g) => (
-              <div key={g}>
-                <h3>{g}</h3>
-                {DENOMS.filter((d) => (g === 'Monedas') === !!d.coin).map((d) => (
-                  <label key={key(d)} className="denom">
-                    <span>{d.label}</span>
-                    <input inputMode="numeric" aria-label={`${g === 'Billetes' ? 'Billetes' : 'Monedas'} de ${d.label}`} value={qty[key(d)] ?? ''} onChange={(e) => setQty({ ...qty, [key(d)]: e.target.value.replace(/\D/g, '') })} placeholder="0" />
-                    <small className="num muted">{mxn(d.v * (Number(qty[key(d)]) || 0))}</small>
-                  </label>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
+        <h2>Corte de caja · 1. Cuenta el dinero</h2>
+        <p className="muted">Cuenta todo el dinero que hay en la caja y escribe el total. Después el sistema te dice si coincide con lo registrado.</p>
+        <label>¿Cuánto dinero hay en la caja?<input inputMode="decimal" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && typed.trim() && void verify()} placeholder="$0.00" /></label>
         <div className="total">{mxn(counted)}</div>
         {err && <p className="error">{err}</p>}
-        <p className="row"><button onClick={onClose}>Volver</button><button className="primary big" disabled={busy || (direct && typed.trim() === '')} onClick={verify}>{busy ? 'Verificando…' : 'Verificar con el sistema'}</button></p>
+        <p className="row"><button onClick={onClose}>Volver</button><button className="primary big" disabled={busy || typed.trim() === '' || Number.isNaN(counted)} onClick={verify}>{busy ? 'Verificando…' : 'Verificar con el sistema'}</button></p>
       </Modal>
     )
   }
