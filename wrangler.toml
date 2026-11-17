@@ -1,0 +1,23 @@
+# NEXORA en Cloudflare, plan gratuito ($0, sin tarjeta).
+# Pantallas: Workers Static Assets. API: Durable Object con SQLite (la base completa).
+name = "nexora-staging"
+main = "src/worker.ts"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[[durable_objects.bindings]]
+name = "NEXORA"
+class_name = "Nexora"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Nexora"]
+
+[observability]
+enabled = true

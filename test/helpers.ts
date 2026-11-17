@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { createApp } from '../src/app.js'
-import { openDb } from '../src/db.js'
+import { openDb } from '../src/db-node.js'
 import { createAdmin } from '../src/admin.js'
 
 export function setup() {

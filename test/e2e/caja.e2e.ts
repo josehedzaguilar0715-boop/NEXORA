@@ -6,7 +6,7 @@ import { Hono } from 'hono'
 import { createRequire } from 'node:module'
 import { mkdirSync } from 'node:fs'
 import { createApp } from '../../src/app.js'
-import { openDb } from '../../src/db.js'
+import { openDb } from '../../src/db-node.js'
 import { createAdmin } from '../../src/admin.js'
 
 const require = createRequire(import.meta.url)

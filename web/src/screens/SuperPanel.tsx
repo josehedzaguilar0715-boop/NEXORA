@@ -181,6 +181,9 @@ function AjustesAdmin() {
       <label>Días vencido antes de poder suspender<input inputMode="numeric" value={s.suspend_after_days} onChange={(e) => setS({ ...s, suspend_after_days: Number(e.target.value) || 0 })} /></label>
       <p><button className="primary" onClick={async () => { await adm('PUT', '/admin/settings', s); setMsg('Guardado.') }}>Guardar</button></p>
       {msg && <p className="muted">{msg}</p>}
+      <h2 style={{ marginTop: 16 }}>Respaldo</h2>
+      <p className="muted">Descarga toda la base y guárdala fuera del servidor (por ejemplo, una vez por semana).</p>
+      <p><button onClick={async () => { const d = await adm('GET', '/admin/export'); const url = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `nexora-${d.exportedAt.slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url) }}>Descargar respaldo</button></p>
       <p className="muted">Precios de planes: {mxn(50000)} / {mxn(70000)} / {mxn(90000)}; sucursal extra {mxn(30000)}; paquete de 5 usuarios {mxn(toCents('200'))}.</p>
     </div>
   )

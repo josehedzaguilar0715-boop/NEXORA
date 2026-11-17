@@ -2,7 +2,7 @@
 // ADMIN_PASSWORD=... ADMIN_PHONE=... ADMIN_EMAIL=... npm run admin:create -- <usuario> "<Nombre>"
 // Con teléfono y/o correo, el acceso pide un código que llega por SMS y correo (dos pasos).
 import { createAdmin } from './admin.js'
-import { openDb } from './db.js'
+import { openDb } from './db-node.js'
 import { createNotifier } from './notify.js'
 
 const [username, name] = process.argv.slice(2)

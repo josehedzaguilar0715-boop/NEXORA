@@ -1,6 +1,18 @@
-import Database from 'better-sqlite3'
-
-export type Db = Database.Database
+/**
+ * Acceso a la base. Dos implementaciones con la misma forma (síncrona):
+ * better-sqlite3 en local y pruebas (`db-node.ts`) y SQLite de Durable Objects en Cloudflare (`db-do.ts`).
+ */
+export interface Statement {
+  get(...params: unknown[]): unknown
+  all(...params: unknown[]): unknown[]
+  run(...params: unknown[]): { changes: number }
+}
+export interface Db {
+  prepare(sql: string): Statement
+  exec(sql: string): void
+  transaction<F extends (...args: any[]) => any>(fn: F): F
+  pragma(source: string, options?: { simple?: boolean }): unknown
+}
 
 type Migration = string | { sql: string; fkOff: true }
 
@@ -1218,10 +1230,8 @@ const MIGRATIONS: Migration[] = [
   `,
 ]
 
-export function openDb(path = ':memory:'): Db {
-  const db = new Database(path)
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
+/** Aplica las migraciones pendientes (en orden, cada una en su transacción). */
+export function migrate(db: Db): Db {
   db.exec('CREATE TABLE IF NOT EXISTS _migrations (version INTEGER PRIMARY KEY)')
   const done = new Set((db.prepare('SELECT version FROM _migrations').all() as { version: number }[]).map((r) => r.version))
   MIGRATIONS.forEach((m, i) => {

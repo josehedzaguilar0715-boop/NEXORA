@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Outbox, type Transport } from '../src/client/outbox.js'
-import { openDb } from '../src/db.js'
+import { openDb } from '../src/db-node.js'
 import { setup } from './helpers.js'
 
 async function negocio() {

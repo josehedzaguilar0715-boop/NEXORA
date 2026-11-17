@@ -285,6 +285,15 @@ admin.delete('/admin/businesses/:id/addons/:addon', (c) => {
   return c.json({ business: businessView(db, refreshStatus(db, now, b.id), now()) })
 })
 
+/** Respaldo completo (todas las tablas) para descargar y guardar fuera del servidor. */
+admin.get('/admin/export', (c) => {
+  const { db, now } = c.get('deps')
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").all() as { name: string }[]).map((t) => t.name)
+  const data = Object.fromEntries(tables.map((t) => [t, db.prepare(`SELECT * FROM "${t}"`).all()]))
+  audit(db, now, { businessId: null, userId: c.get('admin').id, action: 'admin.respaldo' })
+  return c.json({ exportedAt: iso(now()), version: (db.prepare('SELECT MAX(version) v FROM _migrations').get() as { v: number }).v, tables: data }, 200, { 'content-disposition': `attachment; filename="nexora-${iso(now()).slice(0, 10)}.json"` })
+})
+
 admin.get('/admin/settings', (c) => c.json({ settings: Object.fromEntries((c.get('deps').db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]).map((r) => [r.key, Number(r.value)])) }))
 
 admin.put('/admin/settings', async (c) => {

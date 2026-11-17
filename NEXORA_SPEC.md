@@ -341,7 +341,7 @@ Pendiente: definir el costo real por sucursal y por usuario (nube, mensajes de v
 ## 15. Decisiones (2026-11-17)
 
 - Códigos de verificación: por SMS.
-- Alojamiento de staging: Fly.io, región Dallas (dfw), la más cercana a México disponible.
+- Presupuesto $0 hasta tener clientes: staging en Cloudflare, plan gratuito, sin tarjeta. SMS con cuenta de prueba de Twilio y correo con el plan gratis de Resend.
 - Boletos y compras por link: quedan por pagar; se liquidan en efectivo o transferencia. Sin pago en línea.
 - Báscula: el peso se captura a mano.
 - Super panel: verificación en dos pasos con código por SMS y por correo.

@@ -5,3 +5,5 @@ data/
 .env
 web/dist/
 test/e2e/shots/
+.dev.vars
+.wrangler/

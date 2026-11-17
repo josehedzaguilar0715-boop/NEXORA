@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createApp } from './app.js'
-import { openDb } from './db.js'
+import { openDb } from './db-node.js'
 import { createNotifier } from './notify.js'
 
 const dbPath = process.env.NEXORA_DB ?? 'data/nexora.db'

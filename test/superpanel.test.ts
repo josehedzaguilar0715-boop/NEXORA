@@ -184,7 +184,7 @@ describe('super panel: seguridad y extras', () => {
   it('dos pasos: el código llega por SMS y por correo; sin él no hay sesión', async () => {
     const { createAdmin } = await import('../src/admin.js')
     const { createApp } = await import('../src/app.js')
-    const { openDb } = await import('../src/db.js')
+    const { openDb } = await import('../src/db-node.js')
     const sms: Record<string, string> = {}
     const mail: Record<string, string> = {}
     const deps = { db: openDb(':memory:'), now: () => new Date('2026-11-17T15:00:00Z'), notifier: { sendCode: (p: string, c: string) => void (sms[p] = c), sendEmail: (to: string, _s: string, t: string) => void (mail[to] = t.match(/\d{6}/)![0]) } }
@@ -232,5 +232,17 @@ describe('avisos por SMS y correo', () => {
     expect(new URLSearchParams(calls[0]!.body).get('To')).toBe('+525512340000')
     expect(calls[0]!.body).toContain('123456')
     expect(calls[1]!.url).toBe('https://api.resend.com/emails')
+  })
+})
+
+describe('respaldo', () => {
+  it('el super panel descarga todas las tablas; un dueño no', async () => {
+    const s = setup()
+    const a = await s.adminToken()
+    const o = await s.registerOwner()
+    expect((await s.call('GET', '/admin/export', { token: o.token })).status).toBe(401)
+    const r = await s.call('GET', '/admin/export', { token: a })
+    expect(r.json.tables.businesses).toHaveLength(1)
+    expect(r.json.tables.audit_log.length).toBeGreaterThan(0)
   })
 })
