@@ -312,6 +312,21 @@ admin.get('/admin/export', (c) => {
   return c.json({ exportedAt: iso(now()), version: (db.prepare('SELECT MAX(version) v FROM _migrations').get() as { v: number }).v, tables: data }, 200, { 'content-disposition': `attachment; filename="nexora-${iso(now()).slice(0, 10)}.json"` })
 })
 
+/** Cambiar la contraseña propia del super panel (cierra las demás sesiones). */
+admin.post('/admin/password', async (c) => {
+  const { db, now } = c.get('deps')
+  const a = c.get('admin')
+  const d = parse(z.object({ currentPassword: z.string(), newPassword: z.string() }), await body(c))
+  if (!verifySecret(d.currentPassword, a.password_hash)) throw unauthorized('La contraseña actual no es correcta.')
+  checkPassword(d.newPassword)
+  if (d.newPassword === d.currentPassword) throw bad('La contraseña nueva debe ser distinta.')
+  db.prepare('UPDATE admins SET password_hash = ? WHERE id = ?').run(hashSecret(d.newPassword), a.id)
+  const token = (c.req.header('authorization') ?? '').slice(7)
+  db.prepare('UPDATE admin_sessions SET revoked_at = ? WHERE admin_id = ? AND token_hash != ? AND revoked_at IS NULL').run(iso(now()), a.id, sha256(token))
+  audit(db, now, { businessId: null, userId: a.id, action: 'admin.cambio_contrasena' })
+  return c.json({ ok: true })
+})
+
 admin.get('/admin/settings', (c) => c.json({ settings: Object.fromEntries((c.get('deps').db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]).map((r) => [r.key, Number(r.value)])) }))
 
 admin.put('/admin/settings', async (c) => {

@@ -191,10 +191,30 @@ function AjustesAdmin() {
       <label>Días vencido antes de poder suspender<input inputMode="numeric" value={s.suspend_after_days} onChange={(e) => setS({ ...s, suspend_after_days: Number(e.target.value) || 0 })} /></label>
       <p><button className="primary" onClick={async () => { await adm('PUT', '/admin/settings', s); setMsg('Guardado.') }}>Guardar</button></p>
       {msg && <p className="muted">{msg}</p>}
+      <h2 style={{ marginTop: 16 }}>Cambiar mi contraseña</h2>
+      <CambiarClave />
       <h2 style={{ marginTop: 16 }}>Respaldo</h2>
       <p className="muted">Descarga toda la base y guárdala fuera del servidor (por ejemplo, una vez por semana).</p>
       <p><button onClick={async () => { const d = await adm('GET', '/admin/export'); const url = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `nexora-${d.exportedAt.slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url) }}>Descargar respaldo</button></p>
       <p className="muted">Precios de planes: {mxn(50000)} / {mxn(70000)} / {mxn(90000)}; sucursal extra {mxn(30000)}; paquete de 5 usuarios {mxn(toCents('200'))}.</p>
     </div>
+  )
+}
+
+function CambiarClave() {
+  const [f, setF] = useState({ a: '', b: '', c: '' })
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  return (
+    <>
+      <label>Contraseña actual<input type="password" value={f.a} onChange={(e) => setF({ ...f, a: e.target.value })} /></label>
+      <label>Contraseña nueva (mínimo 8)<input type="password" value={f.b} onChange={(e) => setF({ ...f, b: e.target.value })} /></label>
+      <label>Repite la nueva<input type="password" value={f.c} onChange={(e) => setF({ ...f, c: e.target.value })} /></label>
+      {msg.err && <p className="error">{msg.err}</p>}
+      {msg.ok && <p className="okmsg">{msg.ok}</p>}
+      <p><button className="primary" disabled={!f.a || f.b.length < 8} onClick={async () => {
+        if (f.b !== f.c) return setMsg({ err: 'Las contraseñas nuevas no coinciden.' })
+        try { await adm('POST', '/admin/password', { currentPassword: f.a, newPassword: f.b }); setF({ a: '', b: '', c: '' }); setMsg({ ok: 'Contraseña cambiada.' }) } catch (e) { setMsg({ err: (e as Error).message }) }
+      }}>Cambiar contraseña</button></p>
+    </>
   )
 }

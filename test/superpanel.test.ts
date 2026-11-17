@@ -267,3 +267,16 @@ describe('recuperar la cuenta del dueño', () => {
     expect((await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: 'otraclave1' } })).status).toBe(200)
   })
 })
+
+describe('super panel: cambiar contraseña', () => {
+  it('pide la actual y cierra las demás sesiones', async () => {
+    const s = setup()
+    const a = await s.adminToken()
+    const other = await s.adminToken()
+    expect((await s.call('POST', '/admin/password', { token: a, body: { currentPassword: 'mala', newPassword: 'nuevaclave9' } })).status).toBe(401)
+    expect((await s.call('POST', '/admin/password', { token: a, body: { currentPassword: 'superpanel1', newPassword: 'nuevaclave9' } })).status).toBe(200)
+    expect((await s.call('GET', '/admin/settings', { token: other })).status).toBe(401)
+    expect((await s.call('GET', '/admin/settings', { token: a })).status).toBe(200)
+    expect((await s.call('POST', '/admin/login', { body: { username: 'soporte', password: 'nuevaclave9' } })).json.token).toBeTruthy()
+  })
+})

@@ -4,13 +4,14 @@ import { createApp } from './app.js'
 import type { Deps } from './context.js'
 import { doDb } from './db-do.js'
 import { createNotifier } from './notify.js'
+// Pantallas compiladas incluidas en el paquete (npm run build && tsx scripts/embed-assets.ts).
+import { ASSETS } from './assets.gen.js'
 
 /**
- * NEXORA en Cloudflare (plan gratuito): las pantallas salen de Workers Static Assets y la API (/api/*)
+ * NEXORA en Cloudflare (plan gratuito): el Worker entrega las pantallas (incluidas en el paquete) y la API (/api/*)
  * corre dentro de un Durable Object con SQLite. Una sola instancia guarda toda la base.
  */
 interface Env {
-  ASSETS: { fetch(req: Request): Promise<Response> }
   NEXORA: { idFromName(name: string): unknown; get(id: unknown): { fetch(req: Request): Promise<Response> } }
   [k: string]: unknown
 }
@@ -42,6 +43,10 @@ export default {
       url.pathname = url.pathname.slice(4) || '/'
       return env.NEXORA.get(env.NEXORA.idFromName('principal')).fetch(new Request(url, req))
     }
-    return env.ASSETS.fetch(req)
+    // Pantallas: archivo exacto o, si no existe, la app (rutas como /admin o /reservar/…).
+    const file = ASSETS[url.pathname] ?? ASSETS['/index.html']!
+    const bytes = Uint8Array.from(atob(file.body), (ch) => ch.charCodeAt(0))
+    const immutable = url.pathname.startsWith('/assets/')
+    return new Response(bytes, { headers: { 'content-type': file.type, 'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache' } })
   },
 }

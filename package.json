@@ -14,7 +14,9 @@
     "e2e": "tsx test/e2e/caja.e2e.ts",
     "check": "npm run typecheck && vitest run && npm run build && npm run e2e",
     "backup": "tsx scripts/backup.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "build:worker": "npm run build && tsx scripts/embed-assets.ts && tsc --noEmit -p tsconfig.worker.json",
+    "deploy": "npm run build:worker && wrangler deploy"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.8",
