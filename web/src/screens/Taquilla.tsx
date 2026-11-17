@@ -26,8 +26,8 @@ export function Taquilla(_: { me: Me }) {
       setLast(r); setQty({}); setMsg({ ok: `Vendidos ${r.tickets.length} boletos: ${mxn(r.sale.total)}` }); void load()
     } catch (e) { setMsg({ err: (e as Error).message }) }
   }
-  const payOnline = async () => {
-    try { const r = await api<any>('POST', `/tourism/orders/${token.trim()}/pay`, { paymentMethod: 'efectivo' }); setMsg({ ok: `Compra en línea pagada: ${r.paid} boletos, ${mxn(r.sale.total)}` }); setToken('') } catch (e) { setMsg({ err: (e as Error).message }) }
+  const payOnline = async (paymentMethod: string) => {
+    try { const r = await api<any>('POST', `/tourism/orders/${token.trim()}/pay`, { paymentMethod }); setMsg({ ok: `Compra en línea pagada: ${r.paid} boletos, ${mxn(r.sale.total)}` }); setToken('') } catch (e) { setMsg({ err: (e as Error).message }) }
   }
   return (
     <div className="grid2">
@@ -50,7 +50,7 @@ export function Taquilla(_: { me: Me }) {
         {msg.err && <p className="error">{msg.err}</p>}
         {msg.ok && <p className="okmsg">{msg.ok}</p>}
         <h3 style={{ marginTop: 16 }}>Cobrar compra en línea</h3>
-        <div className="row"><input aria-label="Folio de compra en línea" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Folio de la compra" /><button style={{ flex: '0 0 auto' }} disabled={!token} onClick={payOnline}>Cobrar</button></div>
+        <div className="row"><input aria-label="Folio de compra en línea" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Folio de la compra" /><button style={{ flex: '0 0 auto' }} disabled={!token} onClick={() => payOnline('efectivo')}>Efectivo</button><button style={{ flex: '0 0 auto' }} disabled={!token} onClick={() => payOnline('transferencia')}>Transferencia</button></div>
       </section>
       <section className="card">
         <h2>Boletos impresos</h2>
@@ -118,7 +118,7 @@ export function TiendaBoletos({ code }: { code: string }) {
         <label>Teléfono (10 dígitos)<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
         {err && <p className="error">{err}</p>}
         <p><button className="primary big" style={{ width: '100%' }} disabled={!f.start || !total || f.name.trim().length < 2} onClick={buy}>Apartar boletos</button></p>
-        <p className="muted">Se pagan en taquilla el día de tu visita. Recibirás un QR por boleto.</p>
+        <p className="muted">Se pagan en efectivo o por transferencia. Recibirás un QR por boleto.</p>
       </div>
     </main>
   )

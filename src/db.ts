@@ -1189,6 +1189,33 @@ const MIGRATIONS: Migration[] = [
     authorized_by TEXT REFERENCES users(id)
   );
   `,
+  `
+  -- Super panel: verificación en dos pasos por SMS y correo.
+  ALTER TABLE admins ADD COLUMN phone TEXT;
+  ALTER TABLE admins ADD COLUMN email TEXT;
+  CREATE TABLE admin_challenges (
+    id TEXT PRIMARY KEY,
+    admin_id TEXT NOT NULL REFERENCES admins(id),
+    code_hash TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    created_at TEXT NOT NULL
+  );
+  -- Extras de pago (p. ej. instalación del link de reservas): solo el super panel los habilita.
+  ALTER TABLE businesses ADD COLUMN addons TEXT NOT NULL DEFAULT '[]';
+  UPDATE businesses SET addons = '["reservas"]' WHERE modules LIKE '%reservas%';
+  -- Cobros únicos (instalaciones). Nunca se borran.
+  CREATE TABLE one_time_charges (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    concept TEXT NOT NULL,
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    recorded_by TEXT NOT NULL REFERENCES admins(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE TRIGGER one_time_charges_no_delete BEFORE DELETE ON one_time_charges BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {

@@ -11,6 +11,8 @@ import { AppError, bad, clampTime, conflict, forbidden, iso, localDate, newId, n
 
 export const MODULES = ['membresias', 'promociones', 'fidelidad', 'asistencia', 'reservas', 'recordatorios'] as const
 export type Module = (typeof MODULES)[number]
+/** Extras que se cobran aparte (instalación) y habilita el super panel. */
+export const PAID_ADDONS: Module[] = ['reservas']
 
 export function moduleOn(db: Db, businessId: string, m: Module): boolean {
   const r = db.prepare('SELECT modules FROM businesses WHERE id = ?').get(businessId) as { modules: string }
@@ -29,14 +31,17 @@ export const common = new Hono<Env>()
 
 common.get('/modules', (c) => {
   const r = c.get('deps').db.prepare('SELECT modules FROM businesses WHERE id = ?').get(c.get('session').user.business_id) as { modules: string }
-  return c.json({ available: MODULES, active: JSON.parse(r.modules) })
+  const a = c.get('deps').db.prepare('SELECT addons FROM businesses WHERE id = ?').get(c.get('session').user.business_id) as { addons: string }
+  return c.json({ available: MODULES, active: JSON.parse(r.modules), addons: JSON.parse(a.addons), paidAddons: PAID_ADDONS })
 })
 
 common.put('/modules', ownerOnly, async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const d = parse(z.object({ active: z.array(z.enum(MODULES)) }), await body(c))
-  const old = db.prepare('SELECT modules FROM businesses WHERE id = ?').get(u.business_id) as { modules: string }
+  const old = db.prepare('SELECT modules, addons FROM businesses WHERE id = ?').get(u.business_id) as { modules: string; addons: string }
+  // Los extras con costo de instalación (link de reservas) solo se usan si el super panel los habilitó.
+  for (const m of PAID_ADDONS) if (d.active.includes(m) && !(JSON.parse(old.addons) as string[]).includes(m)) throw new AppError(403, 'extra_no_contratado', 'El link de reservas tiene un costo de instalación. Pídelo desde el buzón.')
   db.prepare('UPDATE businesses SET modules = ? WHERE id = ?').run(JSON.stringify([...new Set(d.active)]), u.business_id)
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'negocio.modulos', oldValue: JSON.parse(old.modules), newValue: d.active })
   return c.json({ active: d.active })

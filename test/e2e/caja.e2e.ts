@@ -172,6 +172,7 @@ try {
 
   // Barbería: el cliente reserva por link, el negocio confirma y cobra desde la agenda.
   await call('PATCH', '/business', { giro: 'barberia', forcePasswordChange: false }, token)
+  apiDb.prepare(`UPDATE businesses SET addons = '["reservas"]'`).run() // lo habilita el super panel con la instalación
   await call('PUT', '/modules', { active: ['reservas'] }, token)
   const barbero = (await call('POST', '/users', { name: 'Juan Barbero', username: 'juanb', password: 'inicial123', template: 'barbero' }, token)).user
   await call('PUT', `/staff/${barbero.id}/agenda`, { inAgenda: true, schedule: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, start: '00:00', end: '24:00' })) }, token)
@@ -180,6 +181,8 @@ try {
   await pub.goto(`${base}/reservar/${me.business.code}`)
   await pub.getByRole('button', { name: /Corte de cabello/ }).click()
   await pub.getByRole('button', { name: 'El primero disponible' }).click()
+  // Mañana: así siempre hay horas libres, sin importar la hora en que corra la prueba.
+  await pub.getByLabel('Día').fill(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(Date.now() + 86_400_000)))
   await pub.locator('button', { hasText: /^\d{2}:\d{2}$/ }).first().click()
   await pub.getByLabel('Nombre').fill('Pedro Cliente')
   await pub.getByLabel('Teléfono (10 dígitos)').fill('5598765432')
@@ -189,6 +192,7 @@ try {
   check(true, 'barbería: el cliente reserva por link y ve "por confirmar"')
   await page.goto(`${base}/#/agenda`)
   await page.reload()
+  await page.getByLabel('Día').fill(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(Date.now() + 86_400_000)))
   await page.getByRole('button', { name: 'Confirmar' }).click()
   await page.getByRole('button', { name: 'Cobrar' }).click()
   await page.getByLabel(/Propina para/).fill('20')

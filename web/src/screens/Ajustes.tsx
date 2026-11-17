@@ -9,11 +9,12 @@ const MODULES: Record<string, string> = { membresias: 'Membresías y paquetes', 
 export function Ajustes({ me }: { me: Me }) {
   const [biz, setBiz] = useState({ name: me.business.name, phone: me.business.phone ?? '', logoUrl: '', giro: me.business.giro, forcePasswordChange: true })
   const [mods, setMods] = useState<string[]>([])
+  const [addons, setAddons] = useState<string[]>([])
   const [st, setSt] = useState<Record<string, any>>({})
   const [sessions, setSessions] = useState<any[]>([])
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   useEffect(() => {
-    api<any>('GET', '/modules').then((r) => setMods(r.active)).catch(() => {})
+    api<any>('GET', '/modules').then((r) => { setMods(r.active); setAddons(r.addons ?? []) }).catch(() => {})
     api<any>('GET', '/settings').then((r) => setSt(r.settings)).catch(() => {})
     api<any>('GET', '/auth/sessions').then((r) => setSessions(r.sessions)).catch(() => {})
   }, [])
@@ -31,7 +32,11 @@ export function Ajustes({ me }: { me: Me }) {
         <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={biz.forcePasswordChange} onChange={(e) => setBiz({ ...biz, forcePasswordChange: e.target.checked })} />Pedir cambio de contraseña en el primer ingreso</label>
         <p><button className="primary" onClick={run(() => api('PATCH', '/business', { name: biz.name, phone: biz.phone, logoUrl: biz.logoUrl || undefined, giro: biz.giro, forcePasswordChange: biz.forcePasswordChange }), 'Guardado. Vuelve a entrar para ver las pantallas del giro.')}>Guardar</button></p>
         <h2 style={{ marginTop: 16 }}>Módulos</h2>
-        {Object.entries(MODULES).map(([k, v]) => <label key={k} style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={mods.includes(k)} onChange={() => toggle(k)} />{v}</label>)}
+        {Object.entries(MODULES).map(([k, v]) => {
+          // El link de reservas se contrata con instalación: lo habilita soporte.
+          const locked = k === 'reservas' && !addons.includes(k)
+          return <label key={k} style={{ fontWeight: 500, opacity: locked ? 0.6 : 1 }}><input type="checkbox" disabled={locked} style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={mods.includes(k)} onChange={() => toggle(k)} />{v}{locked ? ' — con costo de instalación; pídelo en el Buzón' : ''}</label>
+        })}
         <p><button className="primary" onClick={run(() => api('PUT', '/modules', { active: mods }))}>Guardar módulos</button></p>
         {mods.includes('reservas') && <p className="muted">Link de reservas: {location.origin}/{me.business.giro === 'turistico' ? 'boletos' : 'reservar'}/{me.business.code}</p>}
       </section>

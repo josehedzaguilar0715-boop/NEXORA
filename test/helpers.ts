@@ -40,7 +40,9 @@ export function setup() {
     db.prepare("UPDATE businesses SET trial_ends_at = '2100-01-01T00:00:00.000Z'").run()
     db.prepare("UPDATE sessions SET expires_at = '2100-01-01T00:00:00.000Z'").run()
   }
-  return { longLived, adminToken, app, db, call, codes, advance, registerOwner, createStaff, uuid: randomUUID }
+  /** Habilita un extra de pago (lo haría el super panel) en todos los negocios de la prueba. */
+  const addon = (name: string) => void db.prepare("UPDATE businesses SET addons = json_insert(addons, '$[#]', ?)").run(name)
+  return { addon, longLived, adminToken, app, db, call, codes, advance, registerOwner, createStaff, uuid: randomUUID }
 }
 
 /** Negocio listo para vender: dueño con código 4321, sin cambio forzado de contraseña. */

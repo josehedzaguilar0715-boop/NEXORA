@@ -140,7 +140,8 @@ tourism.post('/tourism/orders/:token/pay', requirePerm('sell'), async (c) => {
   const deps = c.get('deps')
   const { db, now } = deps
   const u = c.get('session').user
-  const d = parse(z.object({ paymentMethod: z.enum(['efectivo', 'transferencia', 'tarjeta']).default('efectivo'), cashReceived: z.number().int().optional() }), await body(c))
+  // Las compras en línea quedan por pagar y se liquidan en efectivo o transferencia.
+  const d = parse(z.object({ paymentMethod: z.enum(['efectivo', 'transferencia']).default('efectivo'), cashReceived: z.number().int().optional() }), await body(c))
   const tks = db.prepare("SELECT * FROM entry_tickets WHERE order_token = ? AND business_id = ? AND status = 'por_pagar'").all(c.req.param('token'), u.business_id) as { id: string; service_id: string; type_name: string; price: number; date: string; start: string }[]
   if (!tks.length) throw notFound('No hay boletos por pagar con ese folio.')
   const result = db.transaction(() => {

@@ -50,6 +50,7 @@ describe('lugar turístico', () => {
 
   it('venta anticipada en línea: genera QR, queda por pagar (cuenta para el aforo) y se cobra en taquilla', async () => {
     const { s, T, o, open, adulto } = await turistico()
+    s.addon('reservas')
     await s.call('PUT', '/modules', { token: T, body: { active: ['reservas'] } })
     const shop = (await (await s.app.request(`/public/tickets-shop/${o.business.code}?date=2026-11-18`)).json()) as any
     expect(shop.types.map((t: any) => t.name)).toContain('Adulto')
@@ -63,7 +64,9 @@ describe('lugar turístico', () => {
     s.advance(86_400_000) // llega el día
     expect((await s.call('POST', '/tourism/scan', { token: T, body: { code: order.tickets[0].code } })).json.error.code).toBe('boleto_sin_pagar')
     await open(0)
-    const paid = await s.call('POST', `/tourism/orders/${order.token}/pay`, { token: T, body: { paymentMethod: 'tarjeta' } })
+    // Lo comprado en línea se paga solo en efectivo o transferencia.
+    expect((await s.call('POST', `/tourism/orders/${order.token}/pay`, { token: T, body: { paymentMethod: 'tarjeta' } })).status).toBe(400)
+    const paid = await s.call('POST', `/tourism/orders/${order.token}/pay`, { token: T, body: { paymentMethod: 'transferencia' } })
     expect(paid.json.sale.total).toBe(48000)
     expect((await s.call('POST', '/tourism/scan', { token: T, body: { code: order.tickets[0].code } })).json.ok).toBe(true)
     const rep = (await s.call('GET', '/reports/tickets?from=2026-11-17&to=2026-11-18', { token: T })).json
@@ -94,6 +97,7 @@ describe('lugar turístico', () => {
 
   it('cierre temporal por clima: con código, avisa y cancela los afectados; reembolso solo si el dueño lo decide', async () => {
     const { s, T, o, open, adulto } = await turistico()
+    s.addon('reservas')
     await s.call('PUT', '/modules', { token: T, body: { active: ['reservas'] } })
     await open(0)
     await s.call('POST', '/tourism/sell', { token: T, body: { date: '2026-11-17', start: '13:00', items: [{ serviceId: adulto.id, quantity: 2 }] } })

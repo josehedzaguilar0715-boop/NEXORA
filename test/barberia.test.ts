@@ -8,6 +8,7 @@ const ALL_WEEK = [0, 1, 2, 3, 4, 5, 6].filter((d) => d !== 1).map((weekday) => (
 async function barberia() {
   const n = await negocioListo()
   const { s, o, T } = n
+  s.addon('reservas')
   await s.call('PUT', '/modules', { token: T, body: { active: ['reservas', 'membresias'] } })
   const juan = await s.createStaff(T, o.business.code, 'juan', 'barbero')
   const luis = await s.createStaff(T, o.business.code, 'luis', 'barbero')

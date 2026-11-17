@@ -81,6 +81,7 @@ describe('estudio de uñas', () => {
 
   it('la dirección no aparece en el link público', async () => {
     const { s, T, o, ana, mani } = await unas()
+    s.addon('reservas')
     await s.call('PUT', '/modules', { token: T, body: { active: ['reservas'] } })
     const r = await s.app.request(`/public/book/${o.business.code}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ serviceIds: [mani.id], staffId: ana.id, date: '2026-11-18', time: '10:00', name: 'Web', phone: '5511112222' }) })
     const j = (await r.json()) as any

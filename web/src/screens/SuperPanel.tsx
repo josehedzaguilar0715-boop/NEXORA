@@ -33,10 +33,21 @@ export function SuperPanel() {
 }
 
 function AdminLogin({ onLogin }: { onLogin: () => void }) {
-  const [f, setF] = useState({ username: '', password: '' })
+  const [f, setF] = useState({ username: '', password: '', code: '' })
+  const [ch, setCh] = useState<{ challengeId: string; sentTo: string[] } | null>(null)
   const [err, setErr] = useState('')
+  // Segundo paso: el código llega por SMS y por correo.
+  if (ch) return (
+    <form className="card login" onSubmit={async (e) => { e.preventDefault(); try { const r = await adm('POST', '/admin/verify', { challengeId: ch.challengeId, code: f.code }); localStorage.setItem(TOKEN, r.token); onLogin() } catch (er) { setErr((er as Error).message) } }}>
+      <h1>Super panel</h1>
+      <p>Te enviamos un código por {ch.sentTo.join(' y ')}.</p>
+      <label>Código de 6 dígitos<input inputMode="numeric" autoFocus maxLength={6} value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} /></label>
+      {err && <p className="error">{err}</p>}
+      <p><button className="primary big" style={{ width: '100%' }}>Verificar</button></p>
+    </form>
+  )
   return (
-    <form className="card login" onSubmit={async (e) => { e.preventDefault(); try { const r = await adm('POST', '/admin/login', f); localStorage.setItem(TOKEN, r.token); onLogin() } catch (er) { setErr((er as Error).message) } }}>
+    <form className="card login" onSubmit={async (e) => { e.preventDefault(); try { const r = await adm('POST', '/admin/login', { username: f.username, password: f.password }); if (r.token) { localStorage.setItem(TOKEN, r.token); onLogin() } else { setErr(''); setCh(r) } } catch (er) { setErr((er as Error).message) } }}>
       <h1>Super panel</h1>
       <label>Usuario<input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} autoCapitalize="none" /></label>
       <label>Contraseña<input type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></label>
@@ -79,6 +90,11 @@ function Negocios() {
             {['prueba', 'vencido'].includes(sel.status) && !sel.paidUntil && <button className="big" onClick={() => { const d = Number(prompt('Días de prueba (desde el alta):', String(sel.trialDays ?? 14))); if (d >= 0) void run(() => adm('PATCH', `/admin/businesses/${sel.id}`, { trialDays: d }), 'Días de prueba cambiados.')() }}>Días de prueba</button>}
             {sel.status === 'vencido' && <button className="danger big" onClick={() => { const r = prompt('Motivo de la suspensión:'); if (r) void run(() => adm('POST', `/admin/businesses/${sel.id}/suspend`, { reason: r }), 'Suspendido. Sus datos quedan intactos.')() }}>Suspender</button>}
           </div>
+          <h3 style={{ marginTop: 14 }}>Extras</h3>
+          {sel.addons.includes('reservas')
+            ? <p className="muted">Link de reservas habilitado.</p>
+            : <button onClick={() => { const fee = prompt('Cobro de instalación del link de reservas ($):'); if (fee !== null) void run(() => adm('POST', `/admin/businesses/${sel.id}/addons`, { addon: 'reservas', installationFee: toCents(fee || '0') }), 'Link de reservas habilitado.')() }}>Habilitar link de reservas (con instalación)</button>}
+          {sel.oneTimeCharges.length > 0 && <p className="muted">{sel.oneTimeCharges.map((x: any) => `${x.concept}: ${mxn(x.amount)}`).join(' · ')}</p>}
           <h3 style={{ marginTop: 14 }}>Plan</h3>
           <Plan b={sel} onSave={(body) => run(() => adm('PATCH', `/admin/businesses/${sel.id}`, body), 'Plan guardado.')()} />
           <h3 style={{ marginTop: 14 }}>Restablecer acceso del dueño</h3>

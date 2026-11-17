@@ -179,3 +179,58 @@ describe('buzón y solicitudes', () => {
     expect((await s.call('GET', '/support/tickets', { token: e.token })).status).toBe(403)
   })
 })
+
+describe('super panel: seguridad y extras', () => {
+  it('dos pasos: el código llega por SMS y por correo; sin él no hay sesión', async () => {
+    const { createAdmin } = await import('../src/admin.js')
+    const { createApp } = await import('../src/app.js')
+    const { openDb } = await import('../src/db.js')
+    const sms: Record<string, string> = {}
+    const mail: Record<string, string> = {}
+    const deps = { db: openDb(':memory:'), now: () => new Date('2026-11-17T15:00:00Z'), notifier: { sendCode: (p: string, c: string) => void (sms[p] = c), sendEmail: (to: string, _s: string, t: string) => void (mail[to] = t.match(/\d{6}/)![0]) } }
+    const app = createApp(deps)
+    createAdmin(deps, { name: 'Soporte', username: 'soporte', password: 'superpanel1', phone: '5500000001', email: 'soporte@example.com' })
+    const post = async (path: string, body: object) => { const r = await app.request(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); return { status: r.status, json: (await r.json()) as any } }
+    const l = await post('/admin/login', { username: 'soporte', password: 'superpanel1' })
+    expect(l.json.token).toBeUndefined()
+    expect(l.json.sentTo).toHaveLength(2)
+    expect(sms['5500000001']).toBe(mail['soporte@example.com'])
+    expect((await post('/admin/verify', { challengeId: l.json.challengeId, code: '000000' })).status).toBe(400)
+    const v = await post('/admin/verify', { challengeId: l.json.challengeId, code: mail['soporte@example.com'] })
+    expect(v.json.token).toBeTruthy()
+    expect((await post('/admin/verify', { challengeId: l.json.challengeId, code: mail['soporte@example.com'] })).status).toBe(400) // un solo uso
+  })
+
+  it('link de reservas: el dueño no lo enciende solo; el super panel lo habilita con su cobro de instalación', async () => {
+    const s = setup()
+    const a = await s.adminToken()
+    const o = await s.registerOwner()
+    expect((await s.call('PUT', '/modules', { token: o.token, body: { active: ['reservas'] } })).json.error.code).toBe('extra_no_contratado')
+    const id = (await s.call('GET', '/admin/businesses', { token: a })).json.businesses[0].id
+    const r = await s.call('POST', `/admin/businesses/${id}/addons`, { token: a, body: { addon: 'reservas', installationFee: 150000 } })
+    expect(r.json.business.addons).toEqual(['reservas'])
+    expect(r.json.business.oneTimeCharges[0]).toMatchObject({ concept: 'Instalación: reservas', amount: 150000 })
+    expect((await s.call('GET', '/modules', { token: o.token })).json.active).toContain('reservas')
+    expect((await s.call('PUT', '/modules', { token: o.token, body: { active: ['reservas', 'promociones'] } })).status).toBe(200)
+  })
+})
+
+describe('avisos por SMS y correo', () => {
+  it('envía el SMS por Twilio a +52 y el correo por Resend', async () => {
+    const { createNotifier } = await import('../src/notify.js')
+    const calls: { url: string; body: string }[] = []
+    const orig = globalThis.fetch
+    globalThis.fetch = (async (url: string, init: RequestInit) => { calls.push({ url, body: String(init.body) }); return new Response('{}', { status: 201 }) }) as typeof fetch
+    try {
+      const n = createNotifier({ TWILIO_ACCOUNT_SID: 'AC1', TWILIO_AUTH_TOKEN: 'x', TWILIO_FROM: '+15550001111', RESEND_API_KEY: 're_x', MAIL_FROM: 'NEXORA <a@b.c>' })
+      await n.sendCode('5512340000', '123456')
+      await n.sendEmail!('x@y.z', 'Asunto', 'Texto')
+    } finally {
+      globalThis.fetch = orig
+    }
+    expect(calls[0]!.url).toContain('api.twilio.com/2010-04-01/Accounts/AC1/Messages.json')
+    expect(new URLSearchParams(calls[0]!.body).get('To')).toBe('+525512340000')
+    expect(calls[0]!.body).toContain('123456')
+    expect(calls[1]!.url).toBe('https://api.resend.com/emails')
+  })
+})

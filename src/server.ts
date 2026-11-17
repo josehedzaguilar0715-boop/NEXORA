@@ -5,6 +5,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { createApp } from './app.js'
 import { openDb } from './db.js'
+import { createNotifier } from './notify.js'
 
 const dbPath = process.env.NEXORA_DB ?? 'data/nexora.db'
 mkdirSync(dirname(dbPath), { recursive: true })
@@ -12,8 +13,8 @@ const db = openDb(dbPath)
 const api = createApp({
   db,
   now: () => new Date(),
-  // Desarrollo: el código solo se imprime. En staging se conecta WhatsApp/SMS (proveedor pendiente).
-  notifier: { sendCode: (phone, code) => console.log(`[verificación] ${phone}: ${code}`) },
+  // SMS por Twilio y correo por Resend; sin credenciales solo se imprime en consola.
+  notifier: createNotifier(),
 })
 
 const root = new Hono()

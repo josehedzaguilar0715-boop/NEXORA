@@ -6,10 +6,10 @@ import { enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, refreshStatus, set
 import { body, LOCK_MINUTES, MAX_FAILED, parse, type Deps } from './context.js'
 import { ticketView } from './support.js'
 import {
-  bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone, notFound, sha256, unauthorized, verifySecret,
+  bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone, notFound, numericCode, sha256, unauthorized, verifySecret,
 } from './util.js'
 
-interface AdminRow { id: string; name: string; username: string; password_hash: string; active: number; failed_attempts: number; locked_until: string | null }
+interface AdminRow { id: string; name: string; username: string; password_hash: string; active: number; failed_attempts: number; locked_until: string | null; phone: string | null; email: string | null }
 type AdminEnv = { Variables: { deps: Deps; admin: AdminRow } }
 
 /**
@@ -18,10 +18,10 @@ type AdminEnv = { Variables: { deps: Deps; admin: AdminRow } }
  */
 export const admin = new Hono<AdminEnv>()
 
-export function createAdmin(deps: Deps, a: { name: string; username: string; password: string }) {
+export function createAdmin(deps: Deps, a: { name: string; username: string; password: string; phone?: string; email?: string }) {
   checkPassword(a.password)
   const id = newId()
-  deps.db.prepare('INSERT INTO admins (id, name, username, password_hash, created_at) VALUES (?,?,?,?,?)').run(id, a.name, a.username.trim().toLowerCase(), hashSecret(a.password), iso(deps.now()))
+  deps.db.prepare('INSERT INTO admins (id, name, username, password_hash, phone, email, created_at) VALUES (?,?,?,?,?,?,?)').run(id, a.name, a.username.trim().toLowerCase(), hashSecret(a.password), a.phone ? normalizePhone(a.phone) : null, a.email?.trim().toLowerCase() ?? null, iso(deps.now()))
   return id
 }
 
@@ -41,11 +41,41 @@ admin.post('/admin/login', async (c) => {
     throw unauthorized('Datos incorrectos.')
   }
   db.prepare('UPDATE admins SET failed_attempts = 0, locked_until = NULL WHERE id = ?').run(a.id)
+  // Verificación en dos pasos: el mismo código llega por SMS y por correo; sirve cualquiera.
+  if (a.phone || a.email) {
+    const deps = c.get('deps')
+    const code = numericCode(6)
+    const id = newId()
+    db.prepare('INSERT INTO admin_challenges (id, admin_id, code_hash, expires_at, created_at) VALUES (?,?,?,?,?)').run(id, a.id, hashSecret(code), iso(new Date(now().getTime() + 10 * 60_000)), iso(now()))
+    const sent: string[] = []
+    if (a.phone) { await deps.notifier.sendCode(a.phone, code); sent.push(`SMS al ${a.phone.slice(-4).padStart(10, '•')}`) }
+    if (a.email && deps.notifier.sendEmail) { await deps.notifier.sendEmail(a.email, 'NEXORA · código del super panel', `Tu código de acceso al super panel es ${code}. Vence en 10 minutos. Si no fuiste tú, cambia tu contraseña.`); sent.push(`correo ${a.email.replace(/^(.{2}).*(@.*)$/, '$1•••$2')}`) }
+    return c.json({ challengeId: id, sentTo: sent })
+  }
+  return c.json({ token: issueAdminSession(c.get('deps'), a.id) })
+})
+
+function issueAdminSession(deps: Deps, adminId: string) {
+  const { db, now } = deps
   const token = newToken()
   const t = now()
-  db.prepare('INSERT INTO admin_sessions (id, admin_id, token_hash, created_at, expires_at) VALUES (?,?,?,?,?)').run(newId(), a.id, sha256(token), iso(t), iso(new Date(t.getTime() + 12 * 3600_000)))
-  audit(db, now, { businessId: null, userId: a.id, action: 'admin.sesion' })
-  return c.json({ token })
+  db.prepare('INSERT INTO admin_sessions (id, admin_id, token_hash, created_at, expires_at) VALUES (?,?,?,?,?)').run(newId(), adminId, sha256(token), iso(t), iso(new Date(t.getTime() + 12 * 3600_000)))
+  audit(db, now, { businessId: null, userId: adminId, action: 'admin.sesion' })
+  return token
+}
+
+admin.post('/admin/verify', async (c) => {
+  const { db, now } = c.get('deps')
+  const d = parse(z.object({ challengeId: z.string(), code: z.string() }), await body(c))
+  const ch = db.prepare('SELECT * FROM admin_challenges WHERE id = ?').get(d.challengeId) as { id: string; admin_id: string; code_hash: string; attempts: number; expires_at: string; used_at: string | null } | undefined
+  if (!ch || ch.used_at || ch.expires_at <= iso(now())) throw bad('El código venció. Entra de nuevo.', 'codigo_vencido')
+  if (ch.attempts >= MAX_FAILED) throw locked('Demasiados intentos. Entra de nuevo.')
+  if (!verifySecret(d.code.trim(), ch.code_hash)) {
+    db.prepare('UPDATE admin_challenges SET attempts = attempts + 1 WHERE id = ?').run(ch.id)
+    throw bad('Código incorrecto.', 'codigo_incorrecto')
+  }
+  db.prepare('UPDATE admin_challenges SET used_at = ? WHERE id = ?').run(iso(now()), ch.id)
+  return c.json({ token: issueAdminSession(c.get('deps'), ch.admin_id) })
 })
 
 const adminAuth = createMiddleware<AdminEnv>(async (c, next) => {
@@ -61,7 +91,7 @@ const adminAuth = createMiddleware<AdminEnv>(async (c, next) => {
   c.set('admin', a)
   await next()
 })
-admin.use('/admin/*', async (c, next) => (c.req.path === '/admin/login' ? next() : adminAuth(c, next)))
+admin.use('/admin/*', async (c, next) => (['/admin/login', '/admin/verify'].includes(c.req.path) ? next() : adminAuth(c, next)))
 
 function businessView(db: Deps['db'], b: BusinessRow, now: Date = new Date()) {
   const cfg = { plan: b.plan, extraBranches: b.extra_branches, extraUserPacks: b.extra_user_packs }
@@ -75,7 +105,8 @@ function businessView(db: Deps['db'], b: BusinessRow, now: Date = new Date()) {
     trialDays: b.trial_days, trialEndsAt: b.trial_ends_at, paidUntil: b.paid_until, overdueSince: b.overdue_since, overdueDays,
     suspendedReason: b.suspended_reason,
     plan: cfg, pendingPlan: b.pending_plan ? JSON.parse(b.pending_plan) : null, monthlyFee: monthlyFee(cfg), limits: limits(cfg),
-    usage: { users, branches }, unreadTickets: unread,
+    usage: { users, branches }, unreadTickets: unread, addons: JSON.parse((db.prepare('SELECT addons FROM businesses WHERE id = ?').get(b.id) as { addons: string }).addons),
+    oneTimeCharges: db.prepare('SELECT concept, amount, created_at AS createdAt FROM one_time_charges WHERE business_id = ? ORDER BY created_at').all(b.id),
   }
 }
 
@@ -224,6 +255,34 @@ admin.post('/admin/businesses/:id/users/:userId/reset-password', async (c) => {
   db.prepare('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').run(iso(now()), u.id)
   audit(db, now, { businessId: b.id, userId: a.id, action: 'admin.restablecer_acceso', entity: 'user', entityId: u.id, reason: d.reason })
   return c.json({ ok: true })
+})
+
+/** Habilitar un extra con su cobro de instalación (p. ej. link de reservas). Se activa de una vez para el negocio. */
+admin.post('/admin/businesses/:id/addons', async (c) => {
+  const { db, now } = c.get('deps')
+  const a = c.get('admin')
+  const b = loadBusiness(c)
+  const d = parse(z.object({ addon: z.enum(['reservas']), installationFee: z.number().int().min(0), note: z.string().max(200).optional() }), await body(c))
+  const row = db.prepare('SELECT addons, modules FROM businesses WHERE id = ?').get(b.id) as { addons: string; modules: string }
+  const addons = JSON.parse(row.addons) as string[]
+  if (addons.includes(d.addon)) throw conflict('Ese extra ya está habilitado.')
+  const modules = [...new Set([...(JSON.parse(row.modules) as string[]), d.addon])]
+  db.transaction(() => {
+    db.prepare('UPDATE businesses SET addons = ?, modules = ? WHERE id = ?').run(JSON.stringify([...addons, d.addon]), JSON.stringify(modules), b.id)
+    db.prepare('INSERT INTO one_time_charges (id, business_id, concept, amount, recorded_by, created_at) VALUES (?,?,?,?,?,?)').run(newId(), b.id, `Instalación: ${d.addon}${d.note ? ` (${d.note})` : ''}`, d.installationFee, a.id, iso(now()))
+    audit(db, now, { businessId: b.id, userId: a.id, action: 'admin.extra_habilitado', entity: 'business', entityId: b.id, newValue: { addon: d.addon, installationFee: d.installationFee } })
+  })()
+  return c.json({ business: businessView(db, refreshStatus(db, now, b.id), now()) }, 201)
+})
+
+admin.delete('/admin/businesses/:id/addons/:addon', (c) => {
+  const { db, now } = c.get('deps')
+  const b = loadBusiness(c)
+  const row = db.prepare('SELECT addons, modules FROM businesses WHERE id = ?').get(b.id) as { addons: string; modules: string }
+  const strip = (j: string) => JSON.stringify((JSON.parse(j) as string[]).filter((x) => x !== c.req.param('addon')))
+  db.prepare('UPDATE businesses SET addons = ?, modules = ? WHERE id = ?').run(strip(row.addons), strip(row.modules), b.id)
+  audit(db, now, { businessId: b.id, userId: c.get('admin').id, action: 'admin.extra_retirado', entity: 'business', entityId: b.id, newValue: { addon: c.req.param('addon') } })
+  return c.json({ business: businessView(db, refreshStatus(db, now, b.id), now()) })
 })
 
 admin.get('/admin/settings', (c) => c.json({ settings: Object.fromEntries((c.get('deps').db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]).map((r) => [r.key, Number(r.value)])) }))
