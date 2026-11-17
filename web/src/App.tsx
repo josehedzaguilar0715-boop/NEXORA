@@ -27,7 +27,7 @@ import { Reportes } from './screens/Reportes'
 import { Usuarios } from './screens/Usuarios'
 
 export interface Me {
-  user: { id: string; name: string; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
+  user: { id: string; name: string; phone?: string | null; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
   permissions: 'todos' | string[]
   business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string }
   settings?: Record<string, any>

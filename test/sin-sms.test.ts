@@ -32,4 +32,17 @@ describe('sin SMS configurado', () => {
     const again = await call('POST', '/auth/owner/login', { phone: '5511112222', password: 'Temporal99' })
     expect(again.json.mustChangePassword).toBe(true)
   })
+  it('el dueño y el super panel pueden cambiar el teléfono de entrada', async () => {
+    const reg = await call('POST', '/auth/register', { businessName: 'Otra', ownerName: 'Luis', phone: '5533334444', password: 'secreto123' })
+    const tok = reg.json.token
+    expect((await call('POST', '/auth/owner/phone', { phone: '5533335555', password: 'mala1234' }, tok)).status).toBe(401)
+    expect((await call('POST', '/auth/owner/phone', { phone: '5511112222', password: 'secreto123' }, tok)).json.error.code).toBe('telefono_registrado')
+    expect((await call('POST', '/auth/owner/phone', { phone: '5533335555', password: 'secreto123' }, tok)).json.ok).toBe(true)
+    expect((await call('POST', '/auth/owner/login', { phone: '5533335555', password: 'secreto123' })).json.token).toBeTruthy()
+    expect((await call('POST', '/auth/owner/login', { phone: '5533334444', password: 'secreto123' })).status).toBe(401)
+    const adm = (await call('POST', '/admin/login', { username: 'soporte', password: 'superpanel1' })).json.token
+    const r = await call('POST', `/admin/businesses/${reg.json.business.id}/owner-phone`, { phone: '5533336666', reason: 'Cambió de número' }, adm)
+    expect(r.json.business.owner.phone).toBe('5533336666')
+    expect((await call('POST', '/auth/owner/login', { phone: '5533336666', password: 'secreto123' })).json.token).toBeTruthy()
+  })
 })

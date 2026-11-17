@@ -98,6 +98,15 @@ function Negocios() {
           {sel.oneTimeCharges.length > 0 && <p className="muted">{sel.oneTimeCharges.map((x: any) => `${x.concept}: ${mxn(x.amount)}`).join(' · ')}</p>}
           <h3 style={{ marginTop: 14 }}>Plan</h3>
           <Plan b={sel} onSave={(body) => run(() => adm('PATCH', `/admin/businesses/${sel.id}`, body), 'Plan guardado.')()} />
+          <h3 style={{ marginTop: 14 }}>Teléfono del dueño</h3>
+          <p className="muted">Con este número entra el dueño: {sel.owner.phone}</p>
+          <button onClick={async () => {
+            const phone = prompt('Número nuevo del dueño (10 dígitos):')
+            if (!phone) return
+            const reason = prompt('¿Por qué se cambia? (p. ej. "cambió de número, confirmado por llamada")')
+            if (!reason) return
+            run(() => adm('POST', `/admin/businesses/${sel.id}/owner-phone`, { phone, reason }), 'Teléfono cambiado. Ya entra con el número nuevo.')()
+          }}>Cambiar teléfono</button>
           <h3 style={{ marginTop: 14 }}>Restablecer acceso del dueño</h3>
           <p className="muted">Antes confirma que es el dueño: llámale a su número registrado ({sel.owner.phone}). Le das una contraseña temporal, entra con su teléfono y la cambia.</p>
           <button onClick={async () => {

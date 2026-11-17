@@ -4,7 +4,7 @@ import { audit } from './audit.js'
 import { GIROS, setting } from './billing.js'
 import { body, parse, LOCK_MINUTES, MAX_FAILED, smsOn, type Deps, type Env, type UserRow } from './context.js'
 import {
-  bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone,
+  bad, businessCode, forbidden, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone,
   normalizeUsername, notFound, numericCode, sha256, unauthorized, verifySecret,
 } from './util.js'
 
@@ -249,7 +249,7 @@ authed.get('/auth/me', (c) => {
   return c.json({
     settings: Object.fromEntries(settingsRows.map((r) => [r.key, JSON.parse(r.value)])),
     modules: JSON.parse((db.prepare('SELECT modules FROM businesses WHERE id = ?').get(user.business_id) as { modules: string }).modules),
-    user: { id: user.id, name: user.name, username: user.username, role: user.role, branchId: user.branch_id, mustChangePassword: !!user.must_change_password },
+    user: { id: user.id, name: user.name, username: user.username, phone: user.phone, role: user.role, branchId: user.branch_id, mustChangePassword: !!user.must_change_password },
     permissions,
     business: biz,
   })
@@ -266,6 +266,22 @@ authed.post('/auth/change-password', async (c) => {
   forgetDevices(c.get('deps'), user.id)
   audit(db, now, { businessId: user.business_id, userId: user.id, action: 'usuario.cambio_contrasena', entity: 'user', entityId: user.id })
   return c.json({ ok: true })
+})
+
+// El dueño cambia el teléfono con el que entra (confirma con su contraseña).
+authed.post('/auth/owner/phone', async (c) => {
+  const { db, now } = c.get('deps')
+  const { user } = c.get('session')
+  if (user.role !== 'owner') throw forbidden('Solo el dueño puede cambiar su teléfono.')
+  const d = parse(z.object({ phone: z.string(), password: z.string() }), await body(c))
+  if (!verifySecret(d.password, user.password_hash)) throw unauthorized('La contraseña no es correcta.')
+  const phone = normalizePhone(d.phone)
+  if (phone === user.phone) return c.json({ ok: true, phone })
+  if (db.prepare("SELECT 1 FROM users WHERE role = 'owner' AND phone = ? AND id <> ?").get(phone, user.id)) throw conflict('Ese teléfono ya tiene una cuenta.', 'telefono_registrado')
+  db.prepare('UPDATE users SET phone = ?, phone_verified = 1 WHERE id = ?').run(phone, user.id)
+  forgetDevices(c.get('deps'), user.id)
+  audit(db, now, { businessId: user.business_id, userId: user.id, action: 'dueno.cambio_telefono', entity: 'user', entityId: user.id, oldValue: { phone: user.phone }, newValue: { phone } })
+  return c.json({ ok: true, phone })
 })
 
 authed.post('/auth/logout', (c) => {

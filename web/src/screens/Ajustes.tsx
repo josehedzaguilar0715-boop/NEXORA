@@ -25,6 +25,7 @@ export function Ajustes({ me }: { me: Me }) {
   const check = (k: string, label: string) => <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={!!st[k]} onChange={(e) => setSt({ ...st, [k]: e.target.checked })} />{label}</label>
   return (
     <div className="grid2">
+      <MiCuenta me={me} />
       <section className="card">
         <h2>Negocio y ticket</h2>
         <label>Nombre<input value={biz.name} onChange={(e) => setBiz({ ...biz, name: e.target.value })} /></label>
@@ -67,6 +68,34 @@ export function Ajustes({ me }: { me: Me }) {
         {st.travelFee != null && <p className="muted">Traslado: {mxn(st.travelFee)}</p>}
       </section>
     </div>
+  )
+}
+
+/** Mi cuenta (dueño): teléfono con el que entra y contraseña. */
+function MiCuenta({ me }: { me: Me }) {
+  const [phone, setPhone] = useState({ phone: me.user.phone ?? '', password: '' })
+  const [pw, setPw] = useState({ currentPassword: '', newPassword: '', again: '' })
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  const go = (fn: () => Promise<unknown>, ok: string) => async () => { try { await fn(); setMsg({ ok }) } catch (e) { setMsg({ err: (e as Error).message }) } }
+  return (
+    <section className="card">
+      <h2>Mi cuenta</h2>
+      <p className="muted">Entras con tu teléfono y tu contraseña.</p>
+      <label>Teléfono para entrar (10 dígitos)<input inputMode="tel" value={phone.phone} onChange={(e) => setPhone({ ...phone, phone: e.target.value })} /></label>
+      <label>Tu contraseña (para confirmar)<input type="password" value={phone.password} onChange={(e) => setPhone({ ...phone, password: e.target.value })} /></label>
+      <p><button className="primary" disabled={!phone.phone || !phone.password} onClick={go(async () => { await api('POST', '/auth/owner/phone', phone); setPhone({ ...phone, password: '' }) }, 'Teléfono cambiado. La próxima vez entra con el número nuevo.')}>Cambiar teléfono</button></p>
+      <h2 style={{ marginTop: 16 }}>Cambiar mi contraseña</h2>
+      <label>Contraseña actual<input type="password" value={pw.currentPassword} onChange={(e) => setPw({ ...pw, currentPassword: e.target.value })} /></label>
+      <label>Contraseña nueva (mínimo 8)<input type="password" value={pw.newPassword} onChange={(e) => setPw({ ...pw, newPassword: e.target.value })} /></label>
+      <label>Repite la nueva<input type="password" value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} /></label>
+      <p><button className="primary" disabled={!pw.currentPassword || !pw.newPassword} onClick={go(async () => {
+        if (pw.newPassword !== pw.again) throw new Error('Las contraseñas nuevas no coinciden.')
+        await api('POST', '/auth/change-password', { currentPassword: pw.currentPassword, newPassword: pw.newPassword })
+        setPw({ currentPassword: '', newPassword: '', again: '' })
+      }, 'Contraseña cambiada.')}>Cambiar contraseña</button></p>
+      {msg.err && <p className="error">{msg.err}</p>}
+      {msg.ok && <p className="okmsg">{msg.ok}</p>}
+    </section>
   )
 }
 

@@ -271,6 +271,20 @@ admin.post('/admin/businesses/:id/users/:userId/reset-password', async (c) => {
   return c.json({ ok: true })
 })
 
+/** Cambiar el teléfono con el que entra el dueño (cuando cambia de número y no puede hacerlo él). */
+admin.post('/admin/businesses/:id/owner-phone', async (c) => {
+  const { db, now } = c.get('deps')
+  const b = loadBusiness(c)
+  const d = parse(z.object({ phone: z.string(), reason: z.string().trim().min(3).max(300) }), await body(c))
+  const phone = normalizePhone(d.phone)
+  const owner = db.prepare("SELECT id, phone FROM users WHERE business_id = ? AND role = 'owner'").get(b.id) as { id: string; phone: string }
+  if (db.prepare("SELECT 1 FROM users WHERE role = 'owner' AND phone = ? AND id <> ?").get(phone, owner.id)) throw conflict('Ese teléfono ya tiene una cuenta.', 'telefono_registrado')
+  db.prepare('UPDATE users SET phone = ?, phone_verified = 1 WHERE id = ?').run(phone, owner.id)
+  forgetDevices(c.get('deps'), owner.id)
+  audit(db, now, { businessId: b.id, userId: c.get('admin').id, action: 'admin.cambio_telefono_dueno', entity: 'user', entityId: owner.id, oldValue: { phone: owner.phone }, newValue: { phone }, reason: d.reason })
+  return c.json({ business: businessView(db, refreshStatus(db, now, b.id), now()) })
+})
+
 /** Verificar la identidad del dueño: se envía un código a su número registrado. */
 admin.post('/admin/businesses/:id/verify-owner', async (c) => {
   const deps = c.get('deps')
