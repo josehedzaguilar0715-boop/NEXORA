@@ -9,7 +9,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 3 (super panel)**: estados prueba/activo/vencido/suspendido sin perder datos, pagos y reactivación, planes y límites, alta asistida, restablecer accesos, buzón de soporte y solicitudes de cambio. ✅ con pruebas.
 - **Bloque 4 (módulo común)**: clientes finales con QR, escaneo validado por el servidor, membresías por usos y periodo, promociones automáticas, fidelidad (puntos o sellos), asistencia de clientes y personal. Cada módulo se activa por negocio. ✅ con pruebas.
 - **Bloque 5 (abarrotes) — servidor**: catálogo con presentaciones y códigos de barras, granel por kilo o importe, lotes primero-entra-primero-sale con precio y costo real, compras con fletes repartidos, márgenes sugeridos, caducidad, mermas, conteos, traspasos, proveedores y cuentas por pagar, fiado con límite y abonos, gastos, reportes de utilidad y retiro sugerido, cajas asignadas. ✅ con pruebas.
-- En curso: pantalla de caja (interfaz) para abarrotes.
+- **Bloque 5 (abarrotes) — pantallas**: app web instalable (`web/`) con caja (lector de código de barras, granel por kilo o importe, cobro con cambio, fiado, descuento con código, ventas del turno, retiros, corte), productos con alertas, compras con fletes, clientes y fiado, reportes con retiro sugerido y personal con permisos. Funciona sin internet con contador visible. ✅ con prueba de punta a punta en navegador.
+- Siguiente: Bloque 6 (ferretería).
 
 ## Desarrollo local
 
@@ -17,7 +18,10 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 npm install
 npm test          # pruebas
 npm run typecheck
-npm run dev       # API en http://localhost:3000 (base SQLite en data/nexora.db)
+npm run build     # pantallas (web/dist)
+npm run dev       # http://localhost:3000 — pantallas en / y API en /api (base SQLite en data/nexora.db)
+npm run web:dev   # pantallas con recarga en vivo en :5173 (usa la API de :3000)
+npm run e2e       # prueba de punta a punta en navegador (requiere npm run build)
 ADMIN_PASSWORD=... npm run admin:create -- soporte "Soporte"   # usuario del super panel
 ```
 
@@ -69,3 +73,10 @@ Importes siempre en centavos enteros (MXN).
 - **Fiado**: límite por cliente; pasar el límite pide el código del dueño (no de un encargado). Los abonos en efectivo entran al corte como depósito. Cancelar una venta fiada devuelve el cargo.
 - **Retiro sugerido** = utilidad del periodo − reserva (días de gastos fijos que define el dueño) − reposición (lo que cuesta llevar al mínimo los productos que están por debajo). Utilidad = ventas − costo de lo vendido − mermas − gastos.
 - Para los giros siguientes, `saleHooks`, `cancelHooks` y `saleValidators` en `src/sales.ts` permiten agregar comisiones, recetas, propinas, etc. sin tocar la venta base.
+
+## Pantallas (Bloque 5)
+
+- Se sirven desde el mismo servidor; la API vive en `/api`. Navegación por permisos: lo que el usuario no puede hacer no aparece.
+- Link único para empleados: `/?negocio=CODIGO` llena el código del negocio.
+- Sin internet: la apertura, las ventas, los retiros y el corte se guardan en el equipo (cola local) y se envían solos al volver la señal. El botón verde/naranja de arriba es el contador de pendientes. Descuentos, cambios de precio y fiado necesitan señal porque el código se valida en el servidor.
+- Ticket: se imprime con la impresora térmica del sistema (58 mm). Abrir el cajón y leer la báscula directo desde el navegador quedan pendientes (se capturan a mano por ahora).

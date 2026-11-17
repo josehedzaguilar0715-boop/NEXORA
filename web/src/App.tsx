@@ -1,0 +1,106 @@
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { api, auth, cache, flush, outbox } from './api'
+import { Caja } from './screens/Caja'
+import { Clientes } from './screens/Clientes'
+import { Compras } from './screens/Compras'
+import { Login } from './screens/Login'
+import { Productos } from './screens/Productos'
+import { Reportes } from './screens/Reportes'
+import { Usuarios } from './screens/Usuarios'
+
+export interface Me {
+  user: { id: string; name: string; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
+  permissions: 'todos' | string[]
+  business: { id: string; code: string; name: string; phone: string | null; status: string }
+}
+export const can = (me: Me, p: string) => me.permissions === 'todos' || me.permissions.includes(p)
+
+const SCREENS = [
+  { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
+  { key: 'productos', label: 'Productos', perm: 'view_inventory', C: Productos },
+  { key: 'compras', label: 'Compras', perm: 'edit_inventory', C: Compras },
+  { key: 'clientes', label: 'Clientes y fiado', perm: 'customers_credit', C: Clientes },
+  { key: 'reportes', label: 'Reportes', perm: 'view_reports', C: Reportes },
+  { key: 'usuarios', label: 'Personal', perm: 'create_employees', C: Usuarios },
+] as const
+
+function useHash() {
+  const [h, setH] = useState(location.hash.slice(2))
+  useEffect(() => {
+    const on = () => setH(location.hash.slice(2))
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
+  }, [])
+  return h
+}
+
+function PendingBadge() {
+  const pending = useSyncExternalStore(outbox.subscribe, outbox.pending)
+  const rejected = useSyncExternalStore(outbox.subscribe, () => outbox.rejected().length)
+  const [online, setOnline] = useState(navigator.onLine)
+  useEffect(() => {
+    const on = () => setOnline(navigator.onLine)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', on)
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', on) }
+  }, [])
+  // Contador visible de lo que falta sincronizar.
+  return (
+    <button className={`pending ${pending || rejected ? '' : 'ok'}`} onClick={() => void flush()} title="Toca para enviar ahora" data-testid="pendientes">
+      {!online ? 'Sin internet · ' : ''}
+      {pending ? `${pending} por enviar` : 'Todo enviado'}
+      {rejected ? ` · ${rejected} con problema` : ''}
+    </button>
+  )
+}
+
+export function App() {
+  const [me, setMe] = useState<Me | null>(cache.get<Me | null>('me', null))
+  const [checking, setChecking] = useState(!!auth.token)
+  const hash = useHash()
+
+  useEffect(() => {
+    if (!auth.token) return
+    api<Me>('GET', '/auth/me')
+      .then((m) => { setMe(m); cache.set('me', m) })
+      .catch((e) => { if (e.status === 401) { auth.set(null); setMe(null) } })
+      .finally(() => setChecking(false))
+  }, [])
+
+  const logout = async () => {
+    await api('POST', '/auth/logout').catch(() => {})
+    auth.set(null)
+    cache.set('me', null)
+    setMe(null)
+  }
+
+  if (!auth.token || !me) {
+    if (checking) return <main className="muted">Cargando…</main>
+    return <Login onLogin={(m) => { setMe(m); cache.set('me', m) }} />
+  }
+  if (me.user.mustChangePassword) return <Login forceChange onLogin={(m) => { setMe(m); cache.set('me', m) }} />
+
+  const allowed = SCREENS.filter((s) => can(me, s.perm))
+  const current = allowed.find((s) => s.key === hash) ?? allowed[0]
+  const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'
+  return (
+    <div className="app">
+      <header className="top">
+        <span className="name">{me.business.name}</span>
+        {/* Un permiso no marcado no aparece en pantalla. */}
+        <nav>
+          {allowed.map((s) => (
+            <a key={s.key} href={`#/${s.key}`} className={current?.key === s.key ? 'on' : ''}>{s.label}</a>
+          ))}
+        </nav>
+        <PendingBadge />
+        <span className="muted">{me.user.name}</span>
+        <button onClick={logout}>Salir</button>
+      </header>
+      <main>
+        {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
+        {current ? <current.C me={me} /> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}
+      </main>
+    </div>
+  )
+}
