@@ -281,6 +281,139 @@ const MIGRATIONS: string[] = [
   CREATE TRIGGER tickets_no_delete BEFORE DELETE ON tickets BEGIN SELECT RAISE(ABORT, 'El buzón no se puede borrar'); END;
   CREATE TRIGGER ticket_messages_no_delete BEFORE DELETE ON ticket_messages BEGIN SELECT RAISE(ABORT, 'El buzón no se puede borrar'); END;
   `,
+  `
+  -- Módulos que se activan solo si el negocio los necesita.
+  ALTER TABLE businesses ADD COLUMN modules TEXT NOT NULL DEFAULT '[]';
+
+  CREATE TABLE customers (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    phone TEXT,
+    notes TEXT,
+    -- Identificador único, aleatorio y no consecutivo para QR / código de barras.
+    code TEXT NOT NULL UNIQUE,
+    loyalty_enrolled INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX customers_business ON customers(business_id, name);
+
+  CREATE TABLE visits (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    visit_date TEXT NOT NULL,
+    at TEXT NOT NULL,
+    scanned_by TEXT NOT NULL REFERENCES users(id)
+  );
+  CREATE UNIQUE INDEX visits_one_per_day ON visits(customer_id, visit_date);
+
+  CREATE TABLE membership_plans (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    uses_per_period INTEGER NOT NULL CHECK (uses_per_period > 0),
+    period TEXT NOT NULL CHECK (period IN ('dia','semana','mes')),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    applies_to TEXT NOT NULL DEFAULT '[]',
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE customer_memberships (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    plan_id TEXT NOT NULL REFERENCES membership_plans(id),
+    -- Copia del plan al venderse: editar el plan no altera membresías ya vendidas.
+    plan_snapshot TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    price_paid INTEGER NOT NULL,
+    sale_id TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE membership_uses (
+    id TEXT PRIMARY KEY,
+    membership_id TEXT NOT NULL REFERENCES customer_memberships(id),
+    use_date TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    at TEXT NOT NULL,
+    scanned_by TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX membership_one_use_per_visit ON membership_uses(membership_id, use_date);
+
+  CREATE TABLE promotions (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('porcentaje','monto')),
+    value INTEGER NOT NULL CHECK (value > 0),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    -- {"all":true} o {"refs":[...],"categories":[...]}
+    applies_to TEXT NOT NULL,
+    combinable INTEGER NOT NULL DEFAULT 0,
+    min_quantity INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE sale_promotions (
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    promotion_id TEXT NOT NULL REFERENCES promotions(id),
+    amount INTEGER NOT NULL,
+    PRIMARY KEY (sale_id, promotion_id)
+  );
+  ALTER TABLE sales ADD COLUMN promo_discount INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE sales ADD COLUMN customer_id TEXT REFERENCES customers(id);
+  ALTER TABLE sale_items ADD COLUMN ref TEXT;
+  ALTER TABLE sale_items ADD COLUMN category TEXT;
+
+  CREATE TABLE loyalty_program (
+    business_id TEXT PRIMARY KEY REFERENCES businesses(id),
+    unit TEXT NOT NULL CHECK (unit IN ('puntos','sellos')),
+    earn_by TEXT NOT NULL CHECK (earn_by IN ('monto','visita')),
+    -- monto: cada earn_amount centavos dan earn_points; visita: cada visita da earn_points.
+    earn_amount INTEGER,
+    earn_points INTEGER NOT NULL CHECK (earn_points > 0),
+    scope TEXT NOT NULL CHECK (scope IN ('todos','por_persona')),
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE loyalty_rewards (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    cost INTEGER NOT NULL CHECK (cost > 0),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE loyalty_ledger (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    delta INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    sale_id TEXT,
+    reward_id TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX loyalty_ledger_customer ON loyalty_ledger(customer_id);
+
+  CREATE TABLE staff_attendance (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    type TEXT NOT NULL CHECK (type IN ('entrada','salida')),
+    at TEXT NOT NULL
+  );
+  CREATE TRIGGER visits_no_delete BEFORE DELETE ON visits BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  CREATE TRIGGER membership_uses_no_delete BEFORE DELETE ON membership_uses BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  CREATE TRIGGER loyalty_ledger_no_delete BEFORE DELETE ON loyalty_ledger BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  CREATE TRIGGER loyalty_ledger_no_update BEFORE UPDATE ON loyalty_ledger BEGIN SELECT RAISE(ABORT, 'No se puede modificar'); END;
+  CREATE TRIGGER staff_attendance_no_delete BEFORE DELETE ON staff_attendance BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {

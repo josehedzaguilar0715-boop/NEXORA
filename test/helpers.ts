@@ -35,5 +35,10 @@ export function setup() {
     adminCreated = true
     return (await call('POST', '/admin/login', { body: { username: 'soporte', password: 'superpanel1' } })).json.token as string
   }
-  return { adminToken, app, db, call, codes, advance, registerOwner, createStaff, uuid: randomUUID }
+  /** Para pruebas que avanzan muchos días: el negocio queda al corriente y las sesiones no vencen. */
+  const longLived = () => {
+    db.prepare("UPDATE businesses SET trial_ends_at = '2100-01-01T00:00:00.000Z'").run()
+    db.prepare("UPDATE sessions SET expires_at = '2100-01-01T00:00:00.000Z'").run()
+  }
+  return { longLived, adminToken, app, db, call, codes, advance, registerOwner, createStaff, uuid: randomUUID }
 }

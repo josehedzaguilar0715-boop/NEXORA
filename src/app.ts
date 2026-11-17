@@ -4,6 +4,7 @@ import { admin } from './admin.js'
 import { businessGate } from './billing.js'
 import { authenticate } from './context.js'
 import { branches, support } from './support.js'
+import { common, publicCommon } from './common.js'
 import { cash } from './cash.js'
 import type { Deps, Env } from './context.js'
 import { sales } from './sales.js'
@@ -19,6 +20,7 @@ export function createApp(deps: Deps) {
   })
   app.get('/health', (c) => c.json({ ok: true }))
   app.route('/', publicAuth)
+  app.route('/', publicCommon)
   app.route('/', admin as unknown as Hono<Env>)
   // Todo lo demás exige sesión (authed ya aplica `authenticate`).
   const protectedApp = new Hono<Env>()
@@ -32,6 +34,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', sales)
   protectedApp.route('/', support)
   protectedApp.route('/', branches)
+  protectedApp.route('/', common)
   app.route('/', protectedApp)
 
   app.onError((err, c) => {

@@ -7,7 +7,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 1 (base)**: cuentas, acceso y roles, código de autorización, caja y corte, bitácora inmutable, tickets. ✅ con pruebas.
 - **Bloque 2 (sin internet y nube)**: cola local de la caja (`src/client/outbox.ts`), llave de idempotencia, sincronización de cambios con conflictos "gana el más reciente" y panel del dueño (`/dashboard`). ✅ con pruebas.
 - **Bloque 3 (super panel)**: estados prueba/activo/vencido/suspendido sin perder datos, pagos y reactivación, planes y límites, alta asistida, restablecer accesos, buzón de soporte y solicitudes de cambio. ✅ con pruebas.
-- Siguiente: Bloque 4 (módulo común: promociones, membresías, fidelidad, asistencia y QR).
+- **Bloque 4 (módulo común)**: clientes finales con QR, escaneo validado por el servidor, membresías por usos y periodo, promociones automáticas, fidelidad (puntos o sellos), asistencia de clientes y personal. Cada módulo se activa por negocio. ✅ con pruebas.
+- Siguiente: Bloque 5 (abarrotes completo).
 
 ## Desarrollo local
 
@@ -46,3 +47,13 @@ Importes siempre en centavos enteros (MXN).
 - Cambio de plan: se aplica al siguiente pago salvo `applyNow` (en prueba, al momento). Al bajar, los usuarios y sucursales sobrantes (los más nuevos) quedan desactivados, nunca borrados. El usuario del dueño cuenta dentro de los usuarios del plan.
 - Valores provisionales, editables en `/admin/settings`: prueba 14 días, suspensión tras 30 días vencido. Las solicitudes de cambio no registran costo.
 - Pendiente: verificación en dos pasos para el super panel; método para verificar identidad del dueño que perdió su teléfono (hoy el super panel escribe el motivo y queda en bitácora).
+
+## Módulo común (Bloque 4)
+
+- Activar con `PUT /modules` (`membresias`, `promociones`, `fidelidad`, `asistencia`). Un módulo apagado responde 409 `modulo_inactivo`.
+- QR: cada cliente tiene un código aleatorio de 20 caracteres (`NX…`). `GET /public/qr/<código>.svg` le da su QR para descargar. `POST /scan` valida el código contra el negocio y aplica `entrada`, `membresia` o `consulta`.
+- "Misma visita" = mismo día local: un código no registra dos entradas ni usa la membresía dos veces el mismo día.
+- Membresías: usos por periodo (día, semana o mes, contados desde el inicio). Al venderse se copia el plan, así que editarlo no cambia lo ya vendido ni lo consumido.
+- Promociones: porcentaje (en puntos base: 1000 = 10 %) o monto, con vigencia, a qué aplica (todo, productos o categorías) y cantidad mínima. Se aplica sola en la venta: la mejor no combinable o todas las combinables juntas, lo que convenga más. No requiere código porque la definió el dueño.
+- Fidelidad: puntos por monto o sellos por visita, para todos o solo para clientes inscritos. Al cancelar una venta se registra un movimiento contrario; el saldo puede quedar negativo si ya canjeó.
+- Pendiente: cobrar la membresía o el premio como línea de venta (se conecta con productos en el Bloque 5).

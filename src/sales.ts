@@ -2,12 +2,15 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { authorize } from './authcode.js'
+import { earnForSale, moduleOn, reverseSalePoints } from './common.js'
+import { activePromotions, bestPromotions } from './promotions.js'
 import { body, hasPerm, parse, requirePerm, type C, type Deps, type Env } from './context.js'
 import { bad, conflict, forbidden, iso, newId, notFound } from './util.js'
 
 export const sales = new Hono<Env>()
 
 interface SaleRow {
+  promo_discount: number; customer_id: string | null
   id: string; business_id: string; branch_id: string; shift_id: string; folio: number; cashier_id: string
   subtotal: number; discount: number; total: number; payment_method: string; status: string
   cancel_reason: string | null; created_at: string
@@ -17,6 +20,9 @@ const itemSchema = z.object({
   description: z.string().trim().min(1).max(200),
   quantity: z.number().positive().max(1_000_000),
   unitPrice: z.number().int('Usa centavos enteros').min(0),
+  /** Producto o servicio (para promociones e inventario). */
+  ref: z.string().max(100).optional(),
+  category: z.string().max(100).optional(),
 })
 
 const saleSchema = z.object({
@@ -28,13 +34,14 @@ const saleSchema = z.object({
   authCode: z.string().optional(),
   /** Turno en el que se cobró (útil al reenviar ventas hechas sin internet). */
   shiftId: z.string().uuid().optional(),
+  customerId: z.string().optional(),
   createdAt: z.string().datetime().optional(),
 })
 
 function saleView(deps: Deps, s: SaleRow) {
   const items = deps.db.prepare('SELECT description, quantity, unit_price AS unitPrice, total FROM sale_items WHERE sale_id = ? ORDER BY rowid').all(s.id) as { description: string; quantity: number; unitPrice: number; total: number }[]
   return {
-    id: s.id, folio: s.folio, shiftId: s.shift_id, subtotal: s.subtotal, discount: s.discount, total: s.total,
+    id: s.id, folio: s.folio, shiftId: s.shift_id, subtotal: s.subtotal, promoDiscount: s.promo_discount, discount: s.discount, total: s.total, customerId: s.customer_id,
     paymentMethod: s.payment_method, status: s.status, cancelReason: s.cancel_reason, createdAt: s.created_at, items,
   }
 }
@@ -60,14 +67,18 @@ sales.post('/sales', requirePerm('sell'), async (c) => {
 
   const lines = d.items.map((i) => ({ ...i, total: Math.round(i.quantity * i.unitPrice) }))
   const subtotal = lines.reduce((a, l) => a + l.total, 0)
+  if (d.customerId && !db.prepare('SELECT 1 FROM customers WHERE id = ? AND business_id = ?').get(d.customerId, u.business_id)) throw bad('Ese cliente no existe.')
+  const t0 = iso(now())
+  // Promociones vigentes: se aplican solas, sin código (las definió el dueño).
+  const promo = moduleOn(db, u.business_id, 'promociones') ? bestPromotions(activePromotions(db, u.business_id, t0), lines) : { total: 0, applied: [] }
   const discount = d.discount ?? 0
-  if (discount > subtotal) throw bad('El descuento no puede ser mayor al total.')
+  if (discount > subtotal - promo.total) throw bad('El descuento no puede ser mayor al total.')
   let discountAuth: string | null = null
   if (discount > 0) {
     if (!hasPerm(u, 'cancel_discount')) throw forbidden('No tienes permiso para dar descuentos.')
     discountAuth = authorize(deps, u, d.authCode, 'cancel_discount', 'descuento').id
   }
-  const total = subtotal - discount
+  const total = subtotal - promo.total - discount
   const t = now()
   // La hora de la venta es la del equipo (puede venir de una caja sin internet), sin aceptar fechas futuras.
   const createdAt = d.createdAt && new Date(d.createdAt) <= t ? d.createdAt : iso(t)
@@ -77,11 +88,13 @@ sales.post('/sales', requirePerm('sell'), async (c) => {
     db.prepare('UPDATE sale_counters SET last = last + 1 WHERE branch_id = ?').run(shift.branch_id)
     const folio = (db.prepare('SELECT last FROM sale_counters WHERE branch_id = ?').get(shift.branch_id) as { last: number }).last
     db.prepare(
-      `INSERT INTO sales (id, business_id, branch_id, shift_id, folio, cashier_id, subtotal, discount, total, payment_method, discount_authorized_by, created_at, received_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    ).run(d.id, u.business_id, shift.branch_id, shift.id, folio, u.id, subtotal, discount, total, d.paymentMethod, discountAuth, createdAt, iso(t))
-    const ins = db.prepare('INSERT INTO sale_items (id, sale_id, description, quantity, unit_price, total) VALUES (?,?,?,?,?,?)')
-    for (const l of lines) ins.run(newId(), d.id, l.description, l.quantity, l.unitPrice, l.total)
+      `INSERT INTO sales (id, business_id, branch_id, shift_id, folio, cashier_id, subtotal, promo_discount, discount, total, payment_method, discount_authorized_by, customer_id, created_at, received_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    ).run(d.id, u.business_id, shift.branch_id, shift.id, folio, u.id, subtotal, promo.total, discount, total, d.paymentMethod, discountAuth, d.customerId ?? null, createdAt, iso(t))
+    const ins = db.prepare('INSERT INTO sale_items (id, sale_id, description, quantity, unit_price, total, ref, category) VALUES (?,?,?,?,?,?,?,?)')
+    for (const l of lines) ins.run(newId(), d.id, l.description, l.quantity, l.unitPrice, l.total, l.ref ?? null, l.category ?? null)
+    for (const p of promo.applied) db.prepare('INSERT INTO sale_promotions (sale_id, promotion_id, amount) VALUES (?,?,?)').run(d.id, p.id, p.amount)
+    if (d.customerId) earnForSale(db, now, u.business_id, u.id, d.customerId, d.id, total)
     if (discount > 0) {
       audit(db, now, { businessId: u.business_id, userId: u.id, action: 'venta.descuento', entity: 'sale', entityId: d.id, newValue: { subtotal, discount, total }, authorizedBy: discountAuth })
     }
@@ -130,7 +143,10 @@ sales.post('/sales/:id/cancel', requirePerm('cancel_discount'), async (c) => {
   const shift = db.prepare('SELECT status FROM shifts WHERE id = ?').get(s.shift_id) as { status: string }
   if (shift.status !== 'abierto') throw conflict('El turno de esa venta ya tiene corte; no se puede cancelar.', 'turno_cerrado')
   const auth = authorize(deps, u, d.authCode, 'cancel_discount', 'cancelación')
-  db.prepare("UPDATE sales SET status='cancelada', cancelled_by=?, cancel_authorized_by=?, cancel_reason=?, cancelled_at=? WHERE id=?").run(u.id, auth.id, d.reason, iso(now()), s.id)
+  db.transaction(() => {
+    db.prepare("UPDATE sales SET status='cancelada', cancelled_by=?, cancel_authorized_by=?, cancel_reason=?, cancelled_at=? WHERE id=?").run(u.id, auth.id, d.reason, iso(now()), s.id)
+    reverseSalePoints(db, now, u.business_id, u.id, s.id)
+  })()
   audit(db, now, {
     businessId: u.business_id, userId: u.id, action: 'venta.cancelacion', entity: 'sale', entityId: s.id,
     oldValue: { status: 'completada', total: s.total }, newValue: { status: 'cancelada' }, authorizedBy: auth.id, reason: d.reason,
@@ -149,7 +165,7 @@ sales.get('/sales/:id/ticket', (c) => {
   const v = saleView(deps, s)
   const ticket = {
     business: biz.name, logoUrl: biz.logo_url, phone: biz.phone, folio: String(s.folio).padStart(6, '0'), date: s.created_at,
-    items: v.items, subtotal: s.subtotal, discount: s.discount, total: s.total, paymentMethod: s.payment_method, cashier: cashier.name,
+    items: v.items, subtotal: s.subtotal, discount: s.discount + s.promo_discount, total: s.total, paymentMethod: s.payment_method, cashier: cashier.name,
     cancelled: s.status === 'cancelada',
   }
   return c.json({ ticket, text: ticketText(ticket) })
