@@ -198,3 +198,10 @@ Importes siempre en centavos enteros (MXN).
 - **Respaldo**: el super panel descarga toda la base en JSON (Ajustes → Descargar respaldo).
 - **Probar en local como en Cloudflare**: `npm run build && npx wrangler dev` y en otra terminal `npx tsx scripts/smoke.ts http://localhost:8787 <log>`.
 - El `Dockerfile` queda como opción para un servidor propio más adelante.
+
+## Diseño visual (spec §15)
+
+- Tema oscuro con los tokens de la colección "NEXORA" (`web/src/styles.css`): fondos `#07090F` / `#111622` / `#161B26`, acentos cian `#22D3EE` y violeta `#8B5CF6` en degradado, texto `#F1F5F9` / `#7C8799`, positivo `#34D399` y negativo `#F87171`. Fuente Inter con respaldo del sistema.
+- Intro con el logo al abrir (fundido y escala, unos 2.5 s, botón Omitir, una vez por sesión; sin animación si el equipo pide movimiento reducido).
+- Menú lateral (en celular se despliega con ☰). Inicio con indicadores, gráfica de la semana y movimientos recientes; finanzas con la cascada del retiro sugerido; clientes con su QR para descargar; personal con asistencia del día.
+- El logo es provisional (hexágono con N) y la fuente de marca está pendiente. El archivo de Figma no se pudo leer (límite del plan gratuito de Figma), así que el diseño sale de los tokens y la descripción de la spec.

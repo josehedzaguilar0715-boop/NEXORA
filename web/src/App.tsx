@@ -16,6 +16,8 @@ import { CierreDia, PrecioDia } from './screens/Verduleria'
 import { Ajustes, Buzon } from './screens/Ajustes'
 import { Escanear, Lealtad } from './screens/Lealtad'
 import { SuperPanel } from './screens/SuperPanel'
+import { Inicio } from './screens/Inicio'
+import { Intro, Logo } from './Brand'
 import { Comisiones } from './screens/Comisiones'
 import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
@@ -35,6 +37,7 @@ export const can = (me: Me, p: string) => (p === 'owner' ? me.user.role === 'own
 
 type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[] }
 const SCREENS: Screen[] = [
+  { key: 'inicio', label: 'Inicio', perm: 'view_reports', C: Inicio },
   { key: 'agenda', label: 'Agenda', perm: 'sell', C: Agenda, giros: ['barberia', 'unas'] },
   { key: 'entradas', label: 'Entradas', perm: 'sell', C: Entradas, giros: ['banos'] },
   { key: 'taquilla', label: 'Taquilla', perm: 'sell', C: Taquilla, giros: ['turistico'] },
@@ -72,7 +75,7 @@ function useHash() {
   return h
 }
 
-function PendingBadge() {
+function PendingBadge({ main = false }: { main?: boolean }) {
   const pending = useSyncExternalStore(outbox.subscribe, outbox.pending)
   const rejected = useSyncExternalStore(outbox.subscribe, () => outbox.rejected().length)
   const [online, setOnline] = useState(navigator.onLine)
@@ -84,7 +87,7 @@ function PendingBadge() {
   }, [])
   // Contador visible de lo que falta sincronizar.
   return (
-    <button className={`pending ${pending || rejected ? '' : 'ok'}`} onClick={() => void flush()} title="Toca para enviar ahora" data-testid="pendientes">
+    <button className={`pending ${pending || rejected ? '' : 'ok'}`} onClick={() => void flush()} title="Toca para enviar ahora" data-testid={main ? 'pendientes' : undefined}>
       {!online ? 'Sin internet · ' : ''}
       {pending ? `${pending} por enviar` : 'Todo enviado'}
       {rejected ? ` · ${rejected} con problema` : ''}
@@ -100,13 +103,19 @@ export function App() {
   if (path.startsWith('/cita/')) return <EstadoCita token={path.split('/')[2] ?? ''} />
   if (path.startsWith('/boletos/')) return <TiendaBoletos code={path.split('/')[2] ?? ''} />
   if (path.startsWith('/mis-boletos/')) return <MisBoletos token={path.split('/')[2] ?? ''} />
-  return <Privada />
+  return (
+    <>
+      <Intro />
+      <Privada />
+    </>
+  )
 }
 
 function Privada() {
   const [me, setMe] = useState<Me | null>(cache.get<Me | null>('me', null))
   const [checking, setChecking] = useState(!!auth.token)
   const hash = useHash()
+  const [menu, setMenu] = useState(false)
 
   useEffect(() => {
     if (!auth.token) return
@@ -139,17 +148,26 @@ function Privada() {
   return (
     <div className="app">
       <header className="top">
-        <span className="name">{me.business.name}</span>
+        <button className="menu-btn" aria-label="Abrir menú" onClick={() => setMenu(true)}>☰</button>
+        <Logo size={26} />
+        <span style={{ flex: 1 }} />
+        <PendingBadge />
+      </header>
+      <aside className={`side ${menu ? 'open' : ''}`} onClick={() => setMenu(false)}>
+        <div className="brand"><Logo size={30} /><span className="word">NEXORA</span></div>
+        <div className="biz">{me.business.name}</div>
         {/* Un permiso no marcado no aparece en pantalla. */}
         <nav>
           {allowed.map((s) => (
             <a key={s.key} href={`#/${s.key}`} className={current?.key === s.key ? 'on' : ''}>{s.label}</a>
           ))}
         </nav>
-        <PendingBadge />
-        <span className="muted">{me.user.name}</span>
-        <button onClick={logout}>Salir</button>
-      </header>
+        <div className="foot">
+          <PendingBadge main />
+          <span className="muted" style={{ padding: '0 6px' }}>{me.user.name}</span>
+          <button onClick={logout}>Salir</button>
+        </div>
+      </aside>
       <main>
         {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
         {current ? <current.C me={me} /> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}

@@ -51,6 +51,7 @@ export function Reportes({ me }: { me: Me }) {
       {owner && (
         <section className="card">
           <h2>Retiro sugerido del mes</h2>
+          {w && w.suggested != null && <Cascada profit={w.profit} reserve={w.reserve} restock={w.restock} suggested={w.suggested} />}
           {w && (w.suggested == null ? <p>{w.message}</p> : (
             <table className="list"><tbody>
               <tr><td>Utilidad del periodo</td><td className="num">{mxn(w.profit)}</td></tr>
@@ -67,5 +68,34 @@ export function Reportes({ me }: { me: Me }) {
         </section>
       )}
     </div>
+  )
+}
+
+/** Cascada del retiro sugerido: utilidad − reserva − reposición = lo que puedes retirar. */
+function Cascada({ profit, reserve, restock, suggested }: { profit: number; reserve: number; restock: number; suggested: number }) {
+  const steps = [
+    { label: 'Utilidad', from: 0, to: profit, color: '#22D3EE' },
+    { label: 'Reserva', from: profit, to: profit - reserve, color: '#F87171' },
+    { label: 'Reposición', from: profit - reserve, to: profit - reserve - restock, color: '#F87171' },
+    { label: 'Retirar', from: 0, to: suggested, color: '#34D399' },
+  ]
+  const vals = steps.flatMap((s) => [s.from, s.to])
+  const hi = Math.max(1, ...vals), lo = Math.min(0, ...vals)
+  const W = 520, H = 220, pad = 20, bw = (W - pad * 2) / steps.length
+  const y = (v: number) => pad + ((hi - v) * (H - pad * 2)) / (hi - lo || 1)
+  return (
+    <svg className="chart" viewBox={`0 0 ${W} ${H + 40}`} role="img" aria-label={`Retiro sugerido: ${mxn(suggested)}`} style={{ marginBottom: 12 }}>
+      <line x1={pad} x2={W - pad} y1={y(0)} y2={y(0)} stroke="#232A3A" />
+      {steps.map((s, i) => {
+        const top = y(Math.max(s.from, s.to)), h = Math.max(2, Math.abs(y(s.from) - y(s.to)))
+        return (
+          <g key={s.label}>
+            <rect x={pad + i * bw + bw * 0.15} y={top} width={bw * 0.7} height={h} rx={8} fill={s.color} opacity={0.9} />
+            <text x={pad + i * bw + bw / 2} y={top - 6} textAnchor="middle" fill="#F1F5F9" fontSize="14" fontWeight="700">{i === 1 || i === 2 ? '−' : ''}{mxn(Math.abs(s.to - s.from))}</text>
+            <text x={pad + i * bw + bw / 2} y={H + 26} textAnchor="middle" fill="#7C8799" fontSize="14">{s.label}</text>
+          </g>
+        )
+      })}
+    </svg>
   )
 }

@@ -201,6 +201,35 @@ finance.get('/reports/summary', requirePerm('view_reports'), (c) => {
   return c.json({ ...summary, topProducts: top })
 })
 
+/** Ventas por día (para la gráfica del inicio). */
+finance.get('/reports/daily', requirePerm('view_reports'), (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const days = Math.min(Math.max(Number(c.req.query('days') ?? 7) || 7, 1), 92)
+  const out: { date: string; total: number; tickets: number; profit: number }[] = []
+  for (let i = days - 1; i >= 0; i--) {
+    const date = localDate(new Date(now().getTime() - i * 86_400_000))
+    const s = periodSummary(db, u.business_id, date, date)
+    out.push({ date, total: s.sales.total!, tickets: s.sales.tickets!, profit: s.profit })
+  }
+  return c.json({ days: out })
+})
+
+/** Movimientos recientes: ventas, cancelaciones, retiros y depósitos de caja, compras y gastos. */
+finance.get('/reports/recent', requirePerm('view_reports'), (c) => {
+  const { db } = c.get('deps')
+  const b = c.get('session').user.business_id
+  const limit = Math.min(Number(c.req.query('limit') ?? 12) || 12, 50)
+  const rows = db.prepare(`
+    SELECT * FROM (
+      SELECT 'venta' AS kind, s.created_at AS at, s.total AS amount, 'Venta #' || s.folio || ' · ' || s.payment_method AS label, s.status AS status FROM sales s WHERE s.business_id = ?
+      UNION ALL SELECT m.type, m.created_at, m.amount, m.reason, NULL FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ?
+      UNION ALL SELECT 'compra', p.created_at, p.items_total + p.freight_total, CASE WHEN p.ticket_ref IS NULL THEN 'de ' || p.payment ELSE 'folio ' || p.ticket_ref || ' · ' || p.payment END, p.payment FROM purchases p WHERE p.business_id = ?
+      UNION ALL SELECT 'gasto', e.created_at, e.amount, e.concept, e.kind FROM expenses e WHERE e.business_id = ?
+    ) ORDER BY at DESC LIMIT ?`).all(b, b, b, b, limit)
+  return c.json({ movements: rows })
+})
+
 /**
  * Retiro sugerido del dueño = utilidad del periodo − reserva (días de gastos fijos) − reposición de inventario.
  * Sin porcentajes. La reposición es lo que cuesta llevar al mínimo los productos que están por debajo.

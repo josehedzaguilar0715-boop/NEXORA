@@ -39,6 +39,12 @@ export function Clientes({ me }: { me: Me }) {
         {!sel ? <p className="muted">Elige un cliente para ver su cuenta.</p> : (
           <>
             <h2>{sel.name}</h2>
+            {sel.code && (
+              <div className="row" style={{ alignItems: 'center', marginBottom: 8 }}>
+                <img alt={`QR de ${sel.name}`} src={`/api/public/qr/${sel.code}.svg`} width={120} height={120} style={{ flex: '0 0 auto', background: '#fff', borderRadius: 12, padding: 6 }} />
+                <p className="muted" style={{ flex: 1 }}>Su código: <b style={{ color: 'var(--ink)' }}>{sel.code}</b><br /><a href={`/api/public/qr/${sel.code}.svg`} download={`qr-${sel.name}.svg`}>Descargar QR</a> para que lo guarde en su teléfono.</p>
+              </div>
+            )}
             {credit && <>
               <div className="total">Debe {mxn(credit.balance)}</div>
               <p className="muted">Límite {mxn(credit.limit)} · disponible {mxn(credit.available)}</p>

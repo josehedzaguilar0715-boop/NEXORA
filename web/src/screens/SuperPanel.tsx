@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError, mxn, toCents } from '../api'
+import { Logo } from '../Brand'
 
 // El super panel tiene su propio acceso, separado del de los negocios.
 const TOKEN = 'nx_admin_token'
@@ -21,9 +22,9 @@ export function SuperPanel() {
   const [tab, setTab] = useState<'negocios' | 'buzon' | 'alta' | 'ajustes'>('negocios')
   if (!logged) return <AdminLogin onLogin={() => setLogged(true)} />
   return (
-    <div className="app">
-      <header className="top">
-        <span className="name">NEXORA · Super panel</span>
+    <div className="admin-app">
+      <header className="adminbar">
+        <span className="brand" style={{ padding: 0 }}><Logo size={28} /><span className="word">NEXORA</span><span className="muted" style={{ letterSpacing: 0, fontWeight: 600 }}>Super panel</span></span>
         <nav>{(['negocios', 'buzon', 'alta', 'ajustes'] as const).map((k) => <a key={k} href="#" className={tab === k ? 'on' : ''} onClick={(e) => { e.preventDefault(); setTab(k) }}>{{ negocios: 'Negocios', buzon: 'Buzón', alta: 'Alta asistida', ajustes: 'Ajustes' }[k]}</a>)}</nav>
         <button onClick={() => { localStorage.removeItem(TOKEN); setLogged(false) }}>Salir</button>
       </header>
@@ -98,8 +99,17 @@ function Negocios() {
           <h3 style={{ marginTop: 14 }}>Plan</h3>
           <Plan b={sel} onSave={(body) => run(() => adm('PATCH', `/admin/businesses/${sel.id}`, body), 'Plan guardado.')()} />
           <h3 style={{ marginTop: 14 }}>Restablecer acceso del dueño</h3>
-          <p className="muted">Solo después de verificar su identidad. El motivo queda en bitácora.</p>
-          <button onClick={() => { const p = prompt('Contraseña temporal (mínimo 8):'); const r = p && prompt('¿Cómo verificaste su identidad?'); if (p && r) void run(() => adm('POST', `/admin/businesses/${sel.id}/users/${sel.owner.id}/reset-password`, { newPassword: p, reason: r }), 'Acceso restablecido; deberá cambiar la contraseña al entrar.')() }}>Restablecer</button>
+          <p className="muted">Se verifica su identidad con su número registrado: le llega un código por SMS y te lo dicta.</p>
+          <button onClick={async () => {
+            try {
+              const v = await adm('POST', `/admin/businesses/${sel.id}/verify-owner`)
+              const code = prompt(`Código enviado (${v.sentTo}). ¿Qué código te dictó el dueño?`)
+              const p = code && prompt('Contraseña temporal (mínimo 8):')
+              if (!code || !p) return
+              await adm('POST', `/admin/businesses/${sel.id}/users/${sel.owner.id}/reset-password`, { newPassword: p, reason: 'Identidad verificada con código a su número', identityChallengeId: v.challengeId, identityCode: code })
+              setMsg({ ok: 'Acceso restablecido; deberá cambiar la contraseña al entrar.' })
+            } catch (e) { setMsg({ err: (e as Error).message }) }
+          }}>Verificar y restablecer</button>
         </section>
       )}
     </div>

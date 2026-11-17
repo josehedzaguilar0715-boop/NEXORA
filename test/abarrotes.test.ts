@@ -266,3 +266,17 @@ describe('cajas', () => {
     expect((await s.call('POST', '/shifts/open', { token: b.token, body: { openingFloat: 0 } })).json.error.code).toBe('caja_ocupada')
   })
 })
+
+describe('inicio (dashboard)', () => {
+  it('ventas por día y movimientos recientes', async () => {
+    const { s, T, buy, open, sell, refresco } = await tienda()
+    await buy([{ productId: refresco.id, quantity: 10, cost: 10000 }])
+    await open()
+    await sell([{ productId: refresco.id, quantity: 2 }])
+    const d = (await s.call('GET', '/reports/daily?days=7', { token: T })).json.days
+    expect(d).toHaveLength(7)
+    expect(d[6]).toMatchObject({ date: '2026-11-17', total: 3000, tickets: 1 })
+    const m = (await s.call('GET', '/reports/recent', { token: T })).json.movements
+    expect(m.map((x: any) => x.kind)).toEqual(expect.arrayContaining(['venta', 'compra']))
+  })
+})

@@ -47,17 +47,29 @@ await call('POST', '/purchases', { payment: 'contado', items: [{ productId: ref.
 
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+await ctx.addInitScript(() => { if (location.pathname !== '/' || sessionStorage.getItem('nx_e2e_first')) sessionStorage.setItem('nx_intro', '1'); sessionStorage.setItem('nx_e2e_first', '1') })
 const page = await ctx.newPage()
 page.on('dialog', (d: any) => void d.accept(d.type() === 'prompt' ? '4321' : undefined))
 try {
   // Entrar como dueño con verificación en dos pasos.
   await page.goto(base)
+  // Intro con el logo: aparece al abrir y se puede omitir.
+  await page.getByTestId('intro').waitFor()
+  await page.screenshot({ path: `${shots}/0-intro.png` })
+  await page.getByRole('button', { name: 'Omitir' }).click()
+  check(true, 'intro con logo que se puede omitir')
   await page.getByRole('button', { name: 'Dueño' }).click()
   await page.getByLabel('Teléfono (10 dígitos)').fill(phone)
   await page.getByLabel('Contraseña').fill('secreto123')
   await page.getByRole('button', { name: 'Continuar' }).click()
   await page.getByLabel('Código de 6 dígitos').fill(codes[phone]!)
   await page.getByRole('button', { name: 'Verificar' }).click()
+  // El dueño entra al Inicio: indicadores, gráfica y movimientos.
+  await page.getByRole('heading', { name: /^Hola/ }).waitFor()
+  await page.getByText('Ventas de la semana').waitFor()
+  await page.screenshot({ path: `${shots}/1-inicio.png` })
+  check(true, 'inicio con indicadores, gráfica y movimientos')
+  await page.getByRole('link', { name: 'Caja' }).click()
   await page.getByRole('heading', { name: 'Abrir caja' }).waitFor()
   check(true, 'entra el dueño con código por teléfono')
   await page.screenshot({ path: `${shots}/1-abrir-caja.png` })
@@ -103,7 +115,7 @@ try {
 
   await ctx.setOffline(false)
   await page.getByTestId('pendientes').click()
-  await page.getByText('Todo enviado').waitFor({ timeout: 10_000 })
+  await page.getByTestId('pendientes').getByText('Todo enviado').waitFor({ timeout: 10_000 })
   const sales = await call('GET', '/sales', undefined, token)
   check(sales.sales.length === 2, 'al volver la señal se envía sin duplicar (2 ventas en el servidor)')
 
@@ -178,6 +190,7 @@ try {
   await call('PUT', `/staff/${barbero.id}/agenda`, { inAgenda: true, schedule: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ weekday, start: '00:00', end: '24:00' })) }, token)
   await call('POST', '/services', { name: 'Corte de cabello', price: 15000, durationMin: 30 }, token)
   const pub = await browser.newPage()
+  await pub.addInitScript(() => sessionStorage.setItem('nx_intro', '1'))
   await pub.goto(`${base}/reservar/${me.business.code}`)
   await pub.getByRole('button', { name: /Corte de cabello/ }).click()
   await pub.getByRole('button', { name: 'El primero disponible' }).click()
@@ -218,6 +231,7 @@ try {
   check(true, 'restaurante: pedido enviado a cocina')
   await page.screenshot({ path: `${shots}/11-cuenta-mesa.png` })
   const kitchen = await browser.newPage()
+  await kitchen.addInitScript(() => sessionStorage.setItem('nx_intro', '1'))
   await kitchen.addInitScript((t: string) => localStorage.setItem('nx_token', t), token)
   await kitchen.goto(`${base}/#/cocina`)
   await kitchen.getByRole('heading', { name: 'Mesa 7' }).waitFor()
@@ -242,6 +256,7 @@ try {
   check(true, 'buzón: el dueño envía su duda')
   createAdmin({ db: apiDb, now: () => new Date(), notifier: { sendCode: () => {} } }, { name: 'Soporte', username: 'soporte', password: 'superpanel1' })
   const adm = await browser.newPage()
+  await adm.addInitScript(() => sessionStorage.setItem('nx_intro', '1'))
   await adm.goto(`${base}/admin`)
   await adm.getByLabel('Usuario').fill('soporte')
   await adm.getByLabel('Contraseña').fill('superpanel1')

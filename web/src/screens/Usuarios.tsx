@@ -20,6 +20,7 @@ export function Usuarios({ me }: { me: Me }) {
     <div className="grid2">
       <section className="card">
         <h2>Personal</h2>
+        <Asistencia />
         <p className="muted">Código del negocio para entrar: <b>{me.business.code}</b></p>
         <table className="list"><tbody>
           {users.map((u) => <tr key={u.id} onClick={() => u.role !== 'owner' && setSel({ ...u })} style={{ cursor: 'pointer' }}><td>{u.name}<br /><small className="muted">{u.username ?? 'dueño'}{u.active ? '' : ' · desactivado'}</small></td></tr>)}
@@ -94,6 +95,25 @@ function Horario({ userId }: { userId: string }) {
       ))}
       <p><button className="primary" onClick={save}>Guardar horario</button></p>
       {msg && <p className="muted">{msg}</p>}
+    </div>
+  )
+}
+
+/** Asistencia del personal de hoy, y registrar la propia entrada o salida. */
+function Asistencia() {
+  const [rows, setRows] = useState<any[]>([])
+  const [msg, setMsg] = useState('')
+  const from = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+  const load = () => api<any>('GET', `/attendance?from=${from}`).then((r) => setRows(r.attendance)).catch(() => {})
+  useEffect(() => { void load() }, [])
+  const clock = async (type: string) => { try { await api('POST', '/attendance/clock', { type }); setMsg(''); void load() } catch (e) { setMsg((e as Error).message) } }
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <h3>Asistencia de hoy</h3>
+      <div className="row"><button onClick={() => clock('entrada')}>Registrar mi entrada</button><button onClick={() => clock('salida')}>Registrar mi salida</button></div>
+      {msg && <p className="error">{msg}</p>}
+      <table className="list"><tbody>{rows.map((r, i) => <tr key={i}><td>{r.name}</td><td>{r.type}</td><td className="num">{new Date(r.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td></tr>)}</tbody></table>
+      {rows.length === 0 && <p className="muted">Nadie ha registrado hoy.</p>}
     </div>
   )
 }
