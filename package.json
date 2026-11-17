@@ -11,7 +11,8 @@
     "admin:create": "tsx src/admin-cli.ts",
     "build": "vite build --config web/vite.config.ts",
     "web:dev": "vite --config web/vite.config.ts",
-    "e2e": "tsx test/e2e/caja.e2e.ts"
+    "e2e": "tsx test/e2e/caja.e2e.ts",
+    "check": "npm run typecheck && vitest run && npm run build && npm run e2e"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.8",

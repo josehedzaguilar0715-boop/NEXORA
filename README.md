@@ -34,6 +34,7 @@ npm run build     # pantallas (web/dist)
 npm run dev       # http://localhost:3000 — pantallas en / y API en /api (base SQLite en data/nexora.db)
 npm run web:dev   # pantallas con recarga en vivo en :5173 (usa la API de :3000)
 npm run e2e       # prueba de punta a punta en navegador (requiere npm run build)
+npm run check     # todo: tipos, pruebas, build y navegador (se detiene en la primera falla)
 ADMIN_PASSWORD=... npm run admin:create -- soporte "Soporte"   # usuario del super panel
 ```
 
