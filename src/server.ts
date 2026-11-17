@@ -2,11 +2,13 @@ import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { existsSync, mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { createApp } from './app.js'
 import { openDb } from './db.js'
 
-mkdirSync('data', { recursive: true })
-const db = openDb(process.env.NEXORA_DB ?? 'data/nexora.db')
+const dbPath = process.env.NEXORA_DB ?? 'data/nexora.db'
+mkdirSync(dirname(dbPath), { recursive: true })
+const db = openDb(dbPath)
 const api = createApp({
   db,
   now: () => new Date(),

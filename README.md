@@ -184,3 +184,10 @@ Importes siempre en centavos enteros (MXN).
 - **Super panel** en `/admin` (acceso propio): negocios por estado con su mensualidad, días vencido y mensajes sin leer; registrar pago; días de prueba; plan con sucursales y paquetes de usuarios (ahora o en el siguiente pago); suspender; restablecer el acceso del dueño con motivo; alta asistida; buzón con respuesta y estado de solicitudes; valores por defecto.
 - **Dueño**: Ajustes (datos del ticket, giro, módulos, opciones del giro, dispositivos), Buzón (dudas y solicitudes de cambio con su estado), Membresías y promos (planes, paquetes, pases, promociones, puntos o sellos y premios).
 - **Escanear QR** (si hay un módulo que lo use): entrada, usar membresía o consultar.
+
+## Staging y respaldos
+
+- **Contenedor**: `docker build -t nexora .` y `docker run -p 3000:3000 -v nexora-data:/data nexora`. La base vive en el volumen `/data`; las pantallas y la API (`/api`) salen del mismo puerto. Crear el usuario del super panel dentro del contenedor: `ADMIN_PASSWORD=... npx tsx src/admin-cli.ts soporte "Soporte"`.
+- **Respaldos**: `npm run backup -- carpeta` copia la base en caliente y verifica su integridad. Programarlo (p. ej. cada noche) y guardar copias fuera del servidor.
+- **CI**: `.github/workflows/ci.yml` corre tipos, pruebas y build en cada push. La prueba en navegador (`npm run e2e`) se corre en local con `npm run check`.
+- Antes de producción falta: conectar el proveedor de WhatsApp/SMS para los códigos (hoy se imprimen en consola), HTTPS y el dominio, y elegir dónde se aloja.
