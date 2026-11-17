@@ -61,6 +61,7 @@ export function Agenda({ me }: { me: Me }) {
           </section>
         ))}
       </div>
+      <Retoques />
       {staff.length === 0 && <p className="card">Nadie está en la agenda todavía. En Personal, el dueño marca quién atiende y su horario.</p>}
       {form && <NuevaCita walkIn={form.walkIn} date={date} staff={staff} services={services} onClose={() => setForm(null)} onSaved={() => { setForm(null); setMsg({ ok: 'Cita guardada.' }); void load() }} />}
       {checkout && <Cobro appt={checkout} onClose={() => setCheckout(null)} onDone={(t) => { setCheckout(null); setMsg({ ok: `Cobrado: ${mxn(t)}.` }); void load() }} />}
@@ -69,17 +70,17 @@ export function Agenda({ me }: { me: Me }) {
 }
 
 function NuevaCita({ walkIn, date, staff, services, onClose, onSaved }: { walkIn: boolean; date: string; staff: { id: string; name: string }[]; services: Service[]; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ staffId: staff[0]?.id ?? '', serviceIds: [] as string[], time: '', name: '', phone: '' })
+  const [f, setF] = useState({ staffId: staff[0]?.id ?? '', serviceIds: [] as string[], time: '', name: '', phone: '', atHome: false, address: '', travelMin: '30' })
   const [slots, setSlots] = useState<string[]>([])
   const [err, setErr] = useState('')
   const total = useMemo(() => services.filter((s) => f.serviceIds.includes(s.id)).reduce((a, s) => a + s.price, 0), [f.serviceIds, services])
   useEffect(() => {
     if (walkIn || !f.serviceIds.length || !f.staffId) return setSlots([])
-    api<any>('GET', `/agenda/availability?date=${date}&serviceIds=${f.serviceIds.join(',')}&staffId=${f.staffId}`).then((r) => setSlots(r.slots)).catch(() => setSlots([]))
-  }, [f.serviceIds, f.staffId, date, walkIn])
+    api<any>('GET', `/agenda/availability?date=${date}&serviceIds=${f.serviceIds.join(',')}&staffId=${f.staffId}&travelMin=${f.atHome ? Number(f.travelMin) || 0 : 0}`).then((r) => setSlots(r.slots)).catch(() => setSlots([]))
+  }, [f.serviceIds, f.staffId, date, walkIn, f.atHome, f.travelMin])
   const save = async () => {
     try {
-      await api('POST', '/appointments', { staffId: f.staffId, serviceIds: f.serviceIds, customerName: f.name, phone: f.phone || undefined, ...(walkIn ? { walkIn: true } : { startsAt: new Date(`${date}T${f.time}:00-06:00`).toISOString() }) })
+      await api('POST', '/appointments', { staffId: f.staffId, serviceIds: f.serviceIds, customerName: f.name, phone: f.phone || undefined, ...(f.atHome ? { atHome: true, address: f.address, travelMin: Number(f.travelMin) || 0 } : {}), ...(walkIn ? { walkIn: true } : { startsAt: new Date(`${date}T${f.time}:00-06:00`).toISOString() }) })
       onSaved()
     } catch (e) { setErr((e as Error).message) }
   }
@@ -99,6 +100,10 @@ function NuevaCita({ walkIn, date, staff, services, onClose, onSaved }: { walkIn
           </>
         )}
         <div className="row"><label>Nombre del cliente<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label><label>Teléfono<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label></div>
+        {!walkIn && (<>
+          <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={f.atHome} onChange={(e) => setF({ ...f, atHome: e.target.checked, time: '' })} />A domicilio</label>
+          {f.atHome && <div className="row"><label>Dirección (solo la ve el negocio)<input value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label><label style={{ flex: '0 0 180px' }}>Traslado (min)<input inputMode="numeric" value={f.travelMin} onChange={(e) => setF({ ...f, travelMin: e.target.value, time: '' })} /></label></div>}
+        </>)}
         <p className="muted">Total: {mxn(total)}</p>
         {err && <p className="error">{err}</p>}
         <p className="row"><button onClick={onClose}>Cancelar</button><button className="primary" disabled={!f.serviceIds.length || f.name.trim().length < 2 || (!walkIn && !f.time)} onClick={save}>Guardar</button></p>
@@ -130,5 +135,20 @@ function Cobro({ appt, onClose, onDone }: { appt: any; onClose: () => void; onDo
         <p className="row"><button onClick={onClose}>Volver</button><button className="primary big" onClick={pay}>Cobrar</button></p>
       </div>
     </div>
+  )
+}
+
+/** Recordatorios de retoque (si el módulo está activo): solo prepara el mensaje. */
+function Retoques() {
+  const [list, setList] = useState<any[] | null>(null)
+  useEffect(() => { api<any>('GET', '/reminders/retouch').then((r) => setList(r.reminders)).catch(() => setList(null)) }, [])
+  if (!list || list.length === 0) return null
+  return (
+    <section className="card" style={{ marginTop: 16 }}>
+      <h2>Les toca retoque</h2>
+      <table className="list"><tbody>{list.map((r, i) => (
+        <tr key={i}><td>{r.customerName}<br /><small className="muted">{r.service} · última vez {new Date(r.lastVisit).toLocaleDateString('es-MX')}</small></td><td>{r.whatsapp ? <a href={r.whatsapp} target="_blank" rel="noreferrer">Preparar WhatsApp</a> : <span className="muted">sin teléfono</span>}</td></tr>
+      ))}</tbody></table>
+    </section>
   )
 }

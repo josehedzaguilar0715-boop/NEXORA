@@ -903,6 +903,20 @@ const MIGRATIONS: Migration[] = [
   -- Dirección para servicios a domicilio: se guarda por cliente y solo la ve el negocio.
   ALTER TABLE customers ADD COLUMN address TEXT;
   `,
+  `
+  -- Paquetes de sesiones: N usos en total dentro de su vigencia (además de las membresías por periodo).
+  ALTER TABLE membership_plans ADD COLUMN kind TEXT NOT NULL DEFAULT 'periodo';
+  ALTER TABLE membership_plans ADD COLUMN validity_days INTEGER;
+  -- La clienta elige si todos sus servicios son a domicilio (1) o solo algunos (0, se elige en cada cita).
+  ALTER TABLE customers ADD COLUMN home_all INTEGER NOT NULL DEFAULT 0;
+  -- Ajustes por negocio (cargo por traslado, etc.).
+  CREATE TABLE business_settings (
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (business_id, key)
+  );
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {

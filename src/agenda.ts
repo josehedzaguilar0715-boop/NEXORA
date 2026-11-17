@@ -6,6 +6,7 @@ import { moduleOn } from './common.js'
 import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Deps, type Env, type UserRow } from './context.js'
 import type { Db } from './db.js'
 import { createSale, parseSale } from './sales.js'
+import { getSettings } from './settings.js'
 import { AppError, bad, conflict, forbidden, iso, localDate, newId, normalizePhone, notFound } from './util.js'
 
 // Centro de México: UTC−6 fijo (sin horario de verano desde 2022).
@@ -201,6 +202,8 @@ agenda.post('/appointments', requirePerm('sell'), async (c) => {
   const cust = d.customerId ? (db.prepare('SELECT id, name, phone FROM customers WHERE id = ? AND business_id = ?').get(d.customerId, u.business_id) as { id: string; name: string; phone: string | null } | undefined) : undefined
   if (d.customerId && !cust) throw bad('Ese cliente no existe.')
   const name = d.customerName ?? cust?.name
+  // Si la clienta pidió que todos sus servicios sean a domicilio, se aplica solo.
+  if (d.atHome === undefined && cust && (db.prepare('SELECT home_all FROM customers WHERE id = ?').get(cust.id) as { home_all: number }).home_all) d.atHome = true
   if (!name) throw bad('Indica el nombre del cliente.')
   // A domicilio: la dirección se guarda por cliente y solo la ve el negocio.
   const address = d.atHome ? d.address ?? (cust ? (db.prepare('SELECT address FROM customers WHERE id = ?').get(cust.id) as { address: string | null } | undefined)?.address ?? null : null) : null
@@ -271,7 +274,10 @@ agenda.post('/appointments/:id/checkout', requirePerm('sell'), async (c) => {
   const raw = (await body(c)) as Record<string, unknown>
   const extra = Array.isArray(raw.items) ? (raw.items as Record<string, unknown>[]) : []
   const svc = (JSON.parse(a.services) as Svc[]).map((s) => ({ serviceId: s.serviceId, quantity: 1, unitPrice: s.price, staffId: a.staff_id ?? undefined }))
-  const input = parseSale({ ...raw, id: (raw.id as string) ?? newId(), customerId: a.customer_id ?? raw.customerId, items: [...svc, ...extra.map((i) => ({ staffId: a.staff_id ?? undefined, ...i }))] })
+  // Cargo por traslado a domicilio: opcional (apagado por defecto) y fuera de la comisión.
+  const fee = a.at_home ? getSettings(db, u.business_id).travelFee : null
+  const travel = fee ? [{ description: 'Cargo por traslado', quantity: 1, unitPrice: fee, noCommission: true }] : []
+  const input = parseSale({ ...raw, id: (raw.id as string) ?? newId(), customerId: a.customer_id ?? raw.customerId, items: [...svc, ...extra.map((i) => ({ staffId: a.staff_id ?? undefined, ...i })), ...travel] })
   const result = db.transaction(() => {
     // Los servicios se cobran al precio con que se agendaron.
     const r = createSale(deps, u, input, { trustedPrices: !extra.some((i) => i.unitPrice !== undefined) })
@@ -341,4 +347,39 @@ publicAgenda.post('/public/appointments/:token/cancel', (c) => {
   db.prepare("UPDATE appointments SET status = 'cancelada', cancel_reason = 'Cancelada por el cliente' WHERE id = ?").run(a.id)
   audit(db, now, { businessId: a.business_id, userId: null, action: 'cita.cancelada_cliente', entity: 'appointment', entityId: a.id })
   return c.json({ ok: true })
+})
+
+// ---------- Recordatorio de retoque (opcional, apagado por defecto) ----------
+
+/**
+ * Lista de clientes a quienes ya les toca retoque según `attrs.retouchDays` del servicio.
+ * Nada se envía solo: se prepara el mensaje para mandarlo a mano.
+ */
+agenda.get('/reminders/retouch', requirePerm('sell'), (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  if (!moduleOn(db, u.business_id, 'recordatorios')) throw new AppError(409, 'modulo_inactivo', 'Los recordatorios están apagados.')
+  const biz = db.prepare('SELECT name FROM businesses WHERE id = ?').get(u.business_id) as { name: string }
+  const svcs = (db.prepare('SELECT id, name, attrs FROM services WHERE business_id = ? AND active = 1').all(u.business_id) as { id: string; name: string; attrs: string }[])
+    .map((s) => ({ ...s, days: Number((JSON.parse(s.attrs) as { retouchDays?: number }).retouchDays ?? 0) }))
+    .filter((s) => s.days > 0)
+  const appts = db.prepare("SELECT * FROM appointments WHERE business_id = ? AND status = 'atendida' ORDER BY starts_at DESC").all(u.business_id) as ApptRow[]
+  const out: { customerName: string; phone: string | null; service: string; lastVisit: string; dueSince: string; message: string; whatsapp: string | null }[] = []
+  const seen = new Set<string>()
+  for (const a of appts) {
+    const who = a.customer_id ?? a.phone ?? a.customer_name
+    for (const s of (JSON.parse(a.services) as Svc[])) {
+      const rule = svcs.find((x) => x.id === s.serviceId)
+      const key = `${who}|${s.serviceId}`
+      if (!rule || seen.has(key)) continue
+      seen.add(key) // solo la visita más reciente cuenta
+      const due = addMin(a.starts_at, rule.days * 1440)
+      if (due > iso(now())) continue
+      const upcoming = db.prepare(`SELECT 1 FROM appointments WHERE business_id = ? AND status IN ${ACTIVE} AND starts_at > ? AND (customer_id = ? OR phone = ?)`).get(u.business_id, iso(now()), a.customer_id, a.phone)
+      if (upcoming) continue
+      const message = `Hola ${a.customer_name}, en ${biz.name} te recordamos que ya te toca tu retoque de ${s.name}. ¿Te agendamos?`
+      out.push({ customerName: a.customer_name, phone: a.phone, service: s.name, lastVisit: a.starts_at, dueSince: due, message, whatsapp: a.phone ? `https://wa.me/52${a.phone}?text=${encodeURIComponent(message)}` : null })
+    }
+  }
+  return c.json({ reminders: out })
 })

@@ -13,7 +13,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 6 (ferretería)**: varias unidades con equivalencias (caja, rollo; granel por metro y litro), escalas de precio por volumen que la caja aplica sola, cotizaciones que no apartan existencia, clientes constructores con límite (código del dueño), clave del proveedor por producto y devoluciones con o sin ticket (siempre con código). El negocio tiene un **giro** y las pantallas se adaptan. ✅ con pruebas y prueba en navegador.
 - **Bloque 7 (papelería)**: servicios por hoja con precio por tamaño y color, consumibles de uso (tinta, tóner, papel) con costo vía recetas, contador de copiadoras por turno contra hojas cobradas, combos de temporada con un solo precio, encargos con anticipo (la devolución la decide el dueño con código) y mayoreo con escalas y crédito. ✅ con pruebas y prueba en navegador.
 - **Bloque 8 (barbería)**: agenda por barbero con horarios, días de descanso y bloqueos; citas en mostrador y clientes sin cita en la misma agenda; combos con precio repartido; comisiones por barbero y servicio/producto/categoría sin valores predeterminados (sobre precio final, cada venta guarda su %); propinas aparte; productos en la misma cuenta; reserva pública por link con "el primero disponible", solo horas libres, pendiente hasta confirmar y estado visible. Sin recordatorios automáticos (botón para preparar WhatsApp). ✅ con pruebas y prueba en navegador.
-- Siguiente: Bloque 9 (estudio de uñas).
+- **Bloque 9 (estudio de uñas)**: agenda por técnica con tiempo de secado que bloquea; consumibles por técnica; comisiones por técnica (categoría) y propinas aparte; paquetes de sesiones (N usos en su vigencia); notas libres que solo escribe el dueño; a domicilio (todos o algunos servicios, dirección privada, traslado que bloquea la agenda, cargo opcional apagado y fuera de comisión); recordatorio de retoque opcional y apagado, que solo prepara el mensaje. ✅ con pruebas.
+- Siguiente: Bloque 10 (perfumería).
 
 ## Desarrollo local
 
@@ -108,3 +109,10 @@ Importes siempre en centavos enteros (MXN).
 - **Comisiones** (`src/commissions.ts`): reglas del dueño por persona y por servicio, producto, categoría o todo; gana la más específica. Sin regla no hay comisión; sin quien atendió tampoco. Base = precio final con descuentos y promociones repartidos. Cada venta guarda el % aplicado. Cancelar la venta anula la comisión y la propina.
 - **Propinas**: por persona, no son ingreso del negocio ni cuentan para comisión. Las de efectivo se suman a lo que debe haber en caja (están físicamente ahí) como renglón aparte.
 - **Reserva por link**: `/reservar/<código del negocio>` (módulo `reservas`, apagado por defecto). Muestra solo horas libres, no expone datos de otros clientes, limita 3 reservas pendientes por teléfono, y `/cita/<token>` muestra el estado. Pendiente de decidir si se cobra como módulo o sitio aparte (sección 12).
+
+## Estudio de uñas (Bloque 9)
+
+- Técnicas = servicios con `attrs.technique`, duración y `attrs.extraBlockMin` (secado). Comisión por técnica con reglas de categoría.
+- Paquetes de sesiones: plan con `kind: 'paquete'`, `usesPerPeriod` sesiones en total y `validityDays`.
+- A domicilio: la clienta puede tener `homeAll` (todas sus citas a domicilio) o elegir en cada cita. La dirección se guarda en el cliente y nunca sale en el link público. El traslado (`travelMin`) bloquea antes y después de la cita. Cargo por traslado en `PUT /settings { travelFee }` (apagado por defecto), sin comisión.
+- Retoque: `attrs.retouchDays` en el servicio y módulo `recordatorios` (apagado). `GET /reminders/retouch` lista a quién le toca y prepara el WhatsApp; no envía nada.

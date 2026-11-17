@@ -25,7 +25,7 @@ export function rateFor(db: Db, businessId: string, staffId: string, t: { servic
   return null
 }
 
-const staffOf = (l: ResolvedLine, sale: Record<string, unknown>) => (l.input as { staffId?: string }).staffId ?? (sale.staffId as string | undefined) ?? null
+const staffOf = (l: ResolvedLine, sale: Record<string, unknown>) => ((l.input as { noCommission?: boolean }).noCommission ? null : (l.input as { staffId?: string }).staffId ?? (sale.staffId as string | undefined) ?? null)
 const tipsSchema = z.array(z.object({ staffId: z.string(), amount: z.number().int().min(1), method: z.enum(['efectivo', 'transferencia', 'tarjeta']).optional() })).max(20)
 
 // Antes de cobrar: quien atiende y quien recibe propina deben ser del negocio.

@@ -9,7 +9,7 @@ import type { Db } from './db.js'
 import { activePromotions, bestPromotions } from './promotions.js'
 import { AppError, bad, clampTime, conflict, forbidden, iso, localDate, newId, notFound, type Clock } from './util.js'
 
-export const MODULES = ['membresias', 'promociones', 'fidelidad', 'asistencia', 'reservas'] as const
+export const MODULES = ['membresias', 'promociones', 'fidelidad', 'asistencia', 'reservas', 'recordatorios'] as const
 export type Module = (typeof MODULES)[number]
 
 export function moduleOn(db: Db, businessId: string, m: Module): boolean {
@@ -56,6 +56,7 @@ common.post('/customers', requirePerm('customers_credit'), async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const d = parse(z.object({ name: z.string().trim().min(2).max(100), phone: z.string().trim().max(20).optional(), notes: z.string().max(2000).optional(), loyaltyEnrolled: z.boolean().optional() }), await body(c))
+  if (d.notes && u.role !== 'owner') throw new AppError(403, 'sin_permiso', 'Solo el dueño escribe las notas del cliente.')
   const id = newId()
   const code = customerCode()
   db.prepare('INSERT INTO customers (id, business_id, name, phone, notes, code, loyalty_enrolled, created_at) VALUES (?,?,?,?,?,?,?,?)').run(
@@ -77,7 +78,11 @@ common.patch('/customers/:id', requirePerm('customers_credit'), async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const cu = loadCustomer(c)
-  const d = parse(z.object({ name: z.string().trim().min(2).max(100).optional(), phone: z.string().trim().max(20).nullable().optional(), notes: z.string().max(2000).nullable().optional(), loyaltyEnrolled: z.boolean().optional(), active: z.boolean().optional() }), await body(c))
+  const d = parse(z.object({ name: z.string().trim().min(2).max(100).optional(), phone: z.string().trim().max(20).nullable().optional(), notes: z.string().max(2000).nullable().optional(), loyaltyEnrolled: z.boolean().optional(), active: z.boolean().optional(), address: z.string().trim().max(300).nullable().optional(), homeAll: z.boolean().optional() }), await body(c))
+  // Las notas del cliente son texto libre que escribe el dueño (sin fichas médicas estructuradas).
+  if (d.notes !== undefined && u.role !== 'owner') throw new AppError(403, 'sin_permiso', 'Solo el dueño escribe las notas del cliente.')
+  if (d.address !== undefined) db.prepare('UPDATE customers SET address = ? WHERE id = ?').run(d.address, cu.id)
+  if (d.homeAll !== undefined) db.prepare('UPDATE customers SET home_all = ? WHERE id = ?').run(d.homeAll ? 1 : 0, cu.id)
   db.prepare('UPDATE customers SET name = ?, phone = ?, notes = ?, loyalty_enrolled = ?, active = ? WHERE id = ?').run(
     d.name ?? cu.name, d.phone === undefined ? cu.phone : d.phone, d.notes === undefined ? cu.notes : d.notes,
     d.loyaltyEnrolled === undefined ? cu.loyalty_enrolled : d.loyaltyEnrolled ? 1 : 0, d.active === undefined ? cu.active : d.active ? 1 : 0, cu.id,
@@ -144,14 +149,17 @@ export function periodStart(start: Date, p: Period, at: Date) {
 }
 
 function membershipView(db: Db, m: MembershipRow, at: Date) {
-  const plan = JSON.parse(m.plan_snapshot) as { name: string; uses_per_period: number; period: Period }
-  const ps = periodStart(new Date(m.starts_at), plan.period, at)
+  const plan = JSON.parse(m.plan_snapshot) as { name: string; uses_per_period: number; period: Period; kind?: string }
+  // Paquete de sesiones: un solo periodo que dura toda la vigencia.
+  const ps = plan.kind === 'paquete' ? new Date(m.starts_at) : periodStart(new Date(m.starts_at), plan.period, at)
   const used = (db.prepare('SELECT COUNT(*) n FROM membership_uses WHERE membership_id = ? AND period_start = ?').get(m.id, iso(ps)) as { n: number }).n
-  return { id: m.id, name: plan.name, startsAt: m.starts_at, endsAt: m.ends_at, usesPerPeriod: plan.uses_per_period, period: plan.period, usedThisPeriod: used, remaining: Math.max(0, plan.uses_per_period - used), periodStart: iso(ps) }
+  return { id: m.id, name: plan.name, kind: plan.kind ?? 'periodo', startsAt: m.starts_at, endsAt: m.ends_at, usesPerPeriod: plan.uses_per_period, period: plan.kind === 'paquete' ? 'vigencia' : plan.period, usedThisPeriod: used, remaining: Math.max(0, plan.uses_per_period - used), periodStart: iso(ps) }
 }
 
 const planBody = z.object({
   name: z.string().trim().min(2).max(100), usesPerPeriod: z.number().int().min(1).max(1000), period: z.enum(['dia', 'semana', 'mes']),
+  /** paquete: usesPerPeriod sesiones en total, válidas validityDays días. */
+  kind: z.enum(['periodo', 'paquete']).optional(), validityDays: z.number().int().min(1).max(3650).optional(),
   price: z.number().int().min(0), appliesTo: z.array(z.string()).max(200).optional(), active: z.boolean().optional(),
 })
 
@@ -162,7 +170,8 @@ common.post('/membership-plans', requireModule('membresias'), ownerOnly, async (
   const u = c.get('session').user
   const d = parse(planBody, await body(c))
   const id = newId()
-  db.prepare('INSERT INTO membership_plans (id, business_id, name, uses_per_period, period, price, applies_to, created_at) VALUES (?,?,?,?,?,?,?,?)').run(id, u.business_id, d.name, d.usesPerPeriod, d.period, d.price, JSON.stringify(d.appliesTo ?? []), iso(now()))
+  if (d.kind === 'paquete' && !d.validityDays) throw bad('Un paquete necesita su vigencia en días.')
+  db.prepare('INSERT INTO membership_plans (id, business_id, name, uses_per_period, period, price, applies_to, kind, validity_days, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(id, u.business_id, d.name, d.usesPerPeriod, d.period, d.price, JSON.stringify(d.appliesTo ?? []), d.kind ?? 'periodo', d.validityDays ?? null, iso(now()))
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'membresia.plan_alta', entity: 'membership_plan', entityId: id, newValue: d })
   return c.json({ id }, 201)
 })
@@ -186,13 +195,13 @@ common.post('/customers/:id/memberships', requireModule('membresias'), requirePe
   const u = c.get('session').user
   const cu = loadCustomer(c)
   const d = parse(z.object({ planId: z.string(), periods: z.number().int().min(1).max(36).default(1), startsAt: z.string().datetime().optional(), saleId: z.string().optional() }), await body(c))
-  const plan = db.prepare('SELECT * FROM membership_plans WHERE id = ? AND business_id = ? AND active = 1').get(d.planId, u.business_id) as { id: string; name: string; uses_per_period: number; period: Period; price: number; applies_to: string } | undefined
+  const plan = db.prepare('SELECT * FROM membership_plans WHERE id = ? AND business_id = ? AND active = 1').get(d.planId, u.business_id) as { id: string; name: string; uses_per_period: number; period: Period; price: number; applies_to: string; kind: string; validity_days: number | null } | undefined
   if (!plan) throw bad('Ese plan no existe o está desactivado.')
   const start = d.startsAt ? new Date(d.startsAt) : now()
-  const end = addPeriod(start, plan.period, d.periods)
+  const end = plan.kind === 'paquete' ? new Date(start.getTime() + plan.validity_days! * 86_400_000) : addPeriod(start, plan.period, d.periods)
   const id = newId()
   db.prepare('INSERT INTO customer_memberships (id, business_id, customer_id, plan_id, plan_snapshot, starts_at, ends_at, price_paid, sale_id, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(
-    id, u.business_id, cu.id, plan.id, JSON.stringify(plan), iso(start), iso(end), plan.price * d.periods, d.saleId ?? null, u.id, iso(now()),
+    id, u.business_id, cu.id, plan.id, JSON.stringify(plan), iso(start), iso(end), plan.kind === 'paquete' ? plan.price : plan.price * d.periods, d.saleId ?? null, u.id, iso(now()),
   )
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'membresia.venta', entity: 'customer_membership', entityId: id, newValue: { customer: cu.id, plan: plan.name, startsAt: iso(start), endsAt: iso(end) } })
   return c.json({ membership: membershipView(db, db.prepare('SELECT * FROM customer_memberships WHERE id = ?').get(id) as MembershipRow, now()) }, 201)
