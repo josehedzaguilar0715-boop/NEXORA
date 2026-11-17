@@ -111,7 +111,7 @@ if (typeof window !== 'undefined') {
 
 // ---------- Utilidades ----------
 
-export const mxn = (c: number) => `$${(c / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+export const mxn = (c: number) => `${c < 0 ? '−' : ''}$${(Math.abs(c) / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 /** "12.50" → 1250 centavos. */
 export const toCents = (s: string) => Math.round(Number(String(s).replace(/[$,\s]/g, '')) * 100)
 export const cache = {

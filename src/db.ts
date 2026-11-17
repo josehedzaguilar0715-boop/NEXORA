@@ -1266,6 +1266,16 @@ const MIGRATIONS: Migration[] = [
   -- Negocios mixtos: además del giro principal, otros giros cuyas pantallas también se usan (p. ej. abarrotes + papelería).
   ALTER TABLE businesses ADD COLUMN extra_giros TEXT NOT NULL DEFAULT '[]';
   `,
+  `
+  -- Contabilidad: categoría de cada gasto (para el estado de resultados).
+  ALTER TABLE expenses ADD COLUMN category TEXT NOT NULL DEFAULT 'otros';
+  -- Origen de los movimientos de caja: 'manual' (retiro o depósito que hizo alguien) o 'sistema'
+  -- (abonos, gastos, compras y devoluciones, que ya se cuentan en su propia tabla).
+  ALTER TABLE cash_movements ADD COLUMN origin TEXT NOT NULL DEFAULT 'sistema';
+  UPDATE cash_movements SET origin = 'manual'
+   WHERE reason NOT LIKE 'Abono de %' AND reason NOT LIKE 'Gasto: %' AND reason NOT LIKE 'Devolución%'
+     AND reason NOT LIKE 'Pago de compra %' AND reason NOT LIKE 'Abono a proveedor %' AND reason NOT LIKE 'Reembolso de boletos%';
+  `,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

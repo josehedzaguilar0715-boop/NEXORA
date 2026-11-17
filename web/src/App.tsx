@@ -25,6 +25,11 @@ import { Login } from './screens/Login'
 import { Productos } from './screens/Productos'
 import { Reportes } from './screens/Reportes'
 import { Usuarios } from './screens/Usuarios'
+import { Finanzas } from './screens/Finanzas'
+import {
+  Armchair, Boxes, CalendarDays, ChartColumn, ChefHat, ClipboardCheck, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
+  LifeBuoy, LogOut, Menu, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, Tag, Ticket, Truck, Undo2, UserCog, Users, UtensilsCrossed,
+} from 'lucide-react'
 
 export interface Me {
   user: { id: string; name: string; phone?: string | null; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
@@ -38,34 +43,38 @@ export interface Me {
 export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.business.giro]).some((x) => g.includes(x))
 export const can = (me: Me, p: string) => (p === 'owner' ? me.user.role === 'owner' : me.permissions === 'todos' || me.permissions.includes(p))
 
-type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[] }
+type Icon = import('lucide-react').LucideIcon
+type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[]; group: string; icon: Icon; ownTitle?: boolean }
+/** Menú por secciones: lo de todos los días arriba y la administración al final. */
+const GROUPS = ['', 'Operación', 'Inventario', 'Clientes', 'Finanzas', 'Administración']
 const SCREENS: Screen[] = [
-  { key: 'inicio', label: 'Inicio', perm: 'view_reports', C: Inicio },
-  { key: 'agenda', label: 'Agenda', perm: 'sell', C: Agenda, giros: ['barberia', 'unas'] },
-  { key: 'entradas', label: 'Entradas', perm: 'sell', C: Entradas, giros: ['banos'] },
-  { key: 'taquilla', label: 'Taquilla', perm: 'sell', C: Taquilla, giros: ['turistico'] },
-  { key: 'acceso', label: 'Acceso', perm: 'sell', C: Acceso, giros: ['turistico'] },
-  { key: 'mesas', label: 'Mesas', perm: 'sell', C: Mesas, giros: ['palapa', 'restaurante', 'taqueria'] },
-  { key: 'menu', label: 'Menú del día', perm: 'sell', C: MenuDia, giros: ['comedor', 'taqueria'] },
-  { key: 'carne', label: 'Carne', perm: 'sell', C: Trompo, giros: ['taqueria'] },
-  { key: 'precios', label: 'Precio del día', perm: 'change_prices', C: PrecioDia, giros: ['verduleria', 'palapa'] },
-  { key: 'pedidos', label: 'Pedidos', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'comedor', 'verduleria'] },
-  { key: 'cocina', label: 'Cocina', perm: 'sell', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria'] },
-  { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
-  { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria'] },
-  { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria', 'papeleria'] },
-  { key: 'encargos', label: 'Encargos', perm: 'sell', C: Encargos, giros: ['papeleria'] },
-  { key: 'devoluciones', label: 'Devoluciones', perm: 'cancel_discount', C: Devoluciones, giros: ['ferreteria', 'perfumeria', 'papeleria'] },
-  { key: 'productos', label: 'Productos', perm: 'view_inventory', C: Productos },
-  { key: 'cierre', label: 'Cierre del día', perm: 'edit_inventory', C: CierreDia, giros: ['verduleria', 'abarrotes'] },
-  { key: 'compras', label: 'Compras', perm: 'edit_inventory', C: Compras },
-  { key: 'clientes', label: 'Clientes y fiado', perm: 'customers_credit', C: Clientes },
-  { key: 'reportes', label: 'Reportes', perm: 'view_reports', C: Reportes },
-  { key: 'usuarios', label: 'Personal', perm: 'create_employees', C: Usuarios },
-  { key: 'escanear', label: 'Escanear QR', perm: 'sell', C: Escanear },
-  { key: 'lealtad', label: 'Membresías y promos', perm: 'owner', C: Lealtad },
-  { key: 'buzon', label: 'Buzón', perm: 'owner', C: Buzon },
-  { key: 'ajustes', label: 'Ajustes', perm: 'owner', C: Ajustes },
+  { key: 'inicio', label: 'Inicio', perm: 'view_reports', C: Inicio, group: '', icon: LayoutDashboard, ownTitle: true },
+  { key: 'caja', label: 'Caja', perm: 'sell', C: Caja, group: 'Operación', icon: ShoppingCart },
+  { key: 'agenda', label: 'Agenda', perm: 'sell', C: Agenda, giros: ['barberia', 'unas'], group: 'Operación', icon: CalendarDays },
+  { key: 'entradas', label: 'Entradas', perm: 'sell', C: Entradas, giros: ['banos'], group: 'Operación', icon: DoorOpen },
+  { key: 'taquilla', label: 'Taquilla', perm: 'sell', C: Taquilla, giros: ['turistico'], group: 'Operación', icon: Ticket },
+  { key: 'acceso', label: 'Acceso', perm: 'sell', C: Acceso, giros: ['turistico'], group: 'Operación', icon: ScanLine, ownTitle: true },
+  { key: 'mesas', label: 'Mesas', perm: 'sell', C: Mesas, giros: ['palapa', 'restaurante', 'taqueria'], group: 'Operación', icon: Armchair },
+  { key: 'pedidos', label: 'Pedidos', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'comedor', 'verduleria'], group: 'Operación', icon: ClipboardList },
+  { key: 'cocina', label: 'Cocina', perm: 'sell', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria'], group: 'Operación', icon: ChefHat },
+  { key: 'menu', label: 'Menú del día', perm: 'sell', C: MenuDia, giros: ['comedor', 'taqueria'], group: 'Operación', icon: UtensilsCrossed },
+  { key: 'carne', label: 'Carne', perm: 'sell', C: Trompo, giros: ['taqueria'], group: 'Operación', icon: Flame },
+  { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria', 'papeleria'], group: 'Operación', icon: FileText },
+  { key: 'encargos', label: 'Encargos', perm: 'sell', C: Encargos, giros: ['papeleria'], group: 'Operación', icon: Package },
+  { key: 'devoluciones', label: 'Devoluciones', perm: 'cancel_discount', C: Devoluciones, giros: ['ferreteria', 'perfumeria', 'papeleria'], group: 'Operación', icon: Undo2 },
+  { key: 'escanear', label: 'Escanear QR', perm: 'sell', C: Escanear, group: 'Operación', icon: QrCode },
+  { key: 'productos', label: 'Productos', perm: 'view_inventory', C: Productos, group: 'Inventario', icon: Boxes },
+  { key: 'precios', label: 'Precio del día', perm: 'change_prices', C: PrecioDia, giros: ['verduleria', 'palapa'], group: 'Inventario', icon: Tag },
+  { key: 'compras', label: 'Compras', perm: 'edit_inventory', C: Compras, group: 'Inventario', icon: Truck },
+  { key: 'cierre', label: 'Cierre del día', perm: 'edit_inventory', C: CierreDia, giros: ['verduleria', 'abarrotes'], group: 'Inventario', icon: ClipboardCheck },
+  { key: 'clientes', label: 'Clientes y fiado', perm: 'customers_credit', C: Clientes, group: 'Clientes', icon: Users },
+  { key: 'lealtad', label: 'Membresías y promos', perm: 'owner', C: Lealtad, group: 'Clientes', icon: Gift },
+  { key: 'finanzas', label: 'Finanzas', perm: 'view_reports', C: Finanzas, group: 'Finanzas', icon: Landmark, ownTitle: true },
+  { key: 'reportes', label: 'Ventas y retiro', perm: 'view_reports', C: Reportes, group: 'Finanzas', icon: ChartColumn },
+  { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria'], group: 'Finanzas', icon: Percent },
+  { key: 'usuarios', label: 'Personal', perm: 'create_employees', C: Usuarios, group: 'Administración', icon: UserCog },
+  { key: 'buzon', label: 'Soporte', perm: 'owner', C: Buzon, group: 'Administración', icon: LifeBuoy },
+  { key: 'ajustes', label: 'Ajustes', perm: 'owner', C: Ajustes, group: 'Administración', icon: Settings },
 ]
 
 function useHash() {
@@ -152,7 +161,7 @@ function Privada() {
   return (
     <div className="app">
       <header className="top">
-        <button className="menu-btn" aria-label="Abrir menú" onClick={() => setMenu(true)}>☰</button>
+        <button className="menu-btn" aria-label="Abrir menú" onClick={() => setMenu(true)}><Menu size={22} aria-hidden /></button>
         <Logo size={26} />
         <span style={{ flex: 1 }} />
         <PendingBadge />
@@ -162,18 +171,30 @@ function Privada() {
         <div className="biz">{me.business.name}</div>
         {/* Un permiso no marcado no aparece en pantalla. */}
         <nav>
-          {allowed.map((s) => (
-            <a key={s.key} href={`#/${s.key}`} className={current?.key === s.key ? 'on' : ''}>{s.label}</a>
-          ))}
+          {GROUPS.map((g) => {
+            const items = allowed.filter((s) => s.group === g)
+            if (!items.length) return null
+            return (
+              <div key={g || 'top'} className="nav-group">
+                {g && <div className="nav-title">{g}</div>}
+                {items.map((s) => (
+                  <a key={s.key} href={`#/${s.key}`} className={current?.key === s.key ? 'on' : ''} aria-current={current?.key === s.key ? 'page' : undefined}>
+                    <s.icon size={20} strokeWidth={1.9} aria-hidden />{s.label}
+                  </a>
+                ))}
+              </div>
+            )
+          })}
         </nav>
         <div className="foot">
           <PendingBadge main />
-          <span className="muted" style={{ padding: '0 6px' }}>{me.user.name}</span>
-          <button onClick={logout}>Salir</button>
+          <div className="who"><span className="avatar" aria-hidden>{me.user.name.trim().charAt(0).toUpperCase()}</span><span><b>{me.user.name}</b><small className="muted">{me.user.role === 'owner' ? 'Dueño' : 'Personal'}</small></span></div>
+          <button className="logout" onClick={logout}><LogOut size={18} aria-hidden />Salir</button>
         </div>
       </aside>
       <main>
         {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
+        {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <p className="muted">{current.group}</p>}</div></header>}
         {current ? <current.C me={me} /> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}
       </main>
     </div>

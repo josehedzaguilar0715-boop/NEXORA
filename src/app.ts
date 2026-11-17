@@ -6,6 +6,7 @@ import { authenticate } from './context.js'
 import { branches, support } from './support.js'
 import { common, publicCommon } from './common.js'
 import { finance } from './finance.js'
+import { accounting } from './accounting.js'
 import { inventory } from './inventory.js'
 import { hardware } from './hardware.js'
 import { services } from './services.js'
@@ -63,6 +64,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', taqueria)
   protectedApp.route('/', inventory)
   protectedApp.route('/', finance)
+  protectedApp.route('/', accounting)
   app.route('/', protectedApp)
 
   app.onError((err, c) => {

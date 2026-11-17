@@ -35,7 +35,7 @@ export function Inicio({ me }: { me: Me }) {
       <p className="muted" style={{ marginTop: -6 }}>{me.business.name} · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
       <div className="kpis">
         <div className="card kpi"><div className="label">Ventas de hoy</div><div className="value">{sum ? mxn(sum.sales.total) : '—'}</div><div className="hint">{sum ? `${sum.sales.tickets} tickets${sum.cancelled ? ` · ${sum.cancelled} canceladas` : ''}` : ''}</div></div>
-        <div className="card kpi"><div className="label">Utilidad del mes</div><div className={`value ${month && month.profit < 0 ? 'neg' : ''}`}>{month ? mxn(month.profit) : '—'}</div><div className="hint">ventas − costo − mermas − gastos</div></div>
+        <div className="card kpi"><div className="label">Utilidad del mes</div><div className={`value ${month && month.profit < 0 ? 'neg' : ''}`}>{month ? mxn(month.profit) : '—'}</div><div className="hint">ventas − costo − gastos · <a href="#/finanzas">ver finanzas</a></div></div>
         <div className="card kpi"><div className="label">Por cobrar (fiado)</div><div className="value">{rec == null ? '—' : mxn(rec)}</div><div className="hint">saldo de clientes</div></div>
         <div className="card kpi"><div className="label">Productos por surtir</div><div className={`value ${low ? 'neg' : 'pos'}`}>{low ?? '—'}</div><div className="hint">debajo del mínimo</div></div>
       </div>

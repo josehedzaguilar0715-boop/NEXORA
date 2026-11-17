@@ -10,6 +10,9 @@ import { bad, conflict, iso, localDate, newId, notFound } from './util.js'
 
 export const finance = new Hono<Env>()
 
+/** Categorías de gasto (estado de resultados). */
+export const EXPENSE_CATEGORIES = ['renta', 'servicios', 'nomina', 'insumos', 'transporte', 'mantenimiento', 'publicidad', 'impuestos', 'comisiones_bancarias', 'otros'] as const
+
 // ---------- Fiado: límite, abonos y estado de cuenta ----------
 
 finance.put('/customers/:id/credit-limit', ownerOnly, async (c) => {
@@ -90,7 +93,7 @@ finance.post('/expenses', requirePerm('edit_inventory'), async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const d = parse(
-    z.object({ id: z.string().uuid().optional(), concept: z.string().trim().min(2).max(100), amount: z.number().int().min(1), kind: z.enum(['fijo', 'variable']), method: z.enum(['efectivo', 'transferencia', 'tarjeta']), fromCash: z.boolean().optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), branchId: z.string().optional() }),
+    z.object({ id: z.string().uuid().optional(), concept: z.string().trim().min(2).max(100), amount: z.number().int().min(1), kind: z.enum(['fijo', 'variable']), category: z.enum(EXPENSE_CATEGORIES).optional(), method: z.enum(['efectivo', 'transferencia', 'tarjeta']), fromCash: z.boolean().optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), branchId: z.string().optional() }),
     await body(c),
   )
   if (d.id && db.prepare('SELECT 1 FROM expenses WHERE id = ?').get(d.id)) return c.json({ id: d.id, duplicate: true })
@@ -100,8 +103,8 @@ finance.post('/expenses', requirePerm('edit_inventory'), async (c) => {
   if (d.fromCash && (d.method !== 'efectivo' || !shift)) throw conflict('Para pagar desde la caja debe ser en efectivo y con la caja abierta.', 'caja_cerrada')
   const id = d.id ?? newId()
   db.transaction(() => {
-    db.prepare('INSERT INTO expenses (id, business_id, branch_id, concept, amount, kind, method, from_cash_shift, date, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(
-      id, u.business_id, branchId, d.concept, d.amount, d.kind, d.method, shift?.id ?? null, d.date ?? localDate(now()), u.id, iso(now()),
+    db.prepare('INSERT INTO expenses (id, business_id, branch_id, concept, amount, kind, category, method, from_cash_shift, date, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(
+      id, u.business_id, branchId, d.concept, d.amount, d.kind, d.category ?? 'otros', d.method, shift?.id ?? null, d.date ?? localDate(now()), u.id, iso(now()),
     )
     if (shift) db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'retiro',?,?,?,?)").run(newId(), shift.id, d.amount, `Gasto: ${d.concept}`, u.id, iso(now()))
     audit(db, now, { businessId: u.business_id, userId: u.id, action: 'gasto.alta', entity: 'expense', entityId: id, newValue: d })
@@ -112,7 +115,7 @@ finance.post('/expenses', requirePerm('edit_inventory'), async (c) => {
 finance.get('/expenses', requirePerm('view_reports'), (c) => {
   const from = c.req.query('from') ?? '0000-00-00'
   const to = c.req.query('to') ?? '9999-12-31'
-  const rows = c.get('deps').db.prepare('SELECT id, concept, amount, kind, method, date FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ORDER BY date DESC').all(c.get('session').user.business_id, from, to)
+  const rows = c.get('deps').db.prepare('SELECT id, concept, amount, kind, category, method, date FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ORDER BY date DESC').all(c.get('session').user.business_id, from, to)
   return c.json({ expenses: rows })
 })
 
@@ -158,7 +161,7 @@ finance.put('/reserve-days', ownerOnly, async (c) => {
 // ---------- Reportes ----------
 
 /** Rango de fechas locales [from, to] → instantes ISO. Centro de México: UTC−6 fijo (sin horario de verano desde 2022). */
-function range(from: string, to: string) {
+export function range(from: string, to: string) {
   return { start: new Date(`${from}T06:00:00.000Z`).toISOString(), end: new Date(new Date(`${to}T06:00:00.000Z`).getTime() + 86_400_000).toISOString() }
 }
 
@@ -183,8 +186,10 @@ export function periodSummary(db: Db, businessId: string, from: string, to: stri
   const refunds = (db.prepare(`SELECT COALESCE(SUM(amount),0) a FROM returns WHERE business_id = ? AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { a: number }).a
   const restocked = (db.prepare(`SELECT COALESCE(SUM(cost),0) c FROM stock_movements WHERE business_id = ? AND type = 'devolucion' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { c: number }).c
   const cancelled = (db.prepare(`SELECT COUNT(*) n FROM sales WHERE business_id = ? AND status = 'cancelada' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { n: number }).n
+  // Comisiones del personal: costo del negocio (se cuentan al vender; no las registres también como gasto).
+  const commissions = (db.prepare(`SELECT COALESCE(SUM(amount),0) a FROM sale_commissions sc WHERE sc.business_id = ? AND sc.status = 'vigente' AND sc.created_at >= ? AND sc.created_at < ? ${branchId ? 'AND sc.sale_id IN (SELECT id FROM sales WHERE branch_id = ?)' : ''}`).get(businessId, start, end, ...bargs) as { a: number }).a
   const grossProfit = s.total! - refunds - (cogs - restocked)
-  return { from, to, sales: s, cancelled, refunds, costOfSales: cogs - restocked, grossProfit, waste, expenses, profit: grossProfit - waste - expenses }
+  return { from, to, sales: s, cancelled, refunds, costOfSales: cogs - restocked, grossProfit, waste, expenses, commissions, profit: grossProfit - waste - expenses - commissions }
 }
 
 finance.get('/reports/summary', requirePerm('view_reports'), (c) => {

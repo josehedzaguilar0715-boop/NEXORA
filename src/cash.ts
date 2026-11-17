@@ -111,7 +111,7 @@ cash.post('/shifts/:id/movements', requirePerm('open_close_cash'), async (c) => 
   }
   if (d.type === 'retiro' && d.amount > shiftTotals(db, s).expectedCash) throw bad('El retiro es mayor al efectivo que debe haber en caja.')
   const id = d.id ?? newId()
-  db.prepare('INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,?,?,?,?,?)').run(id, s.id, d.type, d.amount, d.reason, u.id, iso(clampTime(d.at, now())))
+  db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at, origin) VALUES (?,?,?,?,?,?,?,'manual')").run(id, s.id, d.type, d.amount, d.reason, u.id, iso(clampTime(d.at, now())))
   audit(db, now, { businessId: u.business_id, userId: u.id, action: `caja.${d.type}`, entity: 'shift', entityId: s.id, newValue: { amount: d.amount }, reason: d.reason })
   return c.json({ id, totals: shiftTotals(db, s) }, 201)
 })

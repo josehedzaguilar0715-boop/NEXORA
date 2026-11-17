@@ -10,7 +10,7 @@ export function Reportes({ me }: { me: Me }) {
   const [r, setR] = useState<any>(null)
   const [w, setW] = useState<any>(null)
   const [fixed, setFixed] = useState<any>(null)
-  const [f, setF] = useState({ concept: '', amount: '', days: '', expConcept: '', expAmount: '', expKind: 'variable' })
+  const [f, setF] = useState({ concept: '', amount: '', days: '' })
   const [err, setErr] = useState('')
   const owner = me.user.role === 'owner'
   const load = async () => {
@@ -33,20 +33,18 @@ export function Reportes({ me }: { me: Me }) {
         {r && (
           <table className="list"><tbody>
             <tr><td>Ventas ({r.sales.tickets} tickets)</td><td className="num"><b>{mxn(r.sales.total)}</b></td></tr>
-            <tr><td className="muted">Efectivo · transferencia · tarjeta · fiado</td><td className="num muted">{mxn(r.sales.efectivo)} · {mxn(r.sales.transferencia)} · {mxn(r.sales.tarjeta)} · {mxn(r.sales.fiado)}</td></tr>
+            {(['efectivo', 'transferencia', 'tarjeta', 'fiado'] as const).map((k) => <tr key={k} className="muted"><td style={{ paddingLeft: 22 }}>{k[0]!.toUpperCase() + k.slice(1)}</td><td className="num">{mxn(r.sales[k])}</td></tr>)}
             <tr><td>Costo de lo vendido</td><td className="num">−{mxn(r.costOfSales)}</td></tr>
             <tr><td>Mermas</td><td className="num">−{mxn(r.waste)}</td></tr>
             <tr><td>Gastos</td><td className="num">−{mxn(r.expenses)}</td></tr>
+            {r.commissions > 0 && <tr><td>Comisiones del personal</td><td className="num">−{mxn(r.commissions)}</td></tr>}
             <tr><td><b>Utilidad</b></td><td className="num"><b>{mxn(r.profit)}</b></td></tr>
             <tr><td className="muted">Cancelaciones</td><td className="num muted">{r.cancelled}</td></tr>
           </tbody></table>
         )}
         <h3 style={{ marginTop: 14 }}>Más vendidos</h3>
         <table className="list"><tbody>{r?.topProducts.map((t: any, i: number) => <tr key={i}><td>{t.description}</td><td className="num">{t.qty}</td><td className="num">{mxn(t.total)}</td></tr>)}</tbody></table>
-        <h3 style={{ marginTop: 14 }}>Registrar gasto</h3>
-        <div className="row"><input placeholder="Concepto" value={f.expConcept} onChange={(e) => setF({ ...f, expConcept: e.target.value })} /><input inputMode="decimal" placeholder="$0.00" value={f.expAmount} onChange={(e) => setF({ ...f, expAmount: e.target.value })} />
-          <select value={f.expKind} onChange={(e) => setF({ ...f, expKind: e.target.value })}><option value="variable">Variable</option><option value="fijo">Fijo</option></select></div>
-        <p><button disabled={!(toCents(f.expAmount) > 0 && f.expConcept.trim().length >= 2)} onClick={run(async () => { await api('POST', '/expenses', { id: crypto.randomUUID(), concept: f.expConcept, amount: toCents(f.expAmount), kind: f.expKind, method: 'transferencia' }); setF({ ...f, expConcept: '', expAmount: '' }) })}>Guardar gasto</button></p>
+        <p className="muted small" style={{ marginTop: 14 }}>Los gastos se registran en <a href="#/finanzas">Finanzas → Gastos</a>.</p>
       </section>
       {owner && (
         <section className="card">
