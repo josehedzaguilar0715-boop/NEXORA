@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ScanButton } from '../Scanner'
 import { api, mxn } from '../api'
 import type { Me } from '../App'
 
@@ -72,15 +73,16 @@ export function Acceso(_: { me: Me }) {
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = () => api<any>('GET', '/tourism/occupancy').then((r) => setInside(r.inside)).catch(() => {})
   useEffect(() => { void load(); const t = setInterval(load, 10_000); return () => clearInterval(t) }, [])
-  const scan = async () => {
-    try { const r = await api<any>('POST', '/tourism/scan', { code }); setInside(r.occupancy); setMsg({ ok: `✔ Adelante (${r.type})` }) } catch (e) { setMsg({ err: `✘ ${(e as Error).message}` }) }
+  const scan = async (c = code) => {
+    try { const r = await api<any>('POST', '/tourism/scan', { code: c }); setInside(r.occupancy); setMsg({ ok: `✔ Adelante (${r.type})` }) } catch (e) { setMsg({ err: `✘ ${(e as Error).message}` }) }
     setCode('')
   }
   const exit = async (n: number) => { try { setInside((await api<any>('POST', '/tourism/exit', { count: n })).occupancy) } catch (e) { setMsg({ err: (e as Error).message }) } }
   return (
     <div className="card login" style={{ maxWidth: 640 }}>
       <h1>Personas adentro: {inside}</h1>
-      <label>Escanea el boleto<input autoFocus value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code && scan()} /></label>
+      <label>Escanea el boleto</label>
+      <div className="row"><input aria-label="Código del boleto" autoFocus value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code && scan()} /><ScanButton onCode={(c) => scan(c)} /></div>
       {msg.ok && <h2 className="okmsg" style={{ fontSize: '1.8rem' }}>{msg.ok}</h2>}
       {msg.err && <h2 className="error" style={{ fontSize: '1.4rem' }}>{msg.err}</h2>}
       <div className="row" style={{ marginTop: 12 }}><button className="big" onClick={() => exit(1)}>Salió 1</button><button className="big" onClick={() => exit(5)}>Salieron 5</button></div>

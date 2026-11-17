@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
 import type { Me } from '../App'
 import type { Product } from './Caja'
@@ -67,7 +68,8 @@ export function Compras(_: { me: Me }) {
           <button style={{ flex: '0 0 auto', alignSelf: 'end' }} onClick={newSupplier}>+ Proveedor</button>
         </div>
         <label>Folio del ticket<input value={head.ticketRef} onChange={(e) => setHead({ ...head, ticketRef: e.target.value })} /></label>
-        <label>Agregar producto<input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Busca o escanea…" /></label>
+        <label>Agregar producto</label>
+        <div className="row"><input aria-label="Agregar producto" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { const p = catalog.find((x) => x.barcode === find.trim()); if (p) add(p) } }} placeholder="Busca o escanea…" /><ScanButton onCode={(c) => { const p = catalog.find((x) => x.barcode === c); if (p) add(p); else setFind(c) }} /></div>
         <div className="results">{matches.map((p) => <button key={p.id} onClick={() => add(p)}>{p.name}</button>)}</div>
         {rows.map((r, i) => (
           <div key={i} className="card" style={{ marginTop: 10 }}>

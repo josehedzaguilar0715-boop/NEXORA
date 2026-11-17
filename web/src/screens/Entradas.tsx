@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ScanButton } from '../Scanner'
 import { api, mxn } from '../api'
 import type { Me } from '../App'
 import type { Service } from './Caja'
@@ -33,8 +34,8 @@ export function Entradas(_: { me: Me }) {
       void load()
     } catch (e) { setMsg({ err: (e as Error).message }) }
   }
-  const pass = async () => {
-    try { const r = await api<any>('POST', '/baths/pass-entry', { code }); setMsg({ ok: `Pase válido: ${r.customer}. Bienvenido.` }); setCode(''); void load() } catch (e) { setMsg({ err: (e as Error).message }); setCode('') }
+  const pass = async (c = code) => {
+    try { const r = await api<any>('POST', '/baths/pass-entry', { code: c }); setMsg({ ok: `Pase válido: ${r.customer}. Bienvenido.` }); setCode(''); void load() } catch (e) { setMsg({ err: (e as Error).message }); setCode('') }
   }
   const exit = async (a: any) => {
     try { const r = await api<any>('POST', `/baths/accesses/${a.accessId}/exit`, { paymentMethod: 'efectivo' }); setMsg({ ok: `${a.name}: ${r.minutes} min, ${mxn(r.sale.total)}` }); setOpen(open.filter((x) => x !== a)); void load() } catch (e) { setMsg({ err: (e as Error).message }) }
@@ -56,7 +57,7 @@ export function Entradas(_: { me: Me }) {
           <button className="big" onClick={() => setSel({})}>Limpiar</button>
         </div>
         <h3 style={{ marginTop: 16 }}>Entrada con pase</h3>
-        <div className="row"><input aria-label="Código del pase" placeholder="Escanea el QR del pase" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code && pass()} /><button style={{ flex: '0 0 auto' }} disabled={!code} onClick={pass}>Validar</button></div>
+        <div className="row"><input aria-label="Código del pase" placeholder="Escanea el QR del pase" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code && pass()} /><ScanButton onCode={(c) => pass(c)} /><button style={{ flex: '0 0 auto' }} disabled={!code} onClick={() => pass()}>Validar</button></div>
         {msg.err && <p className="error">{msg.err}</p>}
         {msg.ok && <p className="okmsg">{msg.ok}</p>}
         {open.length > 0 && (<><h3>Por tiempo (adentro)</h3>{open.map((a) => <p key={a.accessId} className="row"><span>{a.name} · desde {a.at.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span><button className="primary" onClick={() => exit(a)}>Cobrar salida</button></p>)}</>)}

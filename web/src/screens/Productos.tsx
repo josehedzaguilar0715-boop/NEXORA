@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
 import { can, type Me } from '../App'
 import type { Product } from './Caja'
@@ -92,7 +93,8 @@ function Editor({ me, p, onClose, onSaved }: { me: Me; p: P | null; onClose: () 
       <div className="card" onClick={(e) => e.stopPropagation()}>
         <h2>{p ? p.name : 'Nuevo producto'}</h2>
         <label>Nombre<input value={f.name} onChange={set('name')} autoFocus /></label>
-        <label>Código de barras<input value={f.barcode} onChange={set('barcode')} placeholder="Escanéalo aquí" /></label>
+        <label>Código de barras</label>
+        <div className="row"><input aria-label="Código de barras" value={f.barcode} onChange={set('barcode')} onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()} placeholder="Escanéalo aquí" /><ScanButton onCode={(c) => setF((x) => ({ ...x, barcode: c }))} /></div>
         {perfume && (<>
           <div className="row"><label>Marca<input value={f.brand} onChange={set('brand')} /></label><label>Fragancia<input value={f.fragrance} onChange={set('fragrance')} /></label></div>
           <div className="row"><label>Mililitros<input inputMode="numeric" value={f.sizeMl} onChange={set('sizeMl')} /></label>

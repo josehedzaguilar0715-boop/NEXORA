@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ScanButton } from '../Scanner'
 import { api, mxn } from '../api'
 import type { Me } from '../App'
 import type { Product } from './Caja'
@@ -19,6 +20,15 @@ export function Cotizaciones(_: { me: Me }) {
   }
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
   const matches = find ? catalog.filter((p) => p.name.toLowerCase().includes(find.toLowerCase()) || p.barcode === find).slice(0, 8) : []
+  // Lector o cámara: si el código es de un producto o presentación, se agrega directo.
+  const byCode = (c: string) => {
+    for (const p of catalog) {
+      if (p.barcode === c) { setRows((r) => [...r, { productId: p.id, name: p.name, quantity: '1' }]); setFind(''); return }
+      const pr = p.presentations.find((x) => x.barcode === c)
+      if (pr) { setRows((r) => [...r, { productId: p.id, presentationId: pr.id, name: `${p.name} ${pr.name}`, quantity: '1' }]); setFind(''); return }
+    }
+    setFind(c)
+  }
   const save = async () => {
     try {
       const r = await api<any>('POST', '/quotes', { customerName: customer || undefined, items: rows.map((r) => ({ productId: r.productId, presentationId: r.presentationId, quantity: Number(r.quantity) })) })
@@ -41,7 +51,8 @@ export function Cotizaciones(_: { me: Me }) {
       <section className="card">
         <h2>Nueva cotización</h2>
         <label>Cliente<input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Nombre o empresa" /></label>
-        <label>Agregar producto<input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Busca o escanea…" /></label>
+        <label>Agregar producto</label>
+        <div className="row"><input aria-label="Agregar producto" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') byCode(find.trim()) }} placeholder="Busca o escanea…" /><ScanButton onCode={byCode} /></div>
         <div className="results">
           {matches.map((p) => <button key={p.id} onClick={() => { setRows([...rows, { productId: p.id, name: p.name, quantity: '1' }]); setFind('') }}>{p.name}<small>{mxn(p.price)}</small></button>)}
           {matches.flatMap((p) => p.presentations.map((pr) => <button key={pr.id} onClick={() => { setRows([...rows, { productId: p.id, presentationId: pr.id, name: `${p.name} ${pr.name}`, quantity: '1' }]); setFind('') }}>{p.name} {pr.name}<small>{mxn(pr.price)}</small></button>))}

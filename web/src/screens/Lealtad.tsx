@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
 import type { Me } from '../App'
 
@@ -8,14 +9,15 @@ export function Escanear(_: { me: Me }) {
   const [action, setAction] = useState('entrada')
   const [res, setRes] = useState<any>(null)
   const [err, setErr] = useState('')
-  const scan = async () => {
-    try { setRes(await api('POST', '/scan', { code, action })); setErr('') } catch (e) { setRes(null); setErr((e as Error).message) }
+  const scan = async (c = code) => {
+    try { setRes(await api('POST', '/scan', { code: c, action })); setErr('') } catch (e) { setRes(null); setErr((e as Error).message) }
     setCode('')
   }
   return (
     <div className="card login" style={{ maxWidth: 680 }}>
       <div className="tabs">{[['entrada', 'Registrar entrada'], ['membresia', 'Usar membresía'], ['consulta', 'Solo consultar']].map(([k, v]) => <button key={k} className={action === k ? 'on' : ''} onClick={() => setAction(k!)}>{v}</button>)}</div>
-      <label>Escanea el QR o código de barras del cliente<input autoFocus value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code && scan()} /></label>
+      <label>Escanea el QR o código de barras del cliente</label>
+      <div className="row"><input aria-label="Código del cliente" autoFocus value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code && scan()} /><ScanButton onCode={(c) => scan(c)} /></div>
       {err && <h2 className="error">✘ {err}</h2>}
       {res && (
         <div style={{ marginTop: 12 }}>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ScanButton } from '../Scanner'
 import { api, ApiError, cache, flush, mxn, outbox, toCents } from '../api'
 import { can, type Me } from '../App'
 
@@ -99,8 +100,8 @@ export function Caja({ me }: { me: Me }) {
   }
 
   // Lector de código de barras: escribe el código y manda Enter.
-  const onEnter = () => {
-    const t = q.trim()
+  const onEnter = (code = q) => {
+    const t = code.trim()
     if (!t) return
     const byCode = catalog.find((p) => p.barcode === t)
     if (byCode) return add(byCode)
@@ -108,7 +109,8 @@ export function Caja({ me }: { me: Me }) {
       const pr = p.presentations.find((x) => x.barcode === t)
       if (pr) return add(p, pr.id)
     }
-    if (results.length === 1) add(results[0]!)
+    if (code === q && results.length === 1) return add(results[0]!)
+    if (code !== q) setQ(t) // de la cámara y no está en el catálogo: se queda escrito para buscarlo
   }
 
   const setQty = (key: string, delta: number) => setCart((c) => c.flatMap((l) => (l.key !== key ? [l] : l.quantity + delta <= 0 ? [] : [{ ...l, quantity: l.quantity + delta }])))
@@ -161,10 +163,13 @@ export function Caja({ me }: { me: Me }) {
   return (
     <div className="sell">
       <section className="card">
-        <input
-          ref={search} autoFocus placeholder="Escanea o escribe el producto…" value={q} data-testid="buscar"
-          onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onEnter()}
-        />
+        <div className="row">
+          <input
+            ref={search} autoFocus placeholder="Escanea o escribe el producto…" value={q} data-testid="buscar"
+            onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onEnter()}
+          />
+          <ScanButton onCode={(c) => onEnter(c)} />
+        </div>
         <div className="results">
           {serviceResults.map((sv) => (
             <button key={sv.id} onClick={() => setModal({ kind: 'servicio', sv })}>{sv.name}<small>{mxn(sv.price)}{sv.durationMin ? ` · ${sv.durationMin} min` : ''}</small></button>
