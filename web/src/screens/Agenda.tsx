@@ -31,15 +31,15 @@ export function Agenda({ me }: { me: Me }) {
 
   return (
     <div>
-      <div className="card row" style={{ marginBottom: 16 }}>
-        <label style={{ flex: '0 0 220px' }}>Día<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-        <button className="primary big" onClick={() => setForm({ walkIn: false })}>Nueva cita</button>
-        <button className="big" onClick={() => setForm({ walkIn: true })}>Cliente sin cita</button>
-        <p className="muted" style={{ flex: 2 }}>Link para reservar: <a href={link} target="_blank" rel="noreferrer">{link}</a></p>
+      <div className="toolbar agenda-bar">
+        <label className="date-pick">Día<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+        <button className="primary" onClick={() => setForm({ walkIn: false })}>+ Nueva cita</button>
+        <button onClick={() => setForm({ walkIn: true })}>Cliente sin cita</button>
       </div>
+      {me.modules?.includes('reservas') && <p className="muted small link-line">Link para que tus clientes reserven: <a href={link} target="_blank" rel="noreferrer">{link}</a></p>}
       {msg.err && <p className="error">{msg.err}</p>}
       {msg.ok && <p className="okmsg">{msg.ok}</p>}
-      <div className="grid2" style={{ gridTemplateColumns: `repeat(${Math.max(1, staff.length)}, minmax(260px, 1fr))` }}>
+      <div className="agenda-cols">
         {staff.map((st) => (
           <section className="card" key={st.id}>
             <h2>{st.name}</h2>

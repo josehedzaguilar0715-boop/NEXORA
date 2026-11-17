@@ -345,3 +345,14 @@ button.primary kbd { color: #fff; border-color: rgba(255, 255, 255, 0.45); backg
   .quick-grid { order: 4; }
 }
 @media (max-width: 520px) { .quick-grid .results { grid-template-columns: repeat(2, minmax(0, 1fr)); } .quick-grid .results button { min-height: 64px; font-size: 0.9rem; } }
+
+/* ---------- Táctil: casillas y enlaces fáciles de tocar ---------- */
+input[type=checkbox], input[type=radio] { width: 22px !important; height: 22px; min-height: 0 !important; flex: 0 0 auto; accent-color: var(--cyan); vertical-align: middle; }
+label.check, label:has(> input[type=checkbox]) { min-height: 40px; display: flex; align-items: center; gap: 10px; }
+button.link { min-height: 40px; padding: 8px 0; }
+.agenda-bar .date-pick { margin: 0; flex: 0 1 220px; display: flex; align-items: center; gap: 10px; }
+.agenda-bar .date-pick input { margin: 0; }
+.agenda-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; }
+.link-line { overflow-wrap: anywhere; margin-top: -4px; }
+a { overflow-wrap: anywhere; }
+@media (max-width: 900px) { .pos-screen { align-items: stretch; } .pos-screen > * , .pos-main > * { width: 100%; } }
