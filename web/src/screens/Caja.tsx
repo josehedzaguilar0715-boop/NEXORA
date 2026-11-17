@@ -66,13 +66,6 @@ export function Caja({ me }: { me: Me }) {
   }
   useEffect(() => { void refresh() }, [])
 
-  const results = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    const list = catalog.filter((p) => !soldOut.includes(p.id) && (p as Product & { sellable?: boolean }).sellable !== false)
-    // Venta rápida: primero lo más vendido.
-    if (!t) return [...list].sort((a, b) => (top.indexOf(a.id) + 1 || 999) - (top.indexOf(b.id) + 1 || 999)).slice(0, 24)
-    return list.filter((p) => p.name.toLowerCase().includes(t) || p.barcode === t).slice(0, 24)
-  }, [q, catalog, soldOut, top])
   const quick = ['comedor', 'taqueria'].includes(me.business.giro)
   const [soldOut, setSoldOut] = useState<string[]>([])
   const [top, setTop] = useState<string[]>([])
@@ -81,6 +74,13 @@ export function Caja({ me }: { me: Me }) {
     api<any>('GET', '/daily-menu').then((r) => setSoldOut(r.menus.flatMap((m: any) => m.items.filter((i: any) => i.soldOut).map((i: any) => i.productId)))).catch(() => {})
     api<any>('GET', '/products/top').then((r) => setTop(r.products.map((p: any) => p.id))).catch(() => {})
   }, [])
+  const results = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    const list = catalog.filter((p) => !soldOut.includes(p.id) && (p as Product & { sellable?: boolean }).sellable !== false)
+    // Venta rápida: primero lo más vendido.
+    if (!t) return [...list].sort((a, b) => (top.indexOf(a.id) + 1 || 999) - (top.indexOf(b.id) + 1 || 999)).slice(0, 24)
+    return list.filter((p) => p.name.toLowerCase().includes(t) || p.barcode === t).slice(0, 24)
+  }, [q, catalog, soldOut, top])
   const serviceResults = useMemo(() => services.filter((x) => !q.trim() || x.name.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 24), [q, services])
 
   const subtotal = cart.reduce((a, l) => a + lineTotal(l), 0)
