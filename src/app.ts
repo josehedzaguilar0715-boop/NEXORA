@@ -9,6 +9,8 @@ import { finance } from './finance.js'
 import { inventory } from './inventory.js'
 import { hardware } from './hardware.js'
 import { services } from './services.js'
+import { agenda, publicAgenda } from './agenda.js'
+import { commissions } from './commissions.js'
 import { cash } from './cash.js'
 import type { Deps, Env } from './context.js'
 import { sales } from './sales.js'
@@ -25,6 +27,7 @@ export function createApp(deps: Deps) {
   app.get('/health', (c) => c.json({ ok: true }))
   app.route('/', publicAuth)
   app.route('/', publicCommon)
+  app.route('/', publicAgenda)
   app.route('/', admin as unknown as Hono<Env>)
   // Todo lo demás exige sesión (authed ya aplica `authenticate`).
   const protectedApp = new Hono<Env>()
@@ -41,6 +44,8 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', common)
   protectedApp.route('/', hardware)
   protectedApp.route('/', services)
+  protectedApp.route('/', agenda)
+  protectedApp.route('/', commissions)
   protectedApp.route('/', inventory)
   protectedApp.route('/', finance)
   app.route('/', protectedApp)

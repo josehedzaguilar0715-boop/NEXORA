@@ -12,7 +12,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 5 (abarrotes) — pantallas**: app web instalable (`web/`) con caja (lector de código de barras, granel por kilo o importe, cobro con cambio, fiado, descuento con código, ventas del turno, retiros, corte), productos con alertas, compras con fletes, clientes y fiado, reportes con retiro sugerido y personal con permisos. Funciona sin internet con contador visible. ✅ con prueba de punta a punta en navegador.
 - **Bloque 6 (ferretería)**: varias unidades con equivalencias (caja, rollo; granel por metro y litro), escalas de precio por volumen que la caja aplica sola, cotizaciones que no apartan existencia, clientes constructores con límite (código del dueño), clave del proveedor por producto y devoluciones con o sin ticket (siempre con código). El negocio tiene un **giro** y las pantallas se adaptan. ✅ con pruebas y prueba en navegador.
 - **Bloque 7 (papelería)**: servicios por hoja con precio por tamaño y color, consumibles de uso (tinta, tóner, papel) con costo vía recetas, contador de copiadoras por turno contra hojas cobradas, combos de temporada con un solo precio, encargos con anticipo (la devolución la decide el dueño con código) y mayoreo con escalas y crédito. ✅ con pruebas y prueba en navegador.
-- Siguiente: Bloque 8 (barbería).
+- **Bloque 8 (barbería)**: agenda por barbero con horarios, días de descanso y bloqueos; citas en mostrador y clientes sin cita en la misma agenda; combos con precio repartido; comisiones por barbero y servicio/producto/categoría sin valores predeterminados (sobre precio final, cada venta guarda su %); propinas aparte; productos en la misma cuenta; reserva pública por link con "el primero disponible", solo horas libres, pendiente hasta confirmar y estado visible. Sin recordatorios automáticos (botón para preparar WhatsApp). ✅ con pruebas y prueba en navegador.
+- Siguiente: Bloque 9 (estudio de uñas).
 
 ## Desarrollo local
 
@@ -99,3 +100,11 @@ Importes siempre en centavos enteros (MXN).
 - **Contador de copiadora**: lectura de inicio y fin por turno; `GET /shifts/:id/counters` marca la diferencia contra las hojas cobradas.
 - **Encargos** (`/orders`): el anticipo se cobra como venta (entra al corte); al entregar se cobra el saldo. Cancelar con devolución de anticipo exige el código del dueño.
 - Reportes: las devoluciones ya restan de la utilidad (y lo que regresa al inventario recupera su costo).
+
+## Barbería (Bloque 8) y agenda común
+
+- **Agenda** (`src/agenda.ts`): el dueño marca quién atiende y su horario semanal (`PUT /staff/:id/agenda`); un día sin horario es de descanso. Bloqueos con `POST /staff/:id/blocks`. Huecos de 15 minutos. La duración de una cita es la suma de sus servicios (más el bloqueo extra de cada servicio, p. ej. secado, en `attrs.extraBlockMin`).
+- **Estados de cita**: pendiente (por link) → confirmada → en atención → atendida (al cobrar), o cancelada / no vino. Cobrar la cita (`/appointments/:id/checkout`) crea la venta con los servicios al precio agendado, productos extra, descuentos y propinas.
+- **Comisiones** (`src/commissions.ts`): reglas del dueño por persona y por servicio, producto, categoría o todo; gana la más específica. Sin regla no hay comisión; sin quien atendió tampoco. Base = precio final con descuentos y promociones repartidos. Cada venta guarda el % aplicado. Cancelar la venta anula la comisión y la propina.
+- **Propinas**: por persona, no son ingreso del negocio ni cuentan para comisión. Las de efectivo se suman a lo que debe haber en caja (están físicamente ahí) como renglón aparte.
+- **Reserva por link**: `/reservar/<código del negocio>` (módulo `reservas`, apagado por defecto). Muestra solo horas libres, no expone datos de otros clientes, limita 3 reservas pendientes por teléfono, y `/cita/<token>` muestra el estado. Pendiente de decidir si se cobra como módulo o sitio aparte (sección 12).

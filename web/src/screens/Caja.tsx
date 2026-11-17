@@ -32,6 +32,10 @@ export function Caja({ me }: { me: Me }) {
   const [cart, setCart] = useState<Line[]>([])
   const [modal, setModal] = useState<null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product } | { kind: 'libre' } | { kind: 'pago'; method: string } | { kind: 'ticket'; text: string; change?: number | null; provisional: boolean } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' }>(null)
   const [discount, setDiscount] = useState<{ amount: number; code: string } | null>(null)
+  const withStaff = ['barberia', 'unas', 'perfumeria'].includes(me.business.giro)
+  const [staff, setStaff] = useState<{ id: string; name: string }[]>([])
+  const [staffId, setStaffId] = useState('')
+  useEffect(() => { if (withStaff) api<any>('GET', me.business.giro === 'perfumeria' ? '/users' : '/agenda/staff').then((r) => setStaff((r.staff ?? r.users).filter((x: any) => x.active !== false))).catch(() => {}) }, [])
   const [msg, setMsg] = useState('')
   const search = useRef<HTMLInputElement>(null)
 
@@ -105,6 +109,7 @@ export function Caja({ me }: { me: Me }) {
       id, shiftId: shift!.id, paymentMethod: method, createdAt: new Date().toISOString(),
       items: cart.map((l) => (l.serviceId ? { serviceId: l.serviceId, quantity: l.quantity } : l.free ? { description: l.name, quantity: l.quantity, unitPrice: l.unitPrice } : { productId: l.productId, presentationId: l.presentationId, ...(l.amount !== undefined ? { amount: l.amount } : { quantity: l.quantity }) })),
       ...(discount ? { discount: discount.amount, authCode: discount.code } : {}),
+      ...(staffId ? { staffId } : {}),
       ...extra,
     }
     const needsCode = !!discount || !!extra.authCode
@@ -184,6 +189,7 @@ export function Caja({ me }: { me: Me }) {
             </tbody>
           </table>
         )}
+        {withStaff && <label>¿Quién atendió?<select value={staffId} onChange={(e) => setStaffId(e.target.value)}><option value="">— Nadie (sin comisión) —</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
         {discount && <p className="row"><span>Descuento</span><span className="num">−{mxn(discount.amount)}</span></p>}
         <div className="total" data-testid="total">{mxn(total)}</div>
         {msg && <p className="error">{msg}</p>}

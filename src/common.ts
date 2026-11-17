@@ -9,7 +9,7 @@ import type { Db } from './db.js'
 import { activePromotions, bestPromotions } from './promotions.js'
 import { AppError, bad, clampTime, conflict, forbidden, iso, localDate, newId, notFound, type Clock } from './util.js'
 
-export const MODULES = ['membresias', 'promociones', 'fidelidad', 'asistencia'] as const
+export const MODULES = ['membresias', 'promociones', 'fidelidad', 'asistencia', 'reservas'] as const
 export type Module = (typeof MODULES)[number]
 
 export function moduleOn(db: Db, businessId: string, m: Module): boolean {

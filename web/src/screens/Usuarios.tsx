@@ -46,6 +46,7 @@ export function Usuarios({ me }: { me: Me }) {
             <button onClick={() => { const p = prompt('Contraseña nueva (mínimo 8):'); if (p) void run(() => api('POST', `/users/${sel.id}/reset-password`, { newPassword: p }), 'Contraseña restablecida.')() }}>Restablecer contraseña</button>
             {me.user.role === 'owner' && <button onClick={() => { const c = prompt('Código de autorización para esta persona (mínimo 4):'); if (c) void run(() => api('PUT', `/users/${sel.id}/auth-code`, { code: c }), 'Código asignado.')() }}>Asignar código</button>}
           </p>
+          {me.user.role === 'owner' && ['barberia', 'unas'].includes(me.business.giro) && <Horario userId={sel.id} />}
         </section>
       )}
       {!sel && me.user.role === 'owner' && (
@@ -56,6 +57,43 @@ export function Usuarios({ me }: { me: Me }) {
           {msg && <p>{msg}</p>}
         </section>
       )}
+    </div>
+  )
+}
+
+const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+/** Horario de agenda: días que trabaja (los demás son de descanso) y horas. */
+function Horario({ userId }: { userId: string }) {
+  const [inAgenda, setInAgenda] = useState(false)
+  const [days, setDays] = useState(DAYS.map(() => ({ on: false, start: '10:00', end: '19:00' })))
+  const [msg, setMsg] = useState('')
+  useEffect(() => {
+    api<any>('GET', '/agenda/staff').then((r) => {
+      const me = r.staff.find((s: any) => s.id === userId)
+      setInAgenda(!!me)
+      if (me) setDays(DAYS.map((_, i) => { const w = me.schedule.find((x: any) => x.weekday === i); return w ? { on: true, start: w.start, end: w.end } : { on: false, start: '10:00', end: '19:00' } }))
+    }).catch(() => {})
+  }, [userId])
+  const save = async () => {
+    try {
+      await api('PUT', `/staff/${userId}/agenda`, { inAgenda, schedule: days.map((d, weekday) => ({ ...d, weekday })).filter((d) => d.on).map(({ weekday, start, end }) => ({ weekday, start, end })) })
+      setMsg('Horario guardado.')
+    } catch (e) { setMsg((e as Error).message) }
+  }
+  return (
+    <div style={{ borderTop: '2px solid var(--line)', marginTop: 12 }}>
+      <h3 style={{ marginTop: 12 }}>Agenda</h3>
+      <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={inAgenda} onChange={(e) => setInAgenda(e.target.checked)} />Atiende citas</label>
+      {days.map((d, i) => (
+        <div className="row" key={i}>
+          <label style={{ fontWeight: 500, flex: '0 0 150px' }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={d.on} onChange={(e) => setDays(days.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))} />{DAYS[i]}</label>
+          <input aria-label={`Entrada ${DAYS[i]}`} type="time" disabled={!d.on} value={d.start} onChange={(e) => setDays(days.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))} />
+          <input aria-label={`Salida ${DAYS[i]}`} type="time" disabled={!d.on} value={d.end} onChange={(e) => setDays(days.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))} />
+        </div>
+      ))}
+      <p><button className="primary" onClick={save}>Guardar horario</button></p>
+      {msg && <p className="muted">{msg}</p>}
     </div>
   )
 }

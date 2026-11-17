@@ -811,6 +811,98 @@ const MIGRATIONS: Migration[] = [
     UNIQUE (business_id, folio)
   );
   `,
+  `
+  -- Agenda (barbería, uñas…): quién atiende, sus horarios, bloqueos y citas.
+  ALTER TABLE users ADD COLUMN in_agenda INTEGER NOT NULL DEFAULT 0;
+  CREATE TABLE staff_schedules (
+    user_id TEXT NOT NULL REFERENCES users(id),
+    weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+    start TEXT NOT NULL,
+    end TEXT NOT NULL,
+    CHECK (start < end)
+  );
+  CREATE INDEX staff_schedules_user ON staff_schedules(user_id, weekday);
+  CREATE TABLE agenda_blocks (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE appointments (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    staff_id TEXT REFERENCES users(id),
+    customer_id TEXT REFERENCES customers(id),
+    customer_name TEXT NOT NULL,
+    phone TEXT,
+    services TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pendiente','confirmada','en_atencion','atendida','cancelada','no_asistio')),
+    source TEXT NOT NULL CHECK (source IN ('mostrador','link','sin_cita')),
+    public_token TEXT UNIQUE,
+    at_home INTEGER NOT NULL DEFAULT 0,
+    address TEXT,
+    travel_min INTEGER NOT NULL DEFAULT 0,
+    notes TEXT,
+    sale_id TEXT REFERENCES sales(id),
+    cancel_reason TEXT,
+    created_by TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX appointments_staff ON appointments(staff_id, starts_at);
+  -- Combo de servicios: precio fijo que el dueño reparte entre sus servicios (para comisiones).
+  CREATE TABLE service_combos (
+    combo_id TEXT NOT NULL REFERENCES services(id),
+    service_id TEXT NOT NULL REFERENCES services(id),
+    share INTEGER NOT NULL CHECK (share >= 0),
+    PRIMARY KEY (combo_id, service_id)
+  );
+  -- Comisiones sin valores predeterminados: solo lo que el dueño configure.
+  CREATE TABLE commission_rules (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    staff_id TEXT REFERENCES users(id),
+    target_type TEXT NOT NULL CHECK (target_type IN ('service','product','category','all')),
+    target_id TEXT,
+    rate_bp INTEGER NOT NULL CHECK (rate_bp BETWEEN 0 AND 10000),
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE sale_commissions (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    sale_item_id TEXT NOT NULL,
+    staff_id TEXT NOT NULL REFERENCES users(id),
+    base INTEGER NOT NULL,
+    rate_bp INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX sale_commissions_staff ON sale_commissions(staff_id, created_at);
+  -- Propinas: de quien atendió, aparte del ingreso del negocio y sin comisión.
+  CREATE TABLE tips (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    shift_id TEXT NOT NULL REFERENCES shifts(id),
+    staff_id TEXT NOT NULL REFERENCES users(id),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta')),
+    status TEXT NOT NULL DEFAULT 'vigente' CHECK (status IN ('vigente','cancelada')),
+    created_at TEXT NOT NULL
+  );
+  CREATE TRIGGER sale_commissions_no_delete BEFORE DELETE ON sale_commissions BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  CREATE TRIGGER tips_no_delete BEFORE DELETE ON tips BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  ALTER TABLE sale_commissions ADD COLUMN status TEXT NOT NULL DEFAULT 'vigente';
+  -- Dirección para servicios a domicilio: se guarda por cliente y solo la ve el negocio.
+  ALTER TABLE customers ADD COLUMN address TEXT;
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {

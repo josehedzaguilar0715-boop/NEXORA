@@ -44,8 +44,10 @@ export function shiftTotals(db: import('./db.js').Db, shift: ShiftRow) {
        FROM cash_movements WHERE shift_id = ?`,
     )
     .get(shift.id) as { withdrawals: number; deposits: number }
-  const expectedCash = shift.opening_float + sales.cashSales - mv.withdrawals + mv.deposits
-  return { openingFloat: shift.opening_float, ...sales, ...mv, expectedCash }
+  // Propinas en efectivo: son de quien atendió, no del negocio, pero están físicamente en la caja.
+  const tipsCash = (db.prepare("SELECT COALESCE(SUM(amount),0) t FROM tips WHERE shift_id = ? AND method = 'efectivo' AND status = 'vigente'").get(shift.id) as { t: number }).t
+  const expectedCash = shift.opening_float + sales.cashSales - mv.withdrawals + mv.deposits + tipsCash
+  return { openingFloat: shift.opening_float, ...sales, ...mv, tipsCash, expectedCash }
 }
 
 function loadShift(c: C): ShiftRow {
