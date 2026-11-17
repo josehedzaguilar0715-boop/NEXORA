@@ -12,11 +12,13 @@ export function Ajustes({ me }: { me: Me }) {
   const [addons, setAddons] = useState<string[]>([])
   const [st, setSt] = useState<Record<string, any>>({})
   const [sessions, setSessions] = useState<any[]>([])
+  const [trusted, setTrusted] = useState<any[]>([])
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   useEffect(() => {
     api<any>('GET', '/modules').then((r) => { setMods(r.active); setAddons(r.addons ?? []) }).catch(() => {})
     api<any>('GET', '/settings').then((r) => setSt(r.settings)).catch(() => {})
     api<any>('GET', '/auth/sessions').then((r) => setSessions(r.sessions)).catch(() => {})
+    api<any>('GET', '/auth/trusted-devices').then((r) => setTrusted(r.devices)).catch(() => {})
   }, [])
   const run = (fn: () => Promise<unknown>, ok = 'Guardado.') => async () => { try { await fn(); setMsg({ ok }) } catch (e) { setMsg({ err: (e as Error).message }) } }
   const toggle = (k: string) => setMods(mods.includes(k) ? mods.filter((x) => x !== k) : [...mods, k])
@@ -55,6 +57,12 @@ export function Ajustes({ me }: { me: Me }) {
         <table className="list"><tbody>{sessions.map((s) => (
           <tr key={s.id}><td>{s.deviceName ?? 'Equipo'}<br /><small className="muted">última vez {new Date(s.lastSeenAt).toLocaleString('es-MX')}</small></td>
             <td><button onClick={async () => { await api('DELETE', `/auth/sessions/${s.id}`); setSessions(sessions.filter((x) => x.id !== s.id)) }}>Cerrar sesión</button></td></tr>
+        ))}</tbody></table>
+        <h2 style={{ marginTop: 16 }}>Equipos de confianza</h2>
+        <p className="muted">En estos equipos no se pide código por SMS al entrar (30 días).</p>
+        <table className="list"><tbody>{trusted.map((t) => (
+          <tr key={t.id}><td>{t.deviceName ?? 'Equipo'}<br /><small className="muted">vence {new Date(t.expiresAt).toLocaleDateString('es-MX')}</small></td>
+            <td><button onClick={async () => { await api('DELETE', `/auth/trusted-devices/${t.id}`); setTrusted(trusted.filter((x) => x.id !== t.id)) }}>Quitar</button></td></tr>
         ))}</tbody></table>
         {st.travelFee != null && <p className="muted">Traslado: {mxn(st.travelFee)}</p>}
       </section>

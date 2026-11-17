@@ -85,3 +85,36 @@ describe('cuentas y acceso', () => {
     expect(l.status).toBe(200)
   })
 })
+
+describe('equipos de confianza (menos SMS)', () => {
+  it('tras verificar una vez, ese equipo entra 30 días sin código; otro equipo sí lo pide', async () => {
+    const s = setup()
+    const o = await s.registerOwner()
+    const l = await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: o.password, deviceName: 'Caja 1' } })
+    const v = await s.call('POST', '/auth/owner/verify', { body: { challengeId: l.json.challengeId, code: s.codes[o.phone], rememberDevice: true } })
+    const trust = v.json.deviceTrust
+    expect(trust).toBeTruthy()
+    const again = await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: o.password, deviceTrust: trust } })
+    expect(again.json).toMatchObject({ trusted: true })
+    expect(again.json.token).toBeTruthy()
+    // La contraseña sigue siendo obligatoria.
+    expect((await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: 'incorrecta', deviceTrust: trust } })).status).toBe(401)
+    // Otro equipo (sin llave) recibe código.
+    expect((await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: o.password } })).json.challengeId).toBeTruthy()
+    // Vence a los 30 días.
+    s.longLived()
+    s.advance(31 * 86_400_000)
+    expect((await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: o.password, deviceTrust: trust } })).json.challengeId).toBeTruthy()
+  })
+
+  it('cambiar la contraseña olvida los equipos; el dueño puede quitar uno', async () => {
+    const s = setup()
+    const o = await s.registerOwner()
+    const l = await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: o.password } })
+    const v = await s.call('POST', '/auth/owner/verify', { body: { challengeId: l.json.challengeId, code: s.codes[o.phone], rememberDevice: true } })
+    const list = (await s.call('GET', '/auth/trusted-devices', { token: v.json.token })).json.devices
+    expect(list).toHaveLength(1)
+    await s.call('POST', '/auth/change-password', { token: v.json.token, body: { currentPassword: o.password, newPassword: 'otraclave9' } })
+    expect((await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: 'otraclave9', deviceTrust: v.json.deviceTrust } })).json.trusted).toBeUndefined()
+  })
+})

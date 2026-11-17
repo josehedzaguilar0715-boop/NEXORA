@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { audit } from './audit.js'
 import { enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, refreshStatus, setting, type BusinessRow, type Plan } from './billing.js'
 import { body, LOCK_MINUTES, MAX_FAILED, parse, type Deps, type UserRow } from './context.js'
-import { consumeChallenge, createChallenge } from './auth.js'
+import { consumeChallenge, createChallenge, forgetDevices } from './auth.js'
 import { ticketView } from './support.js'
 import {
   bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone, notFound, numericCode, sha256, unauthorized, verifySecret,
@@ -261,6 +261,7 @@ admin.post('/admin/businesses/:id/users/:userId/reset-password', async (c) => {
   }
   db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1, failed_attempts = 0, locked_until = NULL WHERE id = ?').run(hashSecret(d.newPassword), u.id)
   db.prepare('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').run(iso(now()), u.id)
+  forgetDevices(c.get('deps'), u.id)
   audit(db, now, { businessId: b.id, userId: a.id, action: 'admin.restablecer_acceso', entity: 'user', entityId: u.id, reason: d.reason })
   return c.json({ ok: true })
 })

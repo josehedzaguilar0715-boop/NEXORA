@@ -3,6 +3,11 @@ import { api, auth, deviceId } from '../api'
 import type { Me } from '../App'
 import { Logo } from '../Brand'
 
+// Llave de equipo de confianza (por teléfono): con ella no se pide SMS en este equipo por 30 días.
+const trustKey = (phone: string) => `nx_trust_${phone.replace(/\D/g, '').slice(-10)}`
+const getTrust = (phone: string) => { try { return localStorage.getItem(trustKey(phone)) ?? undefined } catch { return undefined } }
+const saveTrust = (phone: string, v?: string) => { try { if (v) localStorage.setItem(trustKey(phone), v) } catch { /* sin almacenamiento */ } }
+
 const deviceName = () => `${navigator.platform || 'Equipo'} · ${new Date().toLocaleDateString('es-MX')}`
 
 export function Login({ onLogin, forceChange }: { onLogin: (m: Me) => void; forceChange?: boolean }) {
@@ -13,6 +18,7 @@ export function Login({ onLogin, forceChange }: { onLogin: (m: Me) => void; forc
   const [f, setF] = useState({ businessCode: linkCode, username: '', password: '', phone: '', businessName: '', ownerName: '', code: '', newPassword: '', newPassword2: '' })
   const [challenge, setChallenge] = useState<string | null>(null)
   const [delivered, setDelivered] = useState(true)
+  const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
@@ -81,8 +87,9 @@ export function Login({ onLogin, forceChange }: { onLogin: (m: Me) => void; forc
         {mode !== 'empleado' && !challenge && (
           <form onSubmit={run(async () => {
             const r = mode === 'dueno'
-              ? await api<{ challengeId: string }>('POST', '/auth/owner/login', { phone: f.phone, password: f.password, deviceId: deviceId(), deviceName: deviceName() })
-              : await api<{ challengeId: string }>('POST', '/auth/register', { businessName: f.businessName, ownerName: f.ownerName, phone: f.phone, password: f.password, deviceId: deviceId(), deviceName: deviceName() })
+              ? await api<{ challengeId: string; token?: string }>('POST', '/auth/owner/login', { phone: f.phone, password: f.password, deviceId: deviceId(), deviceName: deviceName(), deviceTrust: getTrust(f.phone) })
+              : await api<{ challengeId: string; token?: string }>('POST', '/auth/register', { businessName: f.businessName, ownerName: f.ownerName, phone: f.phone, password: f.password, deviceId: deviceId(), deviceName: deviceName() })
+            if (r.token) return finish(r.token) // equipo de confianza: sin SMS
             setDelivered((r as { delivered?: boolean }).delivered !== false)
             setChallenge(r.challengeId)
           })}>
@@ -101,11 +108,13 @@ export function Login({ onLogin, forceChange }: { onLogin: (m: Me) => void; forc
         )}
         {mode !== 'empleado' && challenge && (
           <form onSubmit={run(async () => {
-            const r = await api<{ token: string }>('POST', mode === 'dueno' ? '/auth/owner/verify' : '/auth/register/verify', { challengeId: challenge, code: f.code })
+            const r = await api<{ token: string; deviceTrust?: string }>('POST', mode === 'dueno' ? '/auth/owner/verify' : '/auth/register/verify', { challengeId: challenge, code: f.code, rememberDevice: remember })
+            saveTrust(f.phone, r.deviceTrust)
             await finish(r.token)
           })}>
             {delivered ? <p>Te enviamos un código por SMS al {f.phone}.</p> : <p className="error">Los SMS todavía no están configurados, así que el código no se pudo enviar. Pídeselo a soporte.</p>}
             <label>Código de 6 dígitos<input inputMode="numeric" value={f.code} onChange={set('code')} autoFocus maxLength={6} /></label>
+            <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={remember} onChange={(e) => setRemember(e.target.checked)} />Recordar este equipo 30 días (no vuelve a pedir código aquí)</label>
             {error && <p className="error">{error}</p>}
             <p><button className="primary big" style={{ width: '100%' }} disabled={busy}>Verificar</button></p>
           </form>

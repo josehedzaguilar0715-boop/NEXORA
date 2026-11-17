@@ -1249,6 +1249,19 @@ const MIGRATIONS: Migration[] = [
   ALTER TABLE verification_codes_new RENAME TO verification_codes;
   `,
   },
+  `
+  -- Equipos de confianza del dueño: tras verificar con SMS, ese equipo no vuelve a pedir código en 30 días.
+  CREATE TABLE trusted_devices (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    token_hash TEXT NOT NULL UNIQUE,
+    device_name TEXT,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT
+  );
+  `,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

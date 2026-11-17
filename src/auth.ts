@@ -62,6 +62,21 @@ export function consumeChallenge(deps: Deps, challengeId: string, code: string, 
   return { user, dev: { deviceId: ch.device_id ?? undefined, deviceName: ch.device_name ?? undefined } }
 }
 
+const TRUST_DAYS = 30
+/** Marca el equipo como de confianza y devuelve la llave que guarda el equipo (solo se guarda su huella). */
+function trustDevice(deps: Deps, user: UserRow, deviceName?: string) {
+  const raw = newToken()
+  const t = deps.now()
+  deps.db.prepare('INSERT INTO trusted_devices (id, user_id, token_hash, device_name, created_at, last_used_at, expires_at) VALUES (?,?,?,?,?,?,?)').run(newId(), user.id, sha256(raw), deviceName ?? null, iso(t), iso(t), iso(new Date(t.getTime() + TRUST_DAYS * 86_400_000)))
+  audit(deps.db, deps.now, { businessId: user.business_id, userId: user.id, action: 'sesion.equipo_confianza', newValue: { device: deviceName ?? null } })
+  return raw
+}
+
+/** Olvida todos los equipos de confianza (al cambiar o recuperar la contraseña). */
+export function forgetDevices(deps: Deps, userId: string) {
+  deps.db.prepare('UPDATE trusted_devices SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').run(iso(deps.now()), userId)
+}
+
 /** Verifica contraseña con bloqueo temporal tras varios intentos. */
 function checkLogin(deps: Deps, user: UserRow | undefined, password: string): UserRow {
   const { db, now } = deps
@@ -132,18 +147,18 @@ publicAuth.post('/auth/register', async (c) => {
 
 publicAuth.post('/auth/register/verify', async (c) => {
   const deps = c.get('deps')
-  const d = parse(z.object({ challengeId: z.string(), code: z.string() }), await body(c))
+  const d = parse(z.object({ challengeId: z.string(), code: z.string(), rememberDevice: z.boolean().optional() }), await body(c))
   const { user, dev } = consumeChallenge(deps, d.challengeId, d.code, 'registro')
   deps.db.prepare('UPDATE users SET phone_verified = 1 WHERE id = ?').run(user.id)
   const { token } = createSession(deps, user, dev)
   const biz = deps.db.prepare('SELECT id, code, name FROM businesses WHERE id = ?').get(user.business_id)
-  return c.json({ token, business: biz })
+  return c.json({ token, business: biz, ...(d.rememberDevice ? { deviceTrust: trustDevice(deps, user, dev.deviceName) } : {}) })
 })
 
 // Dueño: teléfono + contraseña, y verificación en dos pasos.
 publicAuth.post('/auth/owner/login', async (c) => {
   const deps = c.get('deps')
-  const d = parse(z.object({ phone: z.string(), password: z.string() }).extend(device.shape), await body(c))
+  const d = parse(z.object({ phone: z.string(), password: z.string(), deviceTrust: z.string().max(200).optional() }).extend(device.shape), await body(c))
   let phone: string
   try {
     phone = normalizePhone(d.phone)
@@ -152,16 +167,25 @@ publicAuth.post('/auth/owner/login', async (c) => {
   }
   const user = deps.db.prepare("SELECT * FROM users WHERE role = 'owner' AND phone = ? AND phone_verified = 1").get(phone) as UserRow | undefined
   checkLogin(deps, user, d.password)
+  // Equipo de confianza: ya verificó con SMS hace menos de 30 días; no se gasta otro mensaje.
+  if (d.deviceTrust) {
+    const t = deps.db.prepare('SELECT id FROM trusted_devices WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?').get(sha256(d.deviceTrust), user!.id, iso(deps.now())) as { id: string } | undefined
+    if (t) {
+      deps.db.prepare('UPDATE trusted_devices SET last_used_at = ? WHERE id = ?').run(iso(deps.now()), t.id)
+      const { token } = createSession(deps, user!, d)
+      return c.json({ token, trusted: true, mustChangePassword: !!user!.must_change_password })
+    }
+  }
   const challengeId = await createChallenge(deps, user!, 'login', d)
   return c.json({ challengeId, delivered: wasDelivered(challengeId) })
 })
 
 publicAuth.post('/auth/owner/verify', async (c) => {
   const deps = c.get('deps')
-  const d = parse(z.object({ challengeId: z.string(), code: z.string() }), await body(c))
+  const d = parse(z.object({ challengeId: z.string(), code: z.string(), rememberDevice: z.boolean().optional() }), await body(c))
   const { user, dev } = consumeChallenge(deps, d.challengeId, d.code, 'login')
   const { token } = createSession(deps, user, dev)
-  return c.json({ token, mustChangePassword: !!user.must_change_password })
+  return c.json({ token, mustChangePassword: !!user.must_change_password, ...(d.rememberDevice ? { deviceTrust: trustDevice(deps, user, dev.deviceName) } : {}) })
 })
 
 // Dueño que olvidó su contraseña: la recupera con un código que llega a su teléfono.
@@ -182,6 +206,7 @@ publicAuth.post('/auth/owner/recover/verify', async (c) => {
   checkPassword(d.newPassword)
   const { user } = consumeChallenge(deps, d.challengeId, d.code, 'recuperar')
   db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?').run(hashSecret(d.newPassword), user.id)
+  forgetDevices(deps, user.id)
   db.prepare('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').run(iso(now()), user.id)
   audit(db, now, { businessId: user.business_id, userId: user.id, action: 'dueno.recupero_cuenta', entity: 'user', entityId: user.id })
   return c.json({ ok: true })
@@ -226,6 +251,7 @@ authed.post('/auth/change-password', async (c) => {
   checkPassword(d.newPassword)
   if (d.currentPassword === d.newPassword) throw bad('La contraseña nueva debe ser distinta.')
   db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?').run(hashSecret(d.newPassword), user.id)
+  forgetDevices(c.get('deps'), user.id)
   audit(db, now, { businessId: user.business_id, userId: user.id, action: 'usuario.cambio_contrasena', entity: 'user', entityId: user.id })
   return c.json({ ok: true })
 })
@@ -248,6 +274,19 @@ authed.get('/auth/sessions', (c) => {
     )
     .all(s.user.id, iso(now()))
   return c.json({ sessions: rows, current: s.id })
+})
+
+authed.get('/auth/trusted-devices', (c) => {
+  const { db, now } = c.get('deps')
+  const rows = db.prepare('SELECT id, device_name AS deviceName, created_at AS createdAt, last_used_at AS lastUsedAt, expires_at AS expiresAt FROM trusted_devices WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ? ORDER BY last_used_at DESC').all(c.get('session').user.id, iso(now()))
+  return c.json({ devices: rows })
+})
+
+authed.delete('/auth/trusted-devices/:id', (c) => {
+  const { db, now } = c.get('deps')
+  const r = db.prepare('UPDATE trusted_devices SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL').run(iso(now()), c.req.param('id'), c.get('session').user.id)
+  if (!r.changes) throw notFound('No se encontró ese equipo.')
+  return c.json({ ok: true })
 })
 
 authed.delete('/auth/sessions/:id', (c) => {
