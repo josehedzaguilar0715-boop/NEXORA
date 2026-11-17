@@ -32,10 +32,11 @@ export function shiftTotals(db: import('./db.js').Db, shift: ShiftRow) {
          COALESCE(SUM(CASE WHEN status='completada' AND payment_method='efectivo' THEN total END),0) AS cashSales,
          COALESCE(SUM(CASE WHEN status='completada' AND payment_method='transferencia' THEN total END),0) AS transferSales,
          COALESCE(SUM(CASE WHEN status='completada' AND payment_method='tarjeta' THEN total END),0) AS cardSales,
+         COALESCE(SUM(CASE WHEN status='completada' AND payment_method='fiado' THEN total END),0) AS creditSales,
          COALESCE(SUM(CASE WHEN status='cancelada' THEN 1 END),0) AS cancelled
        FROM sales WHERE shift_id = ?`,
     )
-    .get(shift.id) as { cashSales: number; transferSales: number; cardSales: number; cancelled: number }
+    .get(shift.id) as { cashSales: number; transferSales: number; cardSales: number; creditSales: number; cancelled: number }
   const mv = db
     .prepare(
       `SELECT COALESCE(SUM(CASE WHEN type='retiro' THEN amount END),0) AS withdrawals,
@@ -75,10 +76,12 @@ cash.post('/shifts/open', requirePerm('open_close_cash'), async (c) => {
   if (!db.prepare('SELECT 1 FROM branches WHERE id = ? AND active = 1').get(u.branch_id)) throw conflict('Tu sucursal está desactivada.', 'sucursal_inactiva')
   const open = db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'abierto'").get(u.id)
   if (open) throw conflict('Ya tienes un turno abierto. Ciérralo antes de abrir otro.', 'turno_abierto')
+  // Caja asignada al cajero: no puede tener dos turnos abiertos a la vez.
+  if (u.register_id && db.prepare("SELECT 1 FROM shifts WHERE register_id = ? AND status = 'abierto'").get(u.register_id)) throw conflict('Tu caja ya tiene un turno abierto por otra persona.', 'caja_ocupada')
   const t = clampTime(d.at, now())
   const id = d.id ?? newId()
-  db.prepare('INSERT INTO shifts (id, business_id, branch_id, cashier_id, opening_float, opened_at, opened_date) VALUES (?,?,?,?,?,?,?)').run(
-    id, u.business_id, u.branch_id, u.id, d.openingFloat, iso(t), localDate(t),
+  db.prepare('INSERT INTO shifts (id, business_id, branch_id, cashier_id, opening_float, opened_at, opened_date, register_id) VALUES (?,?,?,?,?,?,?,?)').run(
+    id, u.business_id, u.branch_id, u.id, d.openingFloat, iso(t), localDate(t), u.register_id ?? null,
   )
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'caja.apertura', entity: 'shift', entityId: id, newValue: { openingFloat: d.openingFloat } })
   return c.json({ shift: db.prepare('SELECT * FROM shifts WHERE id = ?').get(id) }, 201)

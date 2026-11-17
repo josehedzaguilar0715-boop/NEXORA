@@ -8,7 +8,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 2 (sin internet y nube)**: cola local de la caja (`src/client/outbox.ts`), llave de idempotencia, sincronización de cambios con conflictos "gana el más reciente" y panel del dueño (`/dashboard`). ✅ con pruebas.
 - **Bloque 3 (super panel)**: estados prueba/activo/vencido/suspendido sin perder datos, pagos y reactivación, planes y límites, alta asistida, restablecer accesos, buzón de soporte y solicitudes de cambio. ✅ con pruebas.
 - **Bloque 4 (módulo común)**: clientes finales con QR, escaneo validado por el servidor, membresías por usos y periodo, promociones automáticas, fidelidad (puntos o sellos), asistencia de clientes y personal. Cada módulo se activa por negocio. ✅ con pruebas.
-- Siguiente: Bloque 5 (abarrotes completo).
+- **Bloque 5 (abarrotes) — servidor**: catálogo con presentaciones y códigos de barras, granel por kilo o importe, lotes primero-entra-primero-sale con precio y costo real, compras con fletes repartidos, márgenes sugeridos, caducidad, mermas, conteos, traspasos, proveedores y cuentas por pagar, fiado con límite y abonos, gastos, reportes de utilidad y retiro sugerido, cajas asignadas. ✅ con pruebas.
+- En curso: pantalla de caja (interfaz) para abarrotes.
 
 ## Desarrollo local
 
@@ -57,3 +58,14 @@ Importes siempre en centavos enteros (MXN).
 - Promociones: porcentaje (en puntos base: 1000 = 10 %) o monto, con vigencia, a qué aplica (todo, productos o categorías) y cantidad mínima. Se aplica sola en la venta: la mejor no combinable o todas las combinables juntas, lo que convenga más. No requiere código porque la definió el dueño.
 - Fidelidad: puntos por monto o sellos por visita, para todos o solo para clientes inscritos. Al cancelar una venta se registra un movimiento contrario; el saldo puede quedar negativo si ya canjeó.
 - Pendiente: cobrar la membresía o el premio como línea de venta (se conecta con productos en el Bloque 5).
+
+## Abarrotes (Bloque 5)
+
+- Cantidades de inventario en milésimas de la unidad base (1 pieza = 1000; 1 kg = 1000 g), así no hay errores de redondeo.
+- **Compras**: cada renglón crea un lote con su costo. Los fletes (gasolina, casetas…) se reparten por pieza o por kilo según el producto; el reparto es exacto al centavo. Se pueden dar de alta productos nuevos desde el mismo ticket. Contado (opcionalmente desde la caja) o crédito (cuentas por pagar con abonos).
+- **Precio por lote**: cada lote guarda su precio de venta. Se vende primero el lote más viejo, así el precio nuevo entra solo al agotarse el anterior. Un cambio de precio del producto (con código) aplica también a lo que ya está en existencia.
+- **Margen sugerido** por producto o, si no, por categoría (puntos base: 3000 = 30 %). Sin margen no hay sugerencia.
+- **Venta**: por pieza, presentación (paquete) o granel por kilo (báscula) o por importe. Cambiar el precio en caja pide permiso y código. Efectivo recibido y cambio. Sin existencia registrada la venta no se rechaza (puede llegar de una caja sin señal): queda en negativo y sale en la alerta de stock mínimo.
+- **Fiado**: límite por cliente; pasar el límite pide el código del dueño (no de un encargado). Los abonos en efectivo entran al corte como depósito. Cancelar una venta fiada devuelve el cargo.
+- **Retiro sugerido** = utilidad del periodo − reserva (días de gastos fijos que define el dueño) − reposición (lo que cuesta llevar al mínimo los productos que están por debajo). Utilidad = ventas − costo de lo vendido − mermas − gastos.
+- Para los giros siguientes, `saleHooks`, `cancelHooks` y `saleValidators` en `src/sales.ts` permiten agregar comisiones, recetas, propinas, etc. sin tocar la venta base.

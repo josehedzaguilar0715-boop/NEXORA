@@ -19,6 +19,7 @@ export interface UserRow {
   id: string
   business_id: string
   branch_id: string | null
+  register_id: string | null
   role: 'owner' | 'staff'
   name: string
   username: string | null

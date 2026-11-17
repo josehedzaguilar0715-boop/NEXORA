@@ -2,7 +2,9 @@ import Database from 'better-sqlite3'
 
 export type Db = Database.Database
 
-const MIGRATIONS: string[] = [
+type Migration = string | { sql: string; fkOff: true }
+
+const MIGRATIONS: Migration[] = [
   `
   CREATE TABLE businesses (
     id TEXT PRIMARY KEY,
@@ -414,6 +416,231 @@ const MIGRATIONS: string[] = [
   CREATE TRIGGER loyalty_ledger_no_update BEFORE UPDATE ON loyalty_ledger BEGIN SELECT RAISE(ABORT, 'No se puede modificar'); END;
   CREATE TRIGGER staff_attendance_no_delete BEFORE DELETE ON staff_attendance BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
   `,
+  {
+    fkOff: true,
+    sql: `
+  -- Ventas: se agrega "fiado" como forma de pago y el efectivo recibido (para dar cambio).
+  CREATE TABLE sales_new (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    shift_id TEXT NOT NULL REFERENCES shifts(id),
+    folio INTEGER NOT NULL,
+    cashier_id TEXT NOT NULL REFERENCES users(id),
+    subtotal INTEGER NOT NULL,
+    discount INTEGER NOT NULL DEFAULT 0,
+    total INTEGER NOT NULL,
+    payment_method TEXT NOT NULL CHECK (payment_method IN ('efectivo','transferencia','tarjeta','fiado')),
+    status TEXT NOT NULL DEFAULT 'completada' CHECK (status IN ('completada','cancelada')),
+    discount_authorized_by TEXT REFERENCES users(id),
+    cancelled_by TEXT REFERENCES users(id),
+    cancel_authorized_by TEXT REFERENCES users(id),
+    cancel_reason TEXT,
+    cancelled_at TEXT,
+    created_at TEXT NOT NULL,
+    received_at TEXT NOT NULL,
+    promo_discount INTEGER NOT NULL DEFAULT 0,
+    customer_id TEXT REFERENCES customers(id),
+    cash_received INTEGER,
+    price_authorized_by TEXT REFERENCES users(id),
+    credit_authorized_by TEXT REFERENCES users(id),
+    UNIQUE (branch_id, folio)
+  );
+  INSERT INTO sales_new (id, business_id, branch_id, shift_id, folio, cashier_id, subtotal, discount, total, payment_method, status, discount_authorized_by, cancelled_by, cancel_authorized_by, cancel_reason, cancelled_at, created_at, received_at, promo_discount, customer_id)
+    SELECT id, business_id, branch_id, shift_id, folio, cashier_id, subtotal, discount, total, payment_method, status, discount_authorized_by, cancelled_by, cancel_authorized_by, cancel_reason, cancelled_at, created_at, received_at, promo_discount, customer_id FROM sales;
+  DROP TABLE sales;
+  ALTER TABLE sales_new RENAME TO sales;
+  CREATE INDEX sales_shift ON sales(shift_id);
+  CREATE INDEX sales_customer ON sales(customer_id);
+  CREATE TRIGGER sales_no_delete BEFORE DELETE ON sales BEGIN SELECT RAISE(ABORT, 'Las ventas no se pueden borrar'); END;
+
+  ALTER TABLE sale_items ADD COLUMN product_id TEXT;
+  ALTER TABLE sale_items ADD COLUMN presentation_id TEXT;
+  ALTER TABLE sale_items ADD COLUMN qty_milli INTEGER;
+  ALTER TABLE sale_items ADD COLUMN cost INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE businesses ADD COLUMN reserve_days INTEGER;
+  ALTER TABLE customers ADD COLUMN credit_limit INTEGER NOT NULL DEFAULT 0;
+
+  -- Cajas por sucursal; cada cajero puede tener una caja asignada.
+  CREATE TABLE registers (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  ALTER TABLE users ADD COLUMN register_id TEXT REFERENCES registers(id);
+  ALTER TABLE shifts ADD COLUMN register_id TEXT REFERENCES registers(id);
+  CREATE UNIQUE INDEX shifts_one_open_register ON shifts(register_id) WHERE status = 'abierto' AND register_id IS NOT NULL;
+
+  CREATE TABLE categories (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    -- Margen sugerido en puntos base (3000 = 30 %). Sin margen no hay sugerencia.
+    margin_bp INTEGER,
+    created_at TEXT NOT NULL,
+    UNIQUE (business_id, name)
+  );
+  CREATE TABLE products (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    category_id TEXT REFERENCES categories(id),
+    barcode TEXT,
+    -- pieza: cantidades enteras; granel: por kilo (u otra unidad base).
+    unit TEXT NOT NULL CHECK (unit IN ('pieza','kg','metro','litro')),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    margin_bp INTEGER,
+    min_stock_milli INTEGER NOT NULL DEFAULT 0,
+    track_expiry INTEGER NOT NULL DEFAULT 0,
+    last_cost REAL NOT NULL DEFAULT 0,
+    version INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL,
+    updated_device TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX products_barcode ON products(business_id, barcode) WHERE barcode IS NOT NULL;
+  CREATE TABLE presentations (
+    id TEXT PRIMARY KEY,
+    product_id TEXT NOT NULL REFERENCES products(id),
+    name TEXT NOT NULL,
+    factor_milli INTEGER NOT NULL CHECK (factor_milli > 0),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    barcode TEXT,
+    active INTEGER NOT NULL DEFAULT 1
+  );
+
+  CREATE TABLE suppliers (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    phone TEXT,
+    notes TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE purchases (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    supplier_id TEXT REFERENCES suppliers(id),
+    ticket_ref TEXT,
+    items_total INTEGER NOT NULL,
+    freight_total INTEGER NOT NULL,
+    freight_detail TEXT NOT NULL,
+    payment TEXT NOT NULL CHECK (payment IN ('contado','credito')),
+    due_date TEXT,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE lots (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    purchase_id TEXT REFERENCES purchases(id),
+    source_lot_id TEXT REFERENCES lots(id),
+    qty_initial_milli INTEGER NOT NULL,
+    qty_remaining_milli INTEGER NOT NULL CHECK (qty_remaining_milli >= 0),
+    -- Costo real por unidad (incluye su parte de fletes), en centavos.
+    unit_cost REAL NOT NULL,
+    -- Precio de venta de este lote: entra cuando se agota el anterior.
+    price INTEGER NOT NULL,
+    expires_at TEXT,
+    received_at TEXT NOT NULL
+  );
+  CREATE INDEX lots_fifo ON lots(branch_id, product_id, received_at);
+  CREATE TABLE stock_movements (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL,
+    product_id TEXT NOT NULL REFERENCES products(id),
+    lot_id TEXT REFERENCES lots(id),
+    type TEXT NOT NULL CHECK (type IN ('compra','venta','cancelacion','merma','traspaso_salida','traspaso_entrada','ajuste','consumo')),
+    qty_milli INTEGER NOT NULL,
+    cost INTEGER NOT NULL,
+    ref_id TEXT,
+    reason TEXT,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX stock_movements_product ON stock_movements(branch_id, product_id);
+  CREATE INDEX stock_movements_ref ON stock_movements(ref_id);
+  CREATE TRIGGER stock_movements_no_delete BEFORE DELETE ON stock_movements BEGIN SELECT RAISE(ABORT, 'Los movimientos no se pueden borrar'); END;
+  CREATE TRIGGER stock_movements_no_update BEFORE UPDATE ON stock_movements BEGIN SELECT RAISE(ABORT, 'Los movimientos no se pueden modificar'); END;
+  CREATE TABLE purchase_items (
+    id TEXT PRIMARY KEY,
+    purchase_id TEXT NOT NULL REFERENCES purchases(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    qty_milli INTEGER NOT NULL,
+    cost_total INTEGER NOT NULL,
+    freight_share INTEGER NOT NULL,
+    unit_cost REAL NOT NULL,
+    lot_id TEXT NOT NULL REFERENCES lots(id)
+  );
+  CREATE TABLE supplier_payments (
+    id TEXT PRIMARY KEY,
+    purchase_id TEXT NOT NULL REFERENCES purchases(id),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta')),
+    from_cash_shift TEXT REFERENCES shifts(id),
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE transfers (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    from_branch TEXT NOT NULL REFERENCES branches(id),
+    to_branch TEXT NOT NULL REFERENCES branches(id),
+    items TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  -- Fiado: cargos (+) y abonos (−). Saldo = suma.
+  CREATE TABLE credit_ledger (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    delta INTEGER NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('cargo','abono','cancelacion')),
+    method TEXT,
+    sale_id TEXT,
+    shift_id TEXT,
+    note TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX credit_ledger_customer ON credit_ledger(customer_id);
+  CREATE TRIGGER credit_ledger_no_delete BEFORE DELETE ON credit_ledger BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  CREATE TRIGGER credit_ledger_no_update BEFORE UPDATE ON credit_ledger BEGIN SELECT RAISE(ABORT, 'No se puede modificar'); END;
+  CREATE TABLE expenses (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    concept TEXT NOT NULL,
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    kind TEXT NOT NULL CHECK (kind IN ('fijo','variable')),
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta')),
+    from_cash_shift TEXT REFERENCES shifts(id),
+    date TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TRIGGER expenses_no_delete BEFORE DELETE ON expenses BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  -- Gastos fijos mensuales (renta, luz, agua…) que alimentan la reserva del retiro sugerido.
+  CREATE TABLE fixed_expenses (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    concept TEXT NOT NULL,
+    monthly_amount INTEGER NOT NULL CHECK (monthly_amount > 0),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  `,
+  },
 ]
 
 export function openDb(path = ':memory:'): Db {
@@ -422,12 +649,20 @@ export function openDb(path = ':memory:'): Db {
   db.pragma('foreign_keys = ON')
   db.exec('CREATE TABLE IF NOT EXISTS _migrations (version INTEGER PRIMARY KEY)')
   const done = new Set((db.prepare('SELECT version FROM _migrations').all() as { version: number }[]).map((r) => r.version))
-  MIGRATIONS.forEach((sql, i) => {
+  MIGRATIONS.forEach((m, i) => {
     if (done.has(i + 1)) return
+    const sql = typeof m === 'string' ? m : m.sql
+    // Reconstruir una tabla (p. ej. para cambiar un CHECK) exige apagar las llaves foráneas fuera de la transacción.
+    if (typeof m !== 'string') db.pragma('foreign_keys = OFF')
     db.transaction(() => {
       db.exec(sql)
+      if (typeof m !== 'string') {
+        const bad = db.pragma('foreign_key_check') as unknown[]
+        if (bad.length) throw new Error(`Migración ${i + 1}: llaves foráneas rotas`)
+      }
       db.prepare('INSERT INTO _migrations (version) VALUES (?)').run(i + 1)
     })()
+    if (typeof m !== 'string') db.pragma('foreign_keys = ON')
   })
   return db
 }

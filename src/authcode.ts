@@ -9,7 +9,7 @@ import { bad, forbidden, iso, locked, verifySecret } from './util.js'
  * El código pertenece a un usuario del mismo negocio (el dueño, o quien el dueño haya habilitado)
  * y esa persona debe tener el permiso requerido. Tras varios fallos se bloquea al solicitante.
  */
-export function authorize(deps: Deps, requester: UserRow, code: string | undefined, needed: Permission, action: string): UserRow {
+export function authorize(deps: Deps, requester: UserRow, code: string | undefined, needed: Permission, action: string, opts: { ownerOnly?: boolean } = {}): UserRow {
   const { db, now } = deps
   const t = now()
   if (requester.auth_locked_until && requester.auth_locked_until > iso(t)) {
@@ -22,7 +22,7 @@ export function authorize(deps: Deps, requester: UserRow, code: string | undefin
     .all(requester.business_id) as UserRow[]
   const match = candidates.find((u) => verifySecret(code, u.auth_code_hash))
 
-  if (!match || !hasPerm(match, needed)) {
+  if (!match || !hasPerm(match, needed) || (opts.ownerOnly && match.role !== 'owner')) {
     const attempts = requester.auth_failed_attempts + 1
     const lock = attempts >= MAX_FAILED
     db.prepare('UPDATE users SET auth_failed_attempts = ?, auth_locked_until = ? WHERE id = ?').run(
@@ -37,7 +37,7 @@ export function authorize(deps: Deps, requester: UserRow, code: string | undefin
       reason: action,
     })
     if (lock) throw locked('Demasiados intentos con el código. Se bloqueó temporalmente.')
-    throw forbidden(match ? 'Ese código no tiene permiso para esta acción.' : 'Código de autorización incorrecto.')
+    throw forbidden(match ? (opts.ownerOnly ? 'Esta acción requiere el código del dueño.' : 'Ese código no tiene permiso para esta acción.') : 'Código de autorización incorrecto.')
   }
 
   if (requester.auth_failed_attempts) {

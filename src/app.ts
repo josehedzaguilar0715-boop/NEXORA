@@ -5,6 +5,8 @@ import { businessGate } from './billing.js'
 import { authenticate } from './context.js'
 import { branches, support } from './support.js'
 import { common, publicCommon } from './common.js'
+import { finance } from './finance.js'
+import { inventory } from './inventory.js'
 import { cash } from './cash.js'
 import type { Deps, Env } from './context.js'
 import { sales } from './sales.js'
@@ -35,6 +37,8 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', support)
   protectedApp.route('/', branches)
   protectedApp.route('/', common)
+  protectedApp.route('/', inventory)
+  protectedApp.route('/', finance)
   app.route('/', protectedApp)
 
   app.onError((err, c) => {

@@ -1,0 +1,243 @@
+import { Hono } from 'hono'
+import { z } from 'zod'
+import { audit } from './audit.js'
+import { loadCustomer } from './common.js'
+import { body, ownerOnly, parse, requirePerm, type Env } from './context.js'
+import type { Db } from './db.js'
+import { fromMilli, stockOf, type ProductRow } from './inventory.js'
+import { customerBalance } from './sales.js'
+import { bad, conflict, iso, localDate, newId, notFound } from './util.js'
+
+export const finance = new Hono<Env>()
+
+// ---------- Fiado: límite, abonos y estado de cuenta ----------
+
+finance.put('/customers/:id/credit-limit', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const cu = loadCustomer(c)
+  const d = parse(z.object({ limit: z.number().int().min(0) }), await body(c))
+  const old = (db.prepare('SELECT credit_limit FROM customers WHERE id = ?').get(cu.id) as { credit_limit: number }).credit_limit
+  db.prepare('UPDATE customers SET credit_limit = ? WHERE id = ?').run(d.limit, cu.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fiado.limite', entity: 'customer', entityId: cu.id, oldValue: { limit: old }, newValue: { limit: d.limit } })
+  return c.json({ ok: true })
+})
+
+finance.get('/customers/:id/credit', requirePerm('customers_credit'), (c) => {
+  const { db } = c.get('deps')
+  const cu = loadCustomer(c)
+  const limit = (db.prepare('SELECT credit_limit FROM customers WHERE id = ?').get(cu.id) as { credit_limit: number }).credit_limit
+  const ledger = db.prepare('SELECT delta, kind, method, sale_id AS saleId, note, created_at AS createdAt FROM credit_ledger WHERE customer_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 500').all(cu.id)
+  const balance = customerBalance(db, cu.id)
+  return c.json({ balance, limit, available: Math.max(0, limit - balance), ledger })
+})
+
+finance.post('/customers/:id/credit-payments', requirePerm('customers_credit'), async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const cu = loadCustomer(c)
+  const d = parse(z.object({ id: z.string().uuid().optional(), amount: z.number().int().min(1), method: z.enum(['efectivo', 'transferencia', 'tarjeta']), note: z.string().max(200).optional() }), await body(c))
+  if (d.id && db.prepare('SELECT 1 FROM credit_ledger WHERE id = ?').get(d.id)) return c.json({ duplicate: true, balance: customerBalance(db, cu.id) })
+  const bal = customerBalance(db, cu.id)
+  if (d.amount > bal) throw bad(`El saldo es ${bal}; el abono no puede ser mayor.`)
+  const shift = db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'abierto'").get(u.id) as { id: string } | undefined
+  if (d.method === 'efectivo' && !shift) throw conflict('Abre tu caja para recibir un abono en efectivo.', 'caja_cerrada')
+  db.transaction(() => {
+    db.prepare("INSERT INTO credit_ledger (id, business_id, customer_id, delta, kind, method, shift_id, note, created_by, created_at) VALUES (?,?,?,?,'abono',?,?,?,?,?)").run(
+      d.id ?? newId(), u.business_id, cu.id, -d.amount, d.method, shift?.id ?? null, d.note ?? null, u.id, iso(now()),
+    )
+    // El abono en efectivo entra a la caja como depósito, así cuadra el corte.
+    if (d.method === 'efectivo') db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'deposito',?,?,?,?)").run(newId(), shift!.id, d.amount, `Abono de ${cu.name}`, u.id, iso(now()))
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fiado.abono', entity: 'customer', entityId: cu.id, newValue: { amount: d.amount, method: d.method } })
+  })()
+  return c.json({ balance: customerBalance(db, cu.id) }, 201)
+})
+
+finance.get('/receivables', requirePerm('customers_credit'), (c) => {
+  const rows = c.get('deps').db
+    .prepare('SELECT c.id, c.name, c.phone, c.credit_limit AS creditLimit, SUM(l.delta) AS balance FROM credit_ledger l JOIN customers c ON c.id = l.customer_id WHERE l.business_id = ? GROUP BY c.id HAVING balance > 0 ORDER BY balance DESC')
+    .all(c.get('session').user.business_id) as { balance: number }[]
+  return c.json({ customers: rows, total: rows.reduce((a, r) => a + r.balance, 0) })
+})
+
+/** Historial de compras de un cliente frecuente. */
+finance.get('/customers/:id/sales', requirePerm('customers_credit'), (c) => {
+  const cu = loadCustomer(c)
+  const rows = c.get('deps').db.prepare('SELECT id, folio, total, payment_method AS paymentMethod, status, created_at AS createdAt FROM sales WHERE customer_id = ? ORDER BY created_at DESC LIMIT 200').all(cu.id)
+  return c.json({ sales: rows })
+})
+
+// ---------- Gastos ----------
+
+finance.post('/expenses', requirePerm('edit_inventory'), async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(
+    z.object({ id: z.string().uuid().optional(), concept: z.string().trim().min(2).max(100), amount: z.number().int().min(1), kind: z.enum(['fijo', 'variable']), method: z.enum(['efectivo', 'transferencia', 'tarjeta']), fromCash: z.boolean().optional(), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), branchId: z.string().optional() }),
+    await body(c),
+  )
+  if (d.id && db.prepare('SELECT 1 FROM expenses WHERE id = ?').get(d.id)) return c.json({ id: d.id, duplicate: true })
+  const branchId = d.branchId ?? u.branch_id
+  if (!branchId || !db.prepare('SELECT 1 FROM branches WHERE id = ? AND business_id = ?').get(branchId, u.business_id)) throw bad('Sucursal no válida.')
+  const shift = d.fromCash ? (db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'abierto'").get(u.id) as { id: string } | undefined) : undefined
+  if (d.fromCash && (d.method !== 'efectivo' || !shift)) throw conflict('Para pagar desde la caja debe ser en efectivo y con la caja abierta.', 'caja_cerrada')
+  const id = d.id ?? newId()
+  db.transaction(() => {
+    db.prepare('INSERT INTO expenses (id, business_id, branch_id, concept, amount, kind, method, from_cash_shift, date, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(
+      id, u.business_id, branchId, d.concept, d.amount, d.kind, d.method, shift?.id ?? null, d.date ?? localDate(now()), u.id, iso(now()),
+    )
+    if (shift) db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'retiro',?,?,?,?)").run(newId(), shift.id, d.amount, `Gasto: ${d.concept}`, u.id, iso(now()))
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'gasto.alta', entity: 'expense', entityId: id, newValue: d })
+  })()
+  return c.json({ id }, 201)
+})
+
+finance.get('/expenses', requirePerm('view_reports'), (c) => {
+  const from = c.req.query('from') ?? '0000-00-00'
+  const to = c.req.query('to') ?? '9999-12-31'
+  const rows = c.get('deps').db.prepare('SELECT id, concept, amount, kind, method, date FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ORDER BY date DESC').all(c.get('session').user.business_id, from, to)
+  return c.json({ expenses: rows })
+})
+
+finance.get('/fixed-expenses', requirePerm('view_reports'), (c) => {
+  const { db } = c.get('deps')
+  const b = c.get('session').user.business_id
+  const rows = db.prepare('SELECT id, concept, monthly_amount AS monthlyAmount, active FROM fixed_expenses WHERE business_id = ? ORDER BY concept').all(b)
+  const reserveDays = (db.prepare('SELECT reserve_days FROM businesses WHERE id = ?').get(b) as { reserve_days: number | null }).reserve_days
+  return c.json({ fixedExpenses: rows, reserveDays })
+})
+
+finance.post('/fixed-expenses', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ concept: z.string().trim().min(2).max(100), monthlyAmount: z.number().int().min(1) }), await body(c))
+  const id = newId()
+  db.prepare('INSERT INTO fixed_expenses (id, business_id, concept, monthly_amount, created_at) VALUES (?,?,?,?,?)').run(id, u.business_id, d.concept, d.monthlyAmount, iso(now()))
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'gasto_fijo.alta', entity: 'fixed_expense', entityId: id, newValue: d })
+  return c.json({ id }, 201)
+})
+
+finance.patch('/fixed-expenses/:id', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const old = db.prepare('SELECT * FROM fixed_expenses WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; concept: string; monthly_amount: number; active: number } | undefined
+  if (!old) throw notFound()
+  const d = parse(z.object({ concept: z.string().trim().min(2).max(100).optional(), monthlyAmount: z.number().int().min(1).optional(), active: z.boolean().optional() }), await body(c))
+  db.prepare('UPDATE fixed_expenses SET concept = ?, monthly_amount = ?, active = ? WHERE id = ?').run(d.concept ?? old.concept, d.monthlyAmount ?? old.monthly_amount, d.active === undefined ? old.active : d.active ? 1 : 0, old.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'gasto_fijo.cambio', entity: 'fixed_expense', entityId: old.id, oldValue: old, newValue: d })
+  return c.json({ ok: true })
+})
+
+/** El dueño define cuántos días de gastos fijos quiere guardar de reserva. */
+finance.put('/reserve-days', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ days: z.number().int().min(0).max(365) }), await body(c))
+  db.prepare('UPDATE businesses SET reserve_days = ? WHERE id = ?').run(d.days, u.business_id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'negocio.dias_reserva', newValue: d })
+  return c.json({ ok: true })
+})
+
+// ---------- Reportes ----------
+
+/** Rango de fechas locales [from, to] → instantes ISO. Centro de México: UTC−6 fijo (sin horario de verano desde 2022). */
+function range(from: string, to: string) {
+  return { start: new Date(`${from}T06:00:00.000Z`).toISOString(), end: new Date(new Date(`${to}T06:00:00.000Z`).getTime() + 86_400_000).toISOString() }
+}
+
+export function periodSummary(db: Db, businessId: string, from: string, to: string, branchId?: string) {
+  const { start, end } = range(from, to)
+  const bf = branchId ? 'AND branch_id = ?' : ''
+  const bargs = branchId ? [branchId] : []
+  const s = db
+    .prepare(
+      `SELECT COUNT(*) tickets, COALESCE(SUM(total),0) total, COALESCE(SUM(discount + promo_discount),0) discounts,
+        COALESCE(SUM(CASE WHEN payment_method='efectivo' THEN total END),0) efectivo,
+        COALESCE(SUM(CASE WHEN payment_method='transferencia' THEN total END),0) transferencia,
+        COALESCE(SUM(CASE WHEN payment_method='tarjeta' THEN total END),0) tarjeta,
+        COALESCE(SUM(CASE WHEN payment_method='fiado' THEN total END),0) fiado
+       FROM sales WHERE business_id = ? AND status = 'completada' AND created_at >= ? AND created_at < ? ${bf}`,
+    )
+    .get(businessId, start, end, ...bargs) as Record<string, number>
+  const cogs = (db.prepare(`SELECT COALESCE(SUM(si.cost),0) c FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? ${bf.replace('branch_id', 's.branch_id')}`).get(businessId, start, end, ...bargs) as { c: number }).c
+  const waste = -(db.prepare(`SELECT COALESCE(SUM(cost),0) c FROM stock_movements WHERE business_id = ? AND type = 'merma' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { c: number }).c
+  const expenses = (db.prepare(`SELECT COALESCE(SUM(amount),0) a FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ${bf}`).get(businessId, from, to, ...bargs) as { a: number }).a
+  const cancelled = (db.prepare(`SELECT COUNT(*) n FROM sales WHERE business_id = ? AND status = 'cancelada' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { n: number }).n
+  const grossProfit = s.total! - cogs
+  return { from, to, sales: s, cancelled, costOfSales: cogs, grossProfit, waste, expenses, profit: grossProfit - waste - expenses }
+}
+
+finance.get('/reports/summary', requirePerm('view_reports'), (c) => {
+  const { db, now } = c.get('deps')
+  const today = localDate(now())
+  const from = c.req.query('from') ?? today
+  const to = c.req.query('to') ?? today
+  const u = c.get('session').user
+  const summary = periodSummary(db, u.business_id, from, to, c.req.query('branchId'))
+  const { start, end } = range(from, to)
+  const top = db
+    .prepare("SELECT si.description, SUM(si.quantity) qty, SUM(si.total) total, SUM(si.total - si.cost) profit FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? GROUP BY COALESCE(si.product_id, si.description) ORDER BY total DESC LIMIT 20")
+    .all(u.business_id, start, end)
+  return c.json({ ...summary, topProducts: top })
+})
+
+/**
+ * Retiro sugerido del dueño = utilidad del periodo − reserva (días de gastos fijos) − reposición de inventario.
+ * Sin porcentajes. La reposición es lo que cuesta llevar al mínimo los productos que están por debajo.
+ */
+finance.get('/reports/suggested-withdrawal', ownerOnly, (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const today = localDate(now())
+  const from = c.req.query('from') ?? `${today.slice(0, 8)}01`
+  const to = c.req.query('to') ?? today
+  const b = db.prepare('SELECT reserve_days FROM businesses WHERE id = ?').get(u.business_id) as { reserve_days: number | null }
+  const summary = periodSummary(db, u.business_id, from, to)
+  const monthlyFixed = (db.prepare('SELECT COALESCE(SUM(monthly_amount),0) m FROM fixed_expenses WHERE business_id = ? AND active = 1').get(u.business_id) as { m: number }).m
+  const reserve = b.reserve_days == null ? null : Math.round((monthlyFixed * 12 * b.reserve_days) / 365)
+  const branches = db.prepare('SELECT id FROM branches WHERE business_id = ? AND active = 1').all(u.business_id) as { id: string }[]
+  const products = db.prepare('SELECT * FROM products WHERE business_id = ? AND active = 1 AND min_stock_milli > 0').all(u.business_id) as ProductRow[]
+  let restock = 0
+  const restockItems: { name: string; missing: number; cost: number }[] = []
+  for (const br of branches)
+    for (const p of products) {
+      const missing = p.min_stock_milli - stockOf(db, br.id, p.id)
+      if (missing > 0) {
+        const cost = Math.round((missing * p.last_cost) / 1000)
+        restock += cost
+        restockItems.push({ name: p.name, missing: fromMilli(missing), cost })
+      }
+    }
+  if (reserve == null) return c.json({ from, to, profit: summary.profit, monthlyFixed, reserveDays: null, reserve: null, restock, suggested: null, message: 'Define cuántos días de gastos fijos quieres de reserva.' })
+  return c.json({ from, to, profit: summary.profit, monthlyFixed, reserveDays: b.reserve_days, reserve, restock, restockItems, suggested: Math.max(0, summary.profit - reserve - restock) })
+})
+
+// ---------- Cajas ----------
+
+finance.get('/registers', (c) => c.json({ registers: c.get('deps').db.prepare('SELECT id, branch_id AS branchId, name, active FROM registers WHERE business_id = ? ORDER BY name').all(c.get('session').user.business_id) }))
+
+finance.post('/registers', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ name: z.string().trim().min(1).max(50), branchId: z.string().optional() }), await body(c))
+  const branchId = d.branchId ?? u.branch_id
+  if (!branchId || !db.prepare('SELECT 1 FROM branches WHERE id = ? AND business_id = ? AND active = 1').get(branchId, u.business_id)) throw bad('Sucursal no válida.')
+  const id = newId()
+  db.prepare('INSERT INTO registers (id, business_id, branch_id, name, created_at) VALUES (?,?,?,?,?)').run(id, u.business_id, branchId, d.name, iso(now()))
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'caja.alta', entity: 'register', entityId: id, newValue: d })
+  return c.json({ id }, 201)
+})
+
+/** Asignar caja a un cajero (o quitarla con null). */
+finance.put('/users/:id/register', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ registerId: z.string().nullable() }), await body(c))
+  const target = db.prepare('SELECT id, register_id FROM users WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; register_id: string | null } | undefined
+  if (!target) throw notFound()
+  const reg = d.registerId ? (db.prepare('SELECT branch_id FROM registers WHERE id = ? AND business_id = ? AND active = 1').get(d.registerId, u.business_id) as { branch_id: string } | undefined) : null
+  if (d.registerId && !reg) throw bad('Esa caja no existe.')
+  db.prepare('UPDATE users SET register_id = ?, branch_id = COALESCE(?, branch_id) WHERE id = ?').run(d.registerId, reg?.branch_id ?? null, target.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'usuario.caja_asignada', entity: 'user', entityId: target.id, oldValue: { registerId: target.register_id }, newValue: d })
+  return c.json({ ok: true })
+})
