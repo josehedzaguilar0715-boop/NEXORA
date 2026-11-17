@@ -157,6 +157,57 @@ const MIGRATIONS: string[] = [
   CREATE TRIGGER shifts_no_delete BEFORE DELETE ON shifts BEGIN SELECT RAISE(ABORT, 'Los turnos no se pueden borrar'); END;
   CREATE TRIGGER cash_movements_no_delete BEFORE DELETE ON cash_movements BEGIN SELECT RAISE(ABORT, 'Los movimientos no se pueden borrar'); END;
   `,
+  `
+  CREATE TABLE idempotency (
+    user_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key)
+  );
+  -- Cambios de datos compartidos entre equipos (productos, clientes, etc.). Nunca se borran.
+  CREATE TABLE sync_changes (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    op_id TEXT NOT NULL UNIQUE,
+    business_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    data TEXT NOT NULL,
+    client_updated_at TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    applied INTEGER NOT NULL,
+    received_at TEXT NOT NULL
+  );
+  CREATE INDEX sync_changes_pull ON sync_changes(business_id, seq);
+  CREATE TABLE sync_state (
+    business_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    client_updated_at TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    PRIMARY KEY (business_id, entity, entity_id)
+  );
+  CREATE TABLE sync_conflicts (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    winner TEXT NOT NULL,
+    loser TEXT NOT NULL,
+    winner_device TEXT NOT NULL,
+    loser_device TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente','revisado')),
+    created_at TEXT NOT NULL,
+    reviewed_by TEXT,
+    reviewed_at TEXT
+  );
+  CREATE TRIGGER sync_changes_no_delete BEFORE DELETE ON sync_changes BEGIN SELECT RAISE(ABORT, 'Los cambios no se pueden borrar'); END;
+  CREATE TRIGGER sync_conflicts_no_delete BEFORE DELETE ON sync_conflicts BEGIN SELECT RAISE(ABORT, 'Los conflictos no se pueden borrar'); END;
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {

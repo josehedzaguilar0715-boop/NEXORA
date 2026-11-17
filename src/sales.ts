@@ -26,6 +26,8 @@ const saleSchema = z.object({
   paymentMethod: z.enum(['efectivo', 'transferencia', 'tarjeta']),
   discount: z.number().int().min(0).optional(),
   authCode: z.string().optional(),
+  /** Turno en el que se cobró (útil al reenviar ventas hechas sin internet). */
+  shiftId: z.string().uuid().optional(),
   createdAt: z.string().datetime().optional(),
 })
 
@@ -50,8 +52,11 @@ sales.post('/sales', requirePerm('sell'), async (c) => {
     return c.json({ duplicate: true, sale: saleView(deps, prev) })
   }
 
-  const shift = db.prepare("SELECT id, branch_id FROM shifts WHERE cashier_id = ? AND status = 'abierto'").get(u.id) as { id: string; branch_id: string } | undefined
+  const shift = (d.shiftId
+    ? db.prepare("SELECT id, branch_id, status FROM shifts WHERE id = ? AND cashier_id = ?").get(d.shiftId, u.id)
+    : db.prepare("SELECT id, branch_id, status FROM shifts WHERE cashier_id = ? AND status = 'abierto'").get(u.id)) as { id: string; branch_id: string; status: string } | undefined
   if (!shift) throw conflict('Abre tu caja con el fondo inicial para poder vender.', 'caja_cerrada')
+  if (shift.status !== 'abierto') throw conflict('Ese turno ya tiene corte; la venta no se puede agregar.', 'turno_cerrado')
 
   const lines = d.items.map((i) => ({ ...i, total: Math.round(i.quantity * i.unitPrice) }))
   const subtotal = lines.reduce((a, l) => a + l.total, 0)

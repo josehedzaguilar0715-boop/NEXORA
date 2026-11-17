@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
 import { authed, publicAuth } from './auth.js'
+import { authenticate } from './context.js'
 import { cash } from './cash.js'
 import type { Deps, Env } from './context.js'
 import { sales } from './sales.js'
+import { idempotency, sync } from './sync.js'
 import { users } from './users.js'
 import { AppError } from './util.js'
 
@@ -15,10 +17,15 @@ export function createApp(deps: Deps) {
   app.get('/health', (c) => c.json({ ok: true }))
   app.route('/', publicAuth)
   // Todo lo demás exige sesión (authed ya aplica `authenticate`).
-  authed.route('/', users)
-  authed.route('/', cash)
-  authed.route('/', sales)
-  app.route('/', authed)
+  const protectedApp = new Hono<Env>()
+  protectedApp.use('*', authenticate)
+  protectedApp.use('*', idempotency)
+  protectedApp.route('/', authed)
+  protectedApp.route('/', sync)
+  protectedApp.route('/', users)
+  protectedApp.route('/', cash)
+  protectedApp.route('/', sales)
+  app.route('/', protectedApp)
 
   app.onError((err, c) => {
     if (err instanceof AppError) return c.json({ error: { code: err.code, message: err.message } }, err.status as 400)

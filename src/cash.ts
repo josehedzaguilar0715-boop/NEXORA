@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { body, hasPerm, parse, requirePerm, type C, type Env } from './context.js'
-import { bad, conflict, forbidden, iso, localDate, newId, notFound } from './util.js'
+import { bad, clampTime, conflict, forbidden, iso, localDate, newId, notFound } from './util.js'
 
 export const cash = new Hono<Env>()
 
@@ -63,12 +63,19 @@ function ensureCanManage(c: C, s: ShiftRow) {
 cash.post('/shifts/open', requirePerm('open_close_cash'), async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
-  const d = parse(z.object({ openingFloat: money }), await body(c))
+  const d = parse(z.object({ id: z.string().uuid().optional(), at: z.string().datetime().optional(), openingFloat: money }), await body(c))
+  if (d.id) {
+    const same = db.prepare('SELECT * FROM shifts WHERE id = ?').get(d.id) as ShiftRow | undefined
+    if (same) {
+      if (same.business_id !== u.business_id || same.cashier_id !== u.id) throw conflict('Ese identificador ya está en uso.', 'id_repetido')
+      return c.json({ shift: same, duplicate: true })
+    }
+  }
   if (!u.branch_id) throw bad('Tu usuario no tiene sucursal asignada.')
   const open = db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'abierto'").get(u.id)
   if (open) throw conflict('Ya tienes un turno abierto. Ciérralo antes de abrir otro.', 'turno_abierto')
-  const t = now()
-  const id = newId()
+  const t = clampTime(d.at, now())
+  const id = d.id ?? newId()
   db.prepare('INSERT INTO shifts (id, business_id, branch_id, cashier_id, opening_float, opened_at, opened_date) VALUES (?,?,?,?,?,?,?)').run(
     id, u.business_id, u.branch_id, u.id, d.openingFloat, iso(t), localDate(t),
   )
@@ -88,10 +95,14 @@ cash.post('/shifts/:id/movements', requirePerm('open_close_cash'), async (c) => 
   const s = loadShift(c)
   ensureCanManage(c, s)
   if (s.status !== 'abierto') throw conflict('Ese turno ya está cerrado.', 'turno_cerrado')
-  const d = parse(z.object({ type: z.enum(['retiro', 'deposito']), amount: money.min(1), reason: z.string().trim().min(2).max(200) }), await body(c))
+  const d = parse(z.object({ id: z.string().uuid().optional(), at: z.string().datetime().optional(), type: z.enum(['retiro', 'deposito']), amount: money.min(1), reason: z.string().trim().min(2).max(200) }), await body(c))
+  if (d.id) {
+    const dup = db.prepare('SELECT id FROM cash_movements WHERE id = ? AND shift_id = ?').get(d.id, s.id)
+    if (dup) return c.json({ id: d.id, totals: shiftTotals(db, s), duplicate: true })
+  }
   if (d.type === 'retiro' && d.amount > shiftTotals(db, s).expectedCash) throw bad('El retiro es mayor al efectivo que debe haber en caja.')
-  const id = newId()
-  db.prepare('INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,?,?,?,?,?)').run(id, s.id, d.type, d.amount, d.reason, u.id, iso(now()))
+  const id = d.id ?? newId()
+  db.prepare('INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,?,?,?,?,?)').run(id, s.id, d.type, d.amount, d.reason, u.id, iso(clampTime(d.at, now())))
   audit(db, now, { businessId: u.business_id, userId: u.id, action: `caja.${d.type}`, entity: 'shift', entityId: s.id, newValue: { amount: d.amount }, reason: d.reason })
   return c.json({ id, totals: shiftTotals(db, s) }, 201)
 })
@@ -109,13 +120,13 @@ cash.post('/shifts/:id/close', requirePerm('open_close_cash'), async (c) => {
   const s = loadShift(c)
   ensureCanManage(c, s)
   if (s.status !== 'abierto') throw conflict('Ese turno ya está cerrado.', 'turno_cerrado')
-  const d = parse(z.object({ countedCash: money, reason: z.string().trim().max(300).optional() }), await body(c))
+  const d = parse(z.object({ at: z.string().datetime().optional(), countedCash: money, reason: z.string().trim().max(300).optional() }), await body(c))
   const totals = shiftTotals(db, s)
   const difference = d.countedCash - totals.expectedCash
   if (difference !== 0 && !d.reason) throw bad('Hay diferencia en el conteo. Escribe el motivo.', 'motivo_requerido')
   db.prepare(
     "UPDATE shifts SET status='cerrado', closed_at=?, closed_by=?, expected_cash=?, counted_cash=?, difference=?, difference_reason=? WHERE id=?",
-  ).run(iso(now()), u.id, totals.expectedCash, d.countedCash, difference, difference === 0 ? null : d.reason!, s.id)
+  ).run(iso(clampTime(d.at, now())), u.id, totals.expectedCash, d.countedCash, difference, difference === 0 ? null : d.reason!, s.id)
   audit(db, now, {
     businessId: u.business_id, userId: u.id, action: 'caja.corte', entity: 'shift', entityId: s.id,
     newValue: { expected: totals.expectedCash, counted: d.countedCash, difference }, reason: d.reason ?? null,

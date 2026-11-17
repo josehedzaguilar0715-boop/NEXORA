@@ -27,5 +27,5 @@ export function setup() {
     const l = await call('POST', '/auth/login', { body: { businessCode, username, password: 'inicial123' } })
     return { id: r.json.user?.id as string, token: l.json.token as string }
   }
-  return { db, call, codes, advance, registerOwner, createStaff, uuid: randomUUID }
+  return { app, db, call, codes, advance, registerOwner, createStaff, uuid: randomUUID }
 }

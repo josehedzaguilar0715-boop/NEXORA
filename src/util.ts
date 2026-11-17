@@ -53,3 +53,10 @@ export const normalizeUsername = (u: string) => u.trim().toLowerCase()
 export function checkPassword(p: string) {
   if (p.length < 8) throw bad('La contraseña debe tener al menos 8 caracteres.')
 }
+
+/** Hora reportada por el equipo (puede venir de una caja sin internet); nunca en el futuro. */
+export function clampTime(at: string | undefined, now: Date): Date {
+  if (!at) return now
+  const d = new Date(at)
+  return Number.isNaN(d.getTime()) || d > now ? now : d
+}

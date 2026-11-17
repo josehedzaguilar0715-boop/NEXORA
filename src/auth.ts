@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
-import { body, parse, LOCK_MINUTES, MAX_FAILED, type Deps, type Env, type UserRow, authenticate } from './context.js'
+import { body, parse, LOCK_MINUTES, MAX_FAILED, type Deps, type Env, type UserRow } from './context.js'
 import {
   bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone,
   normalizeUsername, notFound, numericCode, sha256, unauthorized, verifySecret,
@@ -168,7 +168,6 @@ publicAuth.post('/auth/login', async (c) => {
 })
 
 export const authed = new Hono<Env>()
-authed.use('*', authenticate)
 
 authed.get('/auth/me', (c) => {
   const { user } = c.get('session')
