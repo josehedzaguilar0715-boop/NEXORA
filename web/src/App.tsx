@@ -10,6 +10,7 @@ import { Agenda } from './screens/Agenda'
 import { Entradas } from './screens/Entradas'
 import { Acceso, MisBoletos, Taquilla, TiendaBoletos } from './screens/Taquilla'
 import { Cocina, Mesas, Pedidos } from './screens/Mesas'
+import { MenuDia } from './screens/MenuDia'
 import { Comisiones } from './screens/Comisiones'
 import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
@@ -21,6 +22,7 @@ export interface Me {
   user: { id: string; name: string; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
   permissions: 'todos' | string[]
   business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string }
+  settings?: Record<string, any>
 }
 export const can = (me: Me, p: string) => me.permissions === 'todos' || me.permissions.includes(p)
 
@@ -31,6 +33,7 @@ const SCREENS: Screen[] = [
   { key: 'taquilla', label: 'Taquilla', perm: 'sell', C: Taquilla, giros: ['turistico'] },
   { key: 'acceso', label: 'Acceso', perm: 'sell', C: Acceso, giros: ['turistico'] },
   { key: 'mesas', label: 'Mesas', perm: 'sell', C: Mesas, giros: ['palapa', 'restaurante', 'taqueria'] },
+  { key: 'menu', label: 'Menú del día', perm: 'sell', C: MenuDia, giros: ['comedor', 'taqueria'] },
   { key: 'pedidos', label: 'Para llevar', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'comedor'] },
   { key: 'cocina', label: 'Cocina', perm: 'sell', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria'] },
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
@@ -111,7 +114,9 @@ function Privada() {
   }
   if (me.user.mustChangePassword) return <Login forceChange onLogin={(m) => { setMe(m); cache.set('me', m) }} />
 
-  const allowed = SCREENS.filter((s) => can(me, s.perm) && (!s.giros || s.giros.includes(me.business.giro)))
+  // Comedor: el mapa de mesas es opcional (apagado por defecto).
+  const giroOk = (s: Screen) => !s.giros || s.giros.includes(me.business.giro) || (s.key === 'mesas' && me.business.giro === 'comedor' && !!me.settings?.tablesEnabled)
+  const allowed = SCREENS.filter((s) => can(me, s.perm) && giroOk(s))
   const current = allowed.find((s) => s.key === hash) ?? allowed[0]
   const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'
   return (

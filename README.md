@@ -19,7 +19,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 12 (lugar turístico)**: boletos por tipo con precio editable, por fecha y horario con aforo (nunca se vende de más); aforo en tiempo real; venta anticipada por link con QR por boleto (queda por pagar y cuenta para el aforo); acceso con QR que rechaza repetidos, vencidos, cancelados y sin pagar; taquilla con corte por tipo de boleto; visitas guiadas con cupo y guía; tienda y estacionamiento aparte; cierre temporal con código que prepara avisos y cancela los afectados; reembolsos solo con código del dueño; grupos vía promociones; reportes por día, horario, tipo y canal. ✅ con pruebas.
 - **Bloque 13 (palapa)**: mesas con cuenta abierta; comandas a cocina y barra con mesa y hora; cobro en mesa completo o dividido por persona o por producto; propinas por mesero aparte; reservas de mesa confirmadas por dueño o encargado; consumo mínimo por mesa; renta de sillas, camastros y sombrillas con su propio control; recetas e insumos; precio por kilo del día con código; merma de perecederos; bebidas y hielo con costo; tolera reenvíos sin señal. ✅ con pruebas.
 - **Bloque 14 (restaurante)**: plano de mesas por área con estados y mapa en vivo; la mesa pasa a limpieza al cobrar y el mesero la libera; comandas por estación (cada una ve solo lo suyo) que se envían al confirmar, con tiempos de cocina; cuenta dividible; cancelaciones y cortesías con código del dueño; pedidos para llevar y recoger con número y estados, cobrados al hacerlos; reserva de hora para recoger con interruptor (apagada); aviso de pedido listo manual; propinas por mesero; menú editable con variantes y combos. ✅ con pruebas y prueba en navegador.
-- Siguiente: Bloque 15 (comedor).
+- **Bloque 15 (comedor)**: menú del día (o corrido) por turno que el encargado publica con código; agotados que no se venden; venta rápida con botones grandes de lo más vendido; turnos de comida (desayuno, comida, cena) con corte por turno; platillos por porción con receta y costo; crédito a oficinas y talleres con límite (pasarlo pide código del dueño); mapa de mesas opcional (apagado); caja rápida con cambio; propinas opcionales (apagadas). ✅ con pruebas.
+- Siguiente: Bloque 16 (taquería).
 
 ## Desarrollo local
 
@@ -153,3 +154,10 @@ Importes siempre en centavos enteros (MXN).
 - **Cancelar o regalar** un renglón siempre pide el código del dueño y queda en bitácora.
 - **Consumo mínimo** por mesa: al cerrar se cobra la diferencia. (Por horario: pendiente.)
 - **Renta de activos** (`/rental-assets`, `/tabs/:id/rentals`): disponibilidad propia; regresan al cerrar la cuenta.
+
+## Comedor (Bloque 15)
+
+- Menú del día: `POST /daily-menu { meal, productIds, authCode }` (con código). `meal` = desayuno, comida, cena o `dia`. Marcar agotado: `POST /daily-menu/:id/sold-out`. Un agotado se rechaza al vender o al pedir en mesa.
+- Venta rápida: `GET /products/top` ordena los botones de la caja por lo más vendido.
+- Turno de comida: la caja se abre con `meal`, y cada turno tiene su corte.
+- Ajustes (`PUT /settings`): `tipsEnabled` (comedor: apagadas por defecto) y `tablesEnabled` (mapa de mesas, apagado).

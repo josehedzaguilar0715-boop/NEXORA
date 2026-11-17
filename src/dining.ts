@@ -147,7 +147,7 @@ const itemBody = z.object({
 })
 
 /** Validaciones de un giro antes de agregar a la cuenta (p. ej. guisados agotados). */
-export const tabItemValidators: ((ctx: { db: Db; user: UserRow; productId: string | null; quantity: number }) => void)[] = []
+export const tabItemValidators: ((ctx: { db: Db; user: UserRow; productId: string | null; quantity: number; now: Date }) => void)[] = []
 
 dining.post('/tabs/:id/items', requirePerm('sell'), async (c) => {
   const deps = c.get('deps')
@@ -158,7 +158,7 @@ dining.post('/tabs/:id/items', requirePerm('sell'), async (c) => {
   const d = parse(z.object({ items: z.array(itemBody).min(1).max(100), authCode: z.string().optional() }), await body(c))
   const rows = d.items.map((it) => {
     if (it.id && db.prepare('SELECT 1 FROM tab_items WHERE id = ?').get(it.id)) return null // ya registrado (reenvío)
-    for (const v of tabItemValidators) v({ db, user: u, productId: it.productId ?? null, quantity: it.quantity })
+    for (const v of tabItemValidators) v({ db, user: u, productId: it.productId ?? null, quantity: it.quantity, now: now() })
     if (it.productId) {
       const p = getProduct(db, u.business_id, it.productId)
       if (!p.active || !p.sellable) throw bad(`${p.name} no está disponible.`)

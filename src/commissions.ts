@@ -5,6 +5,7 @@ import { body, hasPerm, ownerOnly, parse, requirePerm, type Env } from './contex
 import type { Db } from './db.js'
 import { cancelHooks, saleHooks, saleValidators, type ResolvedLine } from './sales.js'
 import { bad, iso, localDate, newId } from './util.js'
+import { getSettings } from './settings.js'
 
 /**
  * Comisiones por persona y por servicio, producto o categoría. Sin valores predeterminados:
@@ -34,6 +35,10 @@ saleValidators.push(({ deps, user, input, lines }) => {
   const ids = new Set<string>()
   for (const l of lines) { const s = staffOf(l, input); if (s) ids.add(s) }
   const tips = input.tips === undefined ? [] : tipsSchema.parse(input.tips)
+  if (tips.length) {
+    const giro = (deps.db.prepare('SELECT giro FROM businesses WHERE id = ?').get(user.business_id) as { giro: string }).giro
+    if (!(getSettings(deps.db, user.business_id).tipsEnabled ?? giro !== 'comedor')) throw bad('Las propinas están apagadas en este negocio.')
+  }
   for (const t of tips) ids.add(t.staffId)
   for (const id of ids) if (!deps.db.prepare('SELECT 1 FROM users WHERE id = ? AND business_id = ? AND active = 1').get(id, user.business_id)) throw bad('La persona que atendió no es de este negocio.')
 })

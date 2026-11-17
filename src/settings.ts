@@ -12,6 +12,10 @@ const SETTINGS = z.object({
   passReentryMin: z.number().int().min(0).max(24 * 60),
   /** Restaurante: reservar hora para pedidos para recoger (apagado: solo número de pedido). */
   pickupScheduling: z.boolean(),
+  /** Propinas. Comedor: apagadas por defecto; los demás giros, encendidas. */
+  tipsEnabled: z.boolean(),
+  /** Comedor: mapa de mesas (apagado por defecto). */
+  tablesEnabled: z.boolean(),
 }).partial()
 export type Settings = z.infer<typeof SETTINGS>
 

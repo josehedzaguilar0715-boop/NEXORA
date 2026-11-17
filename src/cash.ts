@@ -66,7 +66,7 @@ function ensureCanManage(c: C, s: ShiftRow) {
 cash.post('/shifts/open', requirePerm('open_close_cash'), async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
-  const d = parse(z.object({ id: z.string().uuid().optional(), at: z.string().datetime().optional(), openingFloat: money }), await body(c))
+  const d = parse(z.object({ id: z.string().uuid().optional(), at: z.string().datetime().optional(), openingFloat: money, /** Comedor: turno de comida (desayuno, comida, cena). */ meal: z.enum(['desayuno', 'comida', 'cena']).optional() }), await body(c))
   if (d.id) {
     const same = db.prepare('SELECT * FROM shifts WHERE id = ?').get(d.id) as ShiftRow | undefined
     if (same) {
@@ -82,8 +82,8 @@ cash.post('/shifts/open', requirePerm('open_close_cash'), async (c) => {
   if (u.register_id && db.prepare("SELECT 1 FROM shifts WHERE register_id = ? AND status = 'abierto'").get(u.register_id)) throw conflict('Tu caja ya tiene un turno abierto por otra persona.', 'caja_ocupada')
   const t = clampTime(d.at, now())
   const id = d.id ?? newId()
-  db.prepare('INSERT INTO shifts (id, business_id, branch_id, cashier_id, opening_float, opened_at, opened_date, register_id) VALUES (?,?,?,?,?,?,?,?)').run(
-    id, u.business_id, u.branch_id, u.id, d.openingFloat, iso(t), localDate(t), u.register_id ?? null,
+  db.prepare('INSERT INTO shifts (id, business_id, branch_id, cashier_id, opening_float, opened_at, opened_date, register_id, meal) VALUES (?,?,?,?,?,?,?,?,?)').run(
+    id, u.business_id, u.branch_id, u.id, d.openingFloat, iso(t), localDate(t), u.register_id ?? null, d.meal ?? null,
   )
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'caja.apertura', entity: 'shift', entityId: id, newValue: { openingFloat: d.openingFloat } })
   return c.json({ shift: db.prepare('SELECT * FROM shifts WHERE id = ?').get(id) }, 201)

@@ -68,9 +68,19 @@ export function Caja({ me }: { me: Me }) {
 
   const results = useMemo(() => {
     const t = q.trim().toLowerCase()
-    if (!t) return catalog.slice(0, 24)
-    return catalog.filter((p) => p.name.toLowerCase().includes(t) || p.barcode === t).slice(0, 24)
-  }, [q, catalog])
+    const list = catalog.filter((p) => !soldOut.includes(p.id) && (p as Product & { sellable?: boolean }).sellable !== false)
+    // Venta rápida: primero lo más vendido.
+    if (!t) return [...list].sort((a, b) => (top.indexOf(a.id) + 1 || 999) - (top.indexOf(b.id) + 1 || 999)).slice(0, 24)
+    return list.filter((p) => p.name.toLowerCase().includes(t) || p.barcode === t).slice(0, 24)
+  }, [q, catalog, soldOut, top])
+  const quick = ['comedor', 'taqueria'].includes(me.business.giro)
+  const [soldOut, setSoldOut] = useState<string[]>([])
+  const [top, setTop] = useState<string[]>([])
+  useEffect(() => {
+    if (!quick) return
+    api<any>('GET', '/daily-menu').then((r) => setSoldOut(r.menus.flatMap((m: any) => m.items.filter((i: any) => i.soldOut).map((i: any) => i.productId)))).catch(() => {})
+    api<any>('GET', '/products/top').then((r) => setTop(r.products.map((p: any) => p.id))).catch(() => {})
+  }, [])
   const serviceResults = useMemo(() => services.filter((x) => !q.trim() || x.name.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 24), [q, services])
 
   const subtotal = cart.reduce((a, l) => a + lineTotal(l), 0)
@@ -146,7 +156,7 @@ export function Caja({ me }: { me: Me }) {
   }
 
   if (!loaded && !shift) return <p className="muted">Cargando caja…</p>
-  if (!shift) return <OpenShift onOpen={(s) => { setShift(s); cache.set('shift', s) }} />
+  if (!shift) return <OpenShift meals={me.business.giro === 'comedor'} onOpen={(s) => { setShift(s); cache.set('shift', s) }} />
 
   return (
     <div className="sell">
@@ -234,13 +244,14 @@ export function Caja({ me }: { me: Me }) {
   )
 }
 
-function OpenShift({ onOpen }: { onOpen: (s: Shift) => void }) {
+function OpenShift({ onOpen, meals }: { onOpen: (s: Shift) => void; meals?: boolean }) {
   const [amount, setAmount] = useState('')
+  const [meal, setMeal] = useState(() => { const h = new Date().getHours(); return h < 12 ? 'desayuno' : h < 18 ? 'comida' : 'cena' })
   const [err, setErr] = useState('')
   const open = async () => {
     if (amount.trim() === '' || Number.isNaN(toCents(amount))) return setErr('Escribe el fondo inicial (puede ser 0).')
     const id = crypto.randomUUID()
-    const body = { id, openingFloat: toCents(amount), at: new Date().toISOString() }
+    const body = { id, openingFloat: toCents(amount), at: new Date().toISOString(), ...(meals ? { meal } : {}) }
     try {
       const r = await api<{ shift: Shift }>('POST', '/shifts/open', body, { 'idempotency-key': id })
       onOpen(r.shift)
@@ -256,6 +267,7 @@ function OpenShift({ onOpen }: { onOpen: (s: Shift) => void }) {
     <div className="card login">
       <h1>Abrir caja</h1>
       <p className="muted">Cuenta el dinero con el que empiezas el turno.</p>
+      {meals && <div className="tabs">{['desayuno', 'comida', 'cena'].map((m) => <button key={m} className={meal === m ? 'on' : ''} onClick={() => setMeal(m)}>{m[0]!.toUpperCase() + m.slice(1)}</button>)}</div>}
       <label>Fondo inicial<input inputMode="decimal" placeholder="$0.00" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus onKeyDown={(e) => e.key === 'Enter' && open()} /></label>
       {err && <p className="error">{err}</p>}
       <p><button className="primary big" style={{ width: '100%' }} onClick={open}>Abrir caja</button></p>

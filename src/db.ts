@@ -1153,6 +1153,22 @@ const MIGRATIONS: Migration[] = [
   CREATE TRIGGER tab_items_no_delete BEFORE DELETE ON tab_items BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
   CREATE TRIGGER tabs_no_delete BEFORE DELETE ON tabs BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
   `,
+  `
+  -- Comedor / taquería: menú (o guisados) del día por turno de comida, con agotados.
+  CREATE TABLE daily_menus (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    date TEXT NOT NULL,
+    meal TEXT NOT NULL DEFAULT 'dia',
+    items TEXT NOT NULL,
+    published_by TEXT NOT NULL REFERENCES users(id),
+    authorized_by TEXT NOT NULL REFERENCES users(id),
+    published_at TEXT NOT NULL,
+    UNIQUE (business_id, date, meal)
+  );
+  -- Turno de comida del corte (desayuno, comida, cena).
+  ALTER TABLE shifts ADD COLUMN meal TEXT;
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {
