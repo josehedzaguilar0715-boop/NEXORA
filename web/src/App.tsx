@@ -5,6 +5,7 @@ import { Clientes } from './screens/Clientes'
 import { Compras } from './screens/Compras'
 import { Cotizaciones } from './screens/Cotizaciones'
 import { Devoluciones } from './screens/Devoluciones'
+import { Encargos } from './screens/Encargos'
 import { Login } from './screens/Login'
 import { Productos } from './screens/Productos'
 import { Reportes } from './screens/Reportes'
@@ -21,6 +22,7 @@ type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => 
 const SCREENS: Screen[] = [
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
   { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria', 'papeleria'] },
+  { key: 'encargos', label: 'Encargos', perm: 'sell', C: Encargos, giros: ['papeleria'] },
   { key: 'devoluciones', label: 'Devoluciones', perm: 'cancel_discount', C: Devoluciones, giros: ['ferreteria', 'perfumeria', 'papeleria'] },
   { key: 'productos', label: 'Productos', perm: 'view_inventory', C: Productos },
   { key: 'compras', label: 'Compras', perm: 'edit_inventory', C: Compras },

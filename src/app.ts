@@ -8,6 +8,7 @@ import { common, publicCommon } from './common.js'
 import { finance } from './finance.js'
 import { inventory } from './inventory.js'
 import { hardware } from './hardware.js'
+import { services } from './services.js'
 import { cash } from './cash.js'
 import type { Deps, Env } from './context.js'
 import { sales } from './sales.js'
@@ -39,6 +40,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', branches)
   protectedApp.route('/', common)
   protectedApp.route('/', hardware)
+  protectedApp.route('/', services)
   protectedApp.route('/', inventory)
   protectedApp.route('/', finance)
   app.route('/', protectedApp)

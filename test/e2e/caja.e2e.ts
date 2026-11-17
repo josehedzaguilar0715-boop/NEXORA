@@ -153,6 +153,20 @@ try {
   await page.getByRole('button', { name: 'Registrar devolución' }).click()
   await page.getByText('Devolución registrada: $18.50.').waitFor()
   check(true, 'ferretería: devolución con ticket y código')
+
+  // Papelería: copias por hoja desde la caja.
+  await call('PATCH', '/business', { giro: 'papeleria' }, token)
+  await call('POST', '/services', { name: 'Copia carta B/N', price: 100 }, token)
+  await page.goto(`${base}/#/caja`)
+  await page.reload()
+  await page.getByRole('button', { name: /Copia carta B\/N/ }).click()
+  await page.getByRole('button', { name: '20', exact: true }).click()
+  await page.getByRole('button', { name: 'Agregar' }).click()
+  check((await page.getByTestId('total').textContent()) === '$20.00', 'papelería: 20 copias a $1.00')
+  await page.getByRole('button', { name: 'Tarjeta' }).click()
+  await page.getByRole('heading', { name: 'Venta cobrada' }).waitFor()
+  check(await page.getByText(/20 Copia carta B\/N/).first().isVisible(), 'papelería: ticket con las copias')
+  await page.screenshot({ path: `${shots}/8-papeleria.png` })
 } finally {
   await browser.close()
   server.close()

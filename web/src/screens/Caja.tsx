@@ -6,7 +6,8 @@ export interface Product {
   id: string; name: string; barcode: string | null; unit: 'pieza' | 'kg' | 'metro' | 'litro'; price: number; stock?: number
   presentations: { id: string; name: string; factorMilli: number; price: number; barcode: string | null }[]
 }
-interface Line { key: string; productId?: string; presentationId?: string; name: string; quantity: number; amount?: number; unitPrice: number; total: number; unit: string; free?: boolean }
+export interface Service { id: string; name: string; price: number; category: string | null; durationMin: number | null; machineId: string | null; active: boolean }
+interface Line { key: string; serviceId?: string; productId?: string; presentationId?: string; name: string; quantity: number; amount?: number; unitPrice: number; total: number; unit: string; free?: boolean }
 interface Shift { id: string; opening_float: number; opened_at: string }
 interface Customer { id: string; name: string }
 
@@ -26,9 +27,10 @@ export function Caja({ me }: { me: Me }) {
   const [loaded, setLoaded] = useState(false)
   const [catalog, setCatalog] = useState<Product[]>(cache.get<Product[]>('catalog', []))
   const [customers, setCustomers] = useState<Customer[]>(cache.get<Customer[]>('customers', []))
+  const [services, setServices] = useState<Service[]>(cache.get<Service[]>('services', []))
   const [q, setQ] = useState('')
   const [cart, setCart] = useState<Line[]>([])
-  const [modal, setModal] = useState<null | { kind: 'granel'; p: Product } | { kind: 'libre' } | { kind: 'pago'; method: string } | { kind: 'ticket'; text: string; change?: number | null; provisional: boolean } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' }>(null)
+  const [modal, setModal] = useState<null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product } | { kind: 'libre' } | { kind: 'pago'; method: string } | { kind: 'ticket'; text: string; change?: number | null; provisional: boolean } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' }>(null)
   const [discount, setDiscount] = useState<{ amount: number; code: string } | null>(null)
   const [msg, setMsg] = useState('')
   const search = useRef<HTMLInputElement>(null)
@@ -44,6 +46,9 @@ export function Caja({ me }: { me: Me }) {
       const p = await api<{ products: Product[] }>('GET', '/products')
       setCatalog(p.products)
       cache.set('catalog', p.products)
+      const sv = await api<{ services: Service[] }>('GET', '/services')
+      setServices(sv.services.filter((x) => x.active))
+      cache.set('services', sv.services.filter((x) => x.active))
       if (can(me, 'customers_credit')) {
         const c = await api<{ customers: Customer[] }>('GET', '/customers')
         setCustomers(c.customers)
@@ -62,6 +67,7 @@ export function Caja({ me }: { me: Me }) {
     if (!t) return catalog.slice(0, 24)
     return catalog.filter((p) => p.name.toLowerCase().includes(t) || p.barcode === t).slice(0, 24)
   }, [q, catalog])
+  const serviceResults = useMemo(() => services.filter((x) => !q.trim() || x.name.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 24), [q, services])
 
   const subtotal = cart.reduce((a, l) => a + lineTotal(l), 0)
   const total = Math.max(0, subtotal - (discount?.amount ?? 0))
@@ -97,7 +103,7 @@ export function Caja({ me }: { me: Me }) {
     const id = crypto.randomUUID()
     const body = {
       id, shiftId: shift!.id, paymentMethod: method, createdAt: new Date().toISOString(),
-      items: cart.map((l) => (l.free ? { description: l.name, quantity: l.quantity, unitPrice: l.unitPrice } : { productId: l.productId, presentationId: l.presentationId, ...(l.amount !== undefined ? { amount: l.amount } : { quantity: l.quantity }) })),
+      items: cart.map((l) => (l.serviceId ? { serviceId: l.serviceId, quantity: l.quantity } : l.free ? { description: l.name, quantity: l.quantity, unitPrice: l.unitPrice } : { productId: l.productId, presentationId: l.presentationId, ...(l.amount !== undefined ? { amount: l.amount } : { quantity: l.quantity }) })),
       ...(discount ? { discount: discount.amount, authCode: discount.code } : {}),
       ...extra,
     }
@@ -145,6 +151,9 @@ export function Caja({ me }: { me: Me }) {
           onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onEnter()}
         />
         <div className="results">
+          {serviceResults.map((sv) => (
+            <button key={sv.id} onClick={() => setModal({ kind: 'servicio', sv })}>{sv.name}<small>{mxn(sv.price)}{sv.durationMin ? ` · ${sv.durationMin} min` : ''}</small></button>
+          ))}
           {results.map((p) => (
             <button key={p.id} onClick={() => add(p)}>
               {p.name}
@@ -189,10 +198,13 @@ export function Caja({ me }: { me: Me }) {
           <button onClick={() => setModal({ kind: 'ventas' })}>Ventas del turno</button>
           {can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'mov' })}>Retiro / depósito</button>}
           {can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'corte' })}>Corte de caja</button>}
+          {me.business.giro === 'papeleria' && can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'contador' })}>Contador copiadora</button>}
         </div>
       </section>
 
       {modal?.kind === 'granel' && <Granel p={modal.p} onClose={() => setModal(null)} onAdd={(l) => { setCart((c) => [...c, l]); setModal(null); setQ('') }} />}
+      {modal?.kind === 'servicio' && <Cantidad sv={modal.sv} onClose={() => setModal(null)} onAdd={(l) => { setCart((c) => [...c, l]); setModal(null); setQ('') }} />}
+      {modal?.kind === 'contador' && <Contador shift={shift} onClose={() => setModal(null)} />}
       {modal?.kind === 'libre' && <Libre onClose={() => setModal(null)} onAdd={(l) => { setCart((c) => [...c, l]); setModal(null) }} />}
       {modal?.kind === 'descuento' && <Descuento max={subtotal} onClose={() => setModal(null)} onSet={(d) => { setDiscount(d); setModal(null) }} />}
       {modal?.kind === 'pago' && <Pago method={modal.method} total={total} customers={customers} onClose={() => setModal(null)} onPay={(extra) => { setModal(null); void charge(modal.method, extra) }} />}
@@ -456,6 +468,53 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
       {(diff !== 0 || !totals) && <><label>Motivo de la diferencia<input value={reason} onChange={(e) => setReason(e.target.value)} /></label></>}
       {err && <p className="error">{err}</p>}
       <p className="row"><button onClick={onClose}>Volver</button><button className="danger big" disabled={counted === '' || (diff !== 0 && !reason.trim())} onClick={close}>Cerrar caja</button></p>
+    </Modal>
+  )
+}
+
+function Cantidad({ sv, onAdd, onClose }: { sv: Service; onAdd: (l: Line) => void; onClose: () => void }) {
+  const [v, setV] = useState('1')
+  const n = Number(v)
+  const ok = n > 0
+  const add = () => ok && onAdd({ key: crypto.randomUUID(), serviceId: sv.id, name: sv.name, quantity: n, unitPrice: sv.price, total: 0, unit: 'pza', free: false })
+  return (
+    <Modal onClose={onClose}>
+      <h2>{sv.name} · {mxn(sv.price)}</h2>
+      <label>Cantidad (hojas, piezas…)<input inputMode="numeric" autoFocus value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} /></label>
+      <div className="row" style={{ marginTop: 8 }}>{[1, 10, 20, 50, 100].map((x) => <button key={x} onClick={() => setV(String(x))}>{x}</button>)}</div>
+      <div className="total">{mxn(ok ? Math.round(n * sv.price) : 0)}</div>
+      <div className="row"><button onClick={onClose}>Cancelar</button><button className="primary" disabled={!ok} onClick={add}>Agregar</button></div>
+    </Modal>
+  )
+}
+
+/** Papelería: contador de la copiadora al inicio y fin del turno, comparado con las hojas cobradas. */
+function Contador({ shift, onClose }: { shift: Shift; onClose: () => void }) {
+  const [machines, setMachines] = useState<{ id: string; name: string }[]>([])
+  const [report, setReport] = useState<any[]>([])
+  const [f, setF] = useState({ machineId: '', type: 'inicio', value: '' })
+  const [msg, setMsg] = useState('')
+  const load = async () => {
+    const m = await api<any>('GET', '/machines')
+    setMachines(m.machines)
+    setF((x) => ({ ...x, machineId: x.machineId || m.machines[0]?.id || '' }))
+    setReport((await api<any>('GET', `/shifts/${shift.id}/counters`)).machines)
+  }
+  useEffect(() => { void load().catch((e) => setMsg(e.message)) }, [])
+  const save = async () => {
+    try { await api('POST', `/machines/${f.machineId}/readings`, { type: f.type, value: Number(f.value), shiftId: shift.id }); setMsg('Guardado.'); setF({ ...f, value: '' }); void load() } catch (e) { setMsg((e as Error).message) }
+  }
+  return (
+    <Modal onClose={onClose}>
+      <h2>Contador de copiadora</h2>
+      <label>Equipo<select value={f.machineId} onChange={(e) => setF({ ...f, machineId: e.target.value })}>{machines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+      <div className="tabs" style={{ marginTop: 10 }}><button className={f.type === 'inicio' ? 'on' : ''} onClick={() => setF({ ...f, type: 'inicio' })}>Inicio de turno</button><button className={f.type === 'fin' ? 'on' : ''} onClick={() => setF({ ...f, type: 'fin' })}>Fin de turno</button></div>
+      <label>Número del contador<input inputMode="numeric" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} /></label>
+      <p><button className="primary" disabled={!f.machineId || f.value === ''} onClick={save}>Guardar lectura</button></p>
+      {msg && <p className="muted">{msg}</p>}
+      <table className="list"><thead><tr><th>Equipo</th><th className="num">Contador</th><th className="num">Cobradas</th><th className="num">Diferencia</th></tr></thead>
+        <tbody>{report.map((r) => <tr key={r.machineId}><td>{r.name}</td><td className="num">{r.counted ?? '—'}</td><td className="num">{r.sold}</td><td className="num" style={{ color: r.difference ? 'var(--danger)' : undefined }}>{r.difference ?? '—'}</td></tr>)}</tbody></table>
+      <p><button onClick={onClose}>Cerrar</button></p>
     </Modal>
   )
 }

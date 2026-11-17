@@ -22,6 +22,8 @@ const itemSchema = z
     /** Producto del catálogo (descuenta inventario). Sin producto: renglón libre (servicio, varios). */
     productId: z.string().optional(),
     presentationId: z.string().optional(),
+    /** Servicio del catálogo (copias, corte, manicure, tarifa…). */
+    serviceId: z.string().optional(),
     description: z.string().trim().min(1).max(200).optional(),
     /** Piezas, presentaciones o kilos (báscula). */
     quantity: z.number().positive().max(1_000_000).optional(),
@@ -55,7 +57,7 @@ export type SaleInput = z.infer<typeof saleSchema>
 export interface ResolvedLine {
   input: z.infer<typeof itemSchema>
   description: string; quantity: number; unitPrice: number; total: number
-  ref: string | null; category: string | null; productId: string | null; presentationId: string | null; qtyMilli: number | null
+  ref: string | null; category: string | null; productId: string | null; presentationId: string | null; qtyMilli: number | null; serviceId: string | null
   priceChanged: boolean; cost: number; itemId: string
 }
 export interface SaleHookCtx { deps: Deps; user: UserRow; saleId: string; branchId: string; shiftId: string; input: SaleInput; lines: ResolvedLine[]; total: number }
@@ -73,6 +75,15 @@ export function customerBalance(db: Deps['db'], customerId: string): number {
   return (db.prepare('SELECT COALESCE(SUM(delta),0) b FROM credit_ledger WHERE customer_id = ?').get(customerId) as { b: number }).b
 }
 
+/** Convierte millonésimas a milésimas acumulando la fracción sobrante por sucursal y producto. */
+export function carryMilli(db: Deps['db'], branchId: string, productId: string, micro: number): number {
+  const prev = (db.prepare('SELECT micro FROM consumption_carry WHERE branch_id = ? AND product_id = ?').get(branchId, productId) as { micro: number } | undefined)?.micro ?? 0
+  const total = prev + micro
+  const milli = Math.floor(total / 1000)
+  db.prepare('INSERT INTO consumption_carry (branch_id, product_id, micro) VALUES (?,?,?) ON CONFLICT(branch_id, product_id) DO UPDATE SET micro = excluded.micro').run(branchId, productId, total - milli * 1000)
+  return milli
+}
+
 /** Escalas de precio por volumen: la de mayor cantidad mínima que se alcance. */
 export function tierPrice(db: Deps['db'], productId: string, qtyMilli: number): number | null {
   const t = db.prepare('SELECT price FROM price_tiers WHERE product_id = ? AND min_milli <= ? ORDER BY min_milli DESC LIMIT 1').get(productId, qtyMilli) as { price: number } | undefined
@@ -81,13 +92,21 @@ export function tierPrice(db: Deps['db'], productId: string, qtyMilli: number): 
 
 function resolveLine(deps: Deps, u: UserRow, branchId: string, it: z.infer<typeof itemSchema>, trusted = false): ResolvedLine {
   const { db } = deps
-  const base = { input: it, ref: it.ref ?? null, category: it.category ?? null, presentationId: null, qtyMilli: null, priceChanged: false, cost: 0, itemId: newId() }
+  const base = { input: it, ref: it.ref ?? null, category: it.category ?? null, presentationId: null, qtyMilli: null, priceChanged: false, cost: 0, itemId: newId(), serviceId: null }
+  if (it.serviceId) {
+    const sv = db.prepare('SELECT * FROM services WHERE id = ? AND business_id = ? AND active = 1').get(it.serviceId, u.business_id) as { id: string; name: string; price: number; category: string | null } | undefined
+    if (!sv) throw bad('Ese servicio no existe o está desactivado.')
+    const q = it.quantity ?? 1
+    const unitPrice = it.unitPrice ?? sv.price
+    return { ...base, serviceId: sv.id, ref: sv.id, category: it.category ?? sv.category, description: it.description ?? sv.name, quantity: q, unitPrice, total: Math.round(q * unitPrice), productId: null, priceChanged: !trusted && unitPrice !== sv.price }
+  }
   if (!it.productId) {
     if (!it.description || it.quantity === undefined || it.unitPrice === undefined) throw bad('Cada renglón libre necesita descripción, cantidad y precio.')
     return { ...base, description: it.description, quantity: it.quantity, unitPrice: it.unitPrice, total: Math.round(it.quantity * it.unitPrice), productId: null }
   }
   const p = getProduct(db, u.business_id, it.productId)
   if (!p.active) throw bad(`${p.name} está desactivado.`)
+  if (!p.sellable) throw bad(`${p.name} es de uso interno, no se vende.`)
   const category = it.category ?? p.category_id
   if (it.presentationId) {
     const pr = db.prepare('SELECT * FROM presentations WHERE id = ? AND product_id = ? AND active = 1').get(it.presentationId, p.id) as { id: string; name: string; factor_milli: number; price: number } | undefined
@@ -205,8 +224,24 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
     const ctx = { db, now, businessId: u.business_id, branchId: shift.branch_id, userId: u.id }
     const ins = db.prepare('INSERT INTO sale_items (id, sale_id, description, quantity, unit_price, total, ref, category, product_id, presentation_id, qty_milli, cost) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
     for (const l of lines) {
-      if (l.productId && l.qtyMilli) l.cost = consume(ctx, l.productId, l.qtyMilli, 'venta', d.id).cost
+      if (l.productId && l.qtyMilli) {
+        // Combo: descuenta sus componentes; producto normal: su propia existencia.
+        const parts = db.prepare('SELECT product_id, qty_milli FROM combo_items WHERE combo_id = ?').all(l.productId) as { product_id: string; qty_milli: number }[]
+        l.cost = parts.length
+          ? parts.reduce((a, pt) => a + consume(ctx, pt.product_id, Math.round((pt.qty_milli * l.qtyMilli!) / 1000), 'venta', d.id).cost, 0)
+          : consume(ctx, l.productId, l.qtyMilli, 'venta', d.id).cost
+      }
+      // Receta: lo que gasta el servicio o platillo (tinta, papel, insumos), como inventario de uso.
+      const owner = l.serviceId ?? l.productId
+      if (owner) {
+        const recipe = db.prepare('SELECT product_id, qty_micro FROM recipes WHERE owner_id = ?').all(owner) as { product_id: string; qty_micro: number }[]
+        for (const r of recipe) {
+          const milli = carryMilli(db, shift.branch_id, r.product_id, Math.round(r.qty_micro * l.quantity))
+          if (milli > 0) l.cost += consume(ctx, r.product_id, milli, 'consumo', d.id).cost
+        }
+      }
       ins.run(l.itemId, d.id, l.description, l.quantity, l.unitPrice, l.total, l.ref, l.category, l.productId, l.presentationId, l.qtyMilli, l.cost)
+      if (l.serviceId) db.prepare('UPDATE sale_items SET service_id = ? WHERE id = ?').run(l.serviceId, l.itemId)
       if (l.priceChanged) audit(db, now, { businessId: u.business_id, userId: u.id, action: 'venta.cambio_precio', entity: 'sale', entityId: d.id, newValue: { description: l.description, unitPrice: l.unitPrice }, authorizedBy: priceAuth })
     }
     for (const p of promo.applied) db.prepare('INSERT INTO sale_promotions (sale_id, promotion_id, amount) VALUES (?,?,?)').run(d.id, p.id, p.amount)

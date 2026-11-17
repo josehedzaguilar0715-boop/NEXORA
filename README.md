@@ -11,7 +11,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 5 (abarrotes) — servidor**: catálogo con presentaciones y códigos de barras, granel por kilo o importe, lotes primero-entra-primero-sale con precio y costo real, compras con fletes repartidos, márgenes sugeridos, caducidad, mermas, conteos, traspasos, proveedores y cuentas por pagar, fiado con límite y abonos, gastos, reportes de utilidad y retiro sugerido, cajas asignadas. ✅ con pruebas.
 - **Bloque 5 (abarrotes) — pantallas**: app web instalable (`web/`) con caja (lector de código de barras, granel por kilo o importe, cobro con cambio, fiado, descuento con código, ventas del turno, retiros, corte), productos con alertas, compras con fletes, clientes y fiado, reportes con retiro sugerido y personal con permisos. Funciona sin internet con contador visible. ✅ con prueba de punta a punta en navegador.
 - **Bloque 6 (ferretería)**: varias unidades con equivalencias (caja, rollo; granel por metro y litro), escalas de precio por volumen que la caja aplica sola, cotizaciones que no apartan existencia, clientes constructores con límite (código del dueño), clave del proveedor por producto y devoluciones con o sin ticket (siempre con código). El negocio tiene un **giro** y las pantallas se adaptan. ✅ con pruebas y prueba en navegador.
-- Siguiente: Bloque 7 (papelería).
+- **Bloque 7 (papelería)**: servicios por hoja con precio por tamaño y color, consumibles de uso (tinta, tóner, papel) con costo vía recetas, contador de copiadoras por turno contra hojas cobradas, combos de temporada con un solo precio, encargos con anticipo (la devolución la decide el dueño con código) y mayoreo con escalas y crédito. ✅ con pruebas y prueba en navegador.
+- Siguiente: Bloque 8 (barbería).
 
 ## Desarrollo local
 
@@ -88,3 +89,13 @@ Importes siempre en centavos enteros (MXN).
 - Escalas por volumen (`PUT /products/:id/price-tiers`): aplica la escala de mayor cantidad mínima alcanzada. Un precio distinto en caja sigue pidiendo código.
 - Cotizaciones (`/quotes`): fijan precio por su vigencia (15 días por defecto), no apartan existencia; `POST /quotes/:id/convert` crea la venta con esos precios y ahí descuenta. Un precio especial en la cotización pide código al cotizar.
 - Devoluciones (`/returns`): con ticket (por renglón, sin pasar de lo vendido, en proporción a lo cobrado) o sin ticket (producto y monto). Siempre con código. Lo que regresa en buen estado vuelve al inventario; lo dañado (`restock: false`) no. Una venta fiada se devuelve bajando la deuda.
+
+## Papelería (Bloque 7) y piezas comunes nuevas
+
+- **Servicios** (`/services`): catálogo sin inventario propio, con precio, duración y atributos del giro (tamaño, color, técnica…). Se venden con `serviceId` en la venta. Lo usarán barbería, uñas, baños y turístico.
+- **Recetas** (`PUT /recipes/:id`): lo que gasta un servicio o producto por unidad, en millonésimas (una copia = 1/20 000 de cartucho). La fracción sobrante se acumula para no perder consumo. Lo gastado se registra como "consumo" con su costo, que entra al costo de lo vendido.
+- **Uso interno**: productos con `sellable: false` (tóner, papel, insumos) no aparecen ni se venden en la caja.
+- **Combos** (`PUT /products/:id/combo`): un precio, y al venderse descuenta sus componentes.
+- **Contador de copiadora**: lectura de inicio y fin por turno; `GET /shifts/:id/counters` marca la diferencia contra las hojas cobradas.
+- **Encargos** (`/orders`): el anticipo se cobra como venta (entra al corte); al entregar se cobra el saldo. Cancelar con devolución de anticipo exige el código del dueño.
+- Reportes: las devoluciones ya restan de la utilidad (y lo que regresa al inventario recupera su costo).

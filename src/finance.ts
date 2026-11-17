@@ -162,9 +162,12 @@ export function periodSummary(db: Db, businessId: string, from: string, to: stri
   const cogs = (db.prepare(`SELECT COALESCE(SUM(si.cost),0) c FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? ${bf.replace('branch_id', 's.branch_id')}`).get(businessId, start, end, ...bargs) as { c: number }).c
   const waste = -(db.prepare(`SELECT COALESCE(SUM(cost),0) c FROM stock_movements WHERE business_id = ? AND type = 'merma' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { c: number }).c
   const expenses = (db.prepare(`SELECT COALESCE(SUM(amount),0) a FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ${bf}`).get(businessId, from, to, ...bargs) as { a: number }).a
+  // Devoluciones: restan lo devuelto; lo que regresó al inventario recupera su costo.
+  const refunds = (db.prepare(`SELECT COALESCE(SUM(amount),0) a FROM returns WHERE business_id = ? AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { a: number }).a
+  const restocked = (db.prepare(`SELECT COALESCE(SUM(cost),0) c FROM stock_movements WHERE business_id = ? AND type = 'devolucion' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { c: number }).c
   const cancelled = (db.prepare(`SELECT COUNT(*) n FROM sales WHERE business_id = ? AND status = 'cancelada' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { n: number }).n
-  const grossProfit = s.total! - cogs
-  return { from, to, sales: s, cancelled, costOfSales: cogs, grossProfit, waste, expenses, profit: grossProfit - waste - expenses }
+  const grossProfit = s.total! - refunds - (cogs - restocked)
+  return { from, to, sales: s, cancelled, refunds, costOfSales: cogs - restocked, grossProfit, waste, expenses, profit: grossProfit - waste - expenses }
 }
 
 finance.get('/reports/summary', requirePerm('view_reports'), (c) => {

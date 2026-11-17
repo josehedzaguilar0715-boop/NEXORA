@@ -729,6 +729,88 @@ const MIGRATIONS: Migration[] = [
   -- Cada giro tiene su sistema sobre la misma base.
   ALTER TABLE businesses ADD COLUMN giro TEXT NOT NULL DEFAULT 'abarrotes';
   `,
+  `
+  -- Servicios (sin inventario propio): copias, cortes, uñas, tarifas… con precio, duración y atributos.
+  CREATE TABLE services (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    category TEXT,
+    price INTEGER NOT NULL CHECK (price >= 0),
+    duration_min INTEGER,
+    attrs TEXT NOT NULL DEFAULT '{}',
+    machine_id TEXT,
+    sheets_per_unit INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  -- Lo que gasta cada servicio o platillo (tinta, papel, gel, insumos…), por unidad vendida.
+  -- En millonésimas de la unidad: una copia gasta 1/20 000 de cartucho de tóner.
+  CREATE TABLE recipes (
+    owner_id TEXT NOT NULL,
+    product_id TEXT NOT NULL REFERENCES products(id),
+    qty_micro INTEGER NOT NULL CHECK (qty_micro > 0),
+    PRIMARY KEY (owner_id, product_id)
+  );
+  -- Fracción de consumo que aún no completa una milésima; se acumula para no perder nada.
+  CREATE TABLE consumption_carry (
+    branch_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    micro INTEGER NOT NULL,
+    PRIMARY KEY (branch_id, product_id)
+  );
+  -- Combos / paquetes con un solo precio: al venderse descuentan sus componentes.
+  CREATE TABLE combo_items (
+    combo_id TEXT NOT NULL REFERENCES products(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    qty_milli INTEGER NOT NULL CHECK (qty_milli > 0),
+    PRIMARY KEY (combo_id, product_id)
+  );
+  ALTER TABLE products ADD COLUMN sellable INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE sale_items ADD COLUMN service_id TEXT REFERENCES services(id);
+
+  -- Papelería: equipos (copiadoras) y lecturas de su contador por turno.
+  CREATE TABLE machines (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE counter_readings (
+    id TEXT PRIMARY KEY,
+    machine_id TEXT NOT NULL REFERENCES machines(id),
+    shift_id TEXT NOT NULL REFERENCES shifts(id),
+    type TEXT NOT NULL CHECK (type IN ('inicio','fin')),
+    value INTEGER NOT NULL CHECK (value >= 0),
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (machine_id, shift_id, type)
+  );
+
+  -- Encargos con anticipo.
+  CREATE TABLE orders (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    folio INTEGER NOT NULL,
+    customer_id TEXT REFERENCES customers(id),
+    customer_name TEXT,
+    phone TEXT,
+    description TEXT NOT NULL,
+    total INTEGER NOT NULL CHECK (total >= 0),
+    deposit INTEGER NOT NULL CHECK (deposit >= 0),
+    deposit_sale_id TEXT REFERENCES sales(id),
+    final_sale_id TEXT REFERENCES sales(id),
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente','listo','entregado','cancelado')),
+    cancel_reason TEXT,
+    deposit_refunded INTEGER,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (business_id, folio)
+  );
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {
