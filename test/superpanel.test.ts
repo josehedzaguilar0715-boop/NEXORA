@@ -125,7 +125,13 @@ describe('super panel', () => {
     const a = await s.adminToken()
     const o = await s.registerOwner()
     const b = (await s.call('GET', '/admin/businesses', { token: a })).json.businesses[0]
-    const r = await s.call('POST', `/admin/businesses/${b.id}/users/${b.owner.id}/reset-password`, { token: a, body: { newPassword: 'nuevaclave1', reason: 'Identidad verificada por videollamada' } })
+    const body = { newPassword: 'nuevaclave1', reason: 'Recuperó su número con la compañía' }
+    // Sin verificar identidad no se puede.
+    expect((await s.call('POST', `/admin/businesses/${b.id}/users/${b.owner.id}/reset-password`, { token: a, body })).json.error.code).toBe('identidad_requerida')
+    // Se envía un código a su número registrado y el dueño se lo dicta al super panel.
+    const v = await s.call('POST', `/admin/businesses/${b.id}/verify-owner`, { token: a })
+    expect((await s.call('POST', `/admin/businesses/${b.id}/users/${b.owner.id}/reset-password`, { token: a, body: { ...body, identityChallengeId: v.json.challengeId, identityCode: '000000' } })).status).toBe(400)
+    const r = await s.call('POST', `/admin/businesses/${b.id}/users/${b.owner.id}/reset-password`, { token: a, body: { ...body, identityChallengeId: v.json.challengeId, identityCode: s.codes[o.phone] } })
     expect(r.status).toBe(200)
     expect((await s.call('GET', '/auth/me', { token: o.token })).status).toBe(401)
     expect((await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: 'nuevaclave1' } })).status).toBe(200)
@@ -244,5 +250,20 @@ describe('respaldo', () => {
     const r = await s.call('GET', '/admin/export', { token: a })
     expect(r.json.tables.businesses).toHaveLength(1)
     expect(r.json.tables.audit_log.length).toBeGreaterThan(0)
+  })
+})
+
+describe('recuperar la cuenta del dueño', () => {
+  it('con un código que llega a su teléfono; no revela si el número existe', async () => {
+    const s = setup()
+    const o = await s.registerOwner()
+    const fake = await s.call('POST', '/auth/owner/recover', { body: { phone: '5500000000' } })
+    expect(fake.status).toBe(200)
+    expect(fake.json.challengeId).toBeTruthy()
+    const r = await s.call('POST', '/auth/owner/recover', { body: { phone: o.phone } })
+    expect((await s.call('POST', '/auth/owner/recover/verify', { body: { challengeId: r.json.challengeId, code: '000000', newPassword: 'otraclave1' } })).status).toBe(400)
+    expect((await s.call('POST', '/auth/owner/recover/verify', { body: { challengeId: r.json.challengeId, code: s.codes[o.phone], newPassword: 'otraclave1' } })).status).toBe(200)
+    expect((await s.call('GET', '/auth/me', { token: o.token })).status).toBe(401) // se cierran sus sesiones
+    expect((await s.call('POST', '/auth/owner/login', { body: { phone: o.phone, password: 'otraclave1' } })).status).toBe(200)
   })
 })

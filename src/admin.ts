@@ -3,7 +3,8 @@ import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, refreshStatus, setting, type BusinessRow, type Plan } from './billing.js'
-import { body, LOCK_MINUTES, MAX_FAILED, parse, type Deps } from './context.js'
+import { body, LOCK_MINUTES, MAX_FAILED, parse, type Deps, type UserRow } from './context.js'
+import { consumeChallenge, createChallenge } from './auth.js'
 import { ticketView } from './support.js'
 import {
   bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone, notFound, numericCode, sha256, unauthorized, verifySecret,
@@ -247,14 +248,31 @@ admin.post('/admin/businesses/:id/users/:userId/reset-password', async (c) => {
   const { db, now } = c.get('deps')
   const a = c.get('admin')
   const b = loadBusiness(c)
-  const d = parse(z.object({ newPassword: z.string(), reason: z.string().trim().min(3).max(300) }), await body(c))
+  const d = parse(z.object({ newPassword: z.string(), reason: z.string().trim().min(3).max(300), identityChallengeId: z.string().optional(), identityCode: z.string().optional() }), await body(c))
   checkPassword(d.newPassword)
   const u = db.prepare('SELECT id, role FROM users WHERE id = ? AND business_id = ?').get(c.req.param('userId'), b.id) as { id: string; role: string } | undefined
   if (!u) throw notFound('No se encontró ese usuario.')
+  // Identidad del dueño: debe dictar el código que llegó a su número registrado (aunque haya cambiado de aparato).
+  if (u.role === 'owner') {
+    if (!d.identityChallengeId || !d.identityCode) throw bad('Primero envía el código al teléfono del dueño y pídele que te lo dicte.', 'identidad_requerida')
+    const { user } = consumeChallenge(c.get('deps'), d.identityChallengeId, d.identityCode, 'identidad')
+    if (user.id !== u.id) throw bad('Ese código no es de este dueño.', 'identidad_requerida')
+  }
   db.prepare('UPDATE users SET password_hash = ?, must_change_password = 1, failed_attempts = 0, locked_until = NULL WHERE id = ?').run(hashSecret(d.newPassword), u.id)
   db.prepare('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').run(iso(now()), u.id)
   audit(db, now, { businessId: b.id, userId: a.id, action: 'admin.restablecer_acceso', entity: 'user', entityId: u.id, reason: d.reason })
   return c.json({ ok: true })
+})
+
+/** Verificar la identidad del dueño: se envía un código a su número registrado. */
+admin.post('/admin/businesses/:id/verify-owner', async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const b = loadBusiness(c)
+  const owner = db.prepare("SELECT * FROM users WHERE business_id = ? AND role = 'owner'").get(b.id) as UserRow
+  const challengeId = await createChallenge(deps, owner, 'identidad', {})
+  audit(db, now, { businessId: b.id, userId: c.get('admin').id, action: 'admin.verificar_identidad', entity: 'user', entityId: owner.id })
+  return c.json({ challengeId, sentTo: `SMS al ${owner.phone!.slice(-4).padStart(10, '•')}` })
 })
 
 /** Habilitar un extra con su cobro de instalación (p. ej. link de reservas). Se activa de una vez para el negocio. */

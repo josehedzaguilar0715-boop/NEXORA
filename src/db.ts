@@ -1228,6 +1228,27 @@ const MIGRATIONS: Migration[] = [
   );
   CREATE TRIGGER one_time_charges_no_delete BEFORE DELETE ON one_time_charges BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
   `,
+  {
+    fkOff: true,
+    sql: `
+  -- Códigos al teléfono del dueño: también para recuperar la cuenta y para que el super panel verifique su identidad.
+  CREATE TABLE verification_codes_new (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    purpose TEXT NOT NULL CHECK (purpose IN ('registro','login','recuperar','identidad')),
+    code_hash TEXT NOT NULL,
+    device_id TEXT,
+    device_name TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO verification_codes_new SELECT * FROM verification_codes;
+  DROP TABLE verification_codes;
+  ALTER TABLE verification_codes_new RENAME TO verification_codes;
+  `,
+  },
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

@@ -27,7 +27,9 @@ function createSession(deps: Deps, user: UserRow, dev: { deviceId?: string; devi
   return { token, sessionId: id }
 }
 
-async function createChallenge(deps: Deps, user: UserRow, purpose: 'registro' | 'login', dev: { deviceId?: string; deviceName?: string }) {
+export type CodePurpose = 'registro' | 'login' | 'recuperar' | 'identidad'
+
+export async function createChallenge(deps: Deps, user: UserRow, purpose: CodePurpose, dev: { deviceId?: string; deviceName?: string }) {
   const { db, now, notifier } = deps
   const code = numericCode(6)
   const id = newId()
@@ -39,7 +41,7 @@ async function createChallenge(deps: Deps, user: UserRow, purpose: 'registro' | 
   return id
 }
 
-function consumeChallenge(deps: Deps, challengeId: string, code: string, purpose: 'registro' | 'login') {
+export function consumeChallenge(deps: Deps, challengeId: string, code: string, purpose: CodePurpose) {
   const { db, now } = deps
   const ch = db.prepare('SELECT * FROM verification_codes WHERE id = ? AND purpose = ?').get(challengeId, purpose) as
     | { id: string; user_id: string; code_hash: string; device_id: string | null; device_name: string | null; attempts: number; expires_at: string; used_at: string | null }
@@ -155,6 +157,29 @@ publicAuth.post('/auth/owner/verify', async (c) => {
   const { user, dev } = consumeChallenge(deps, d.challengeId, d.code, 'login')
   const { token } = createSession(deps, user, dev)
   return c.json({ token, mustChangePassword: !!user.must_change_password })
+})
+
+// Dueño que olvidó su contraseña: la recupera con un código que llega a su teléfono.
+publicAuth.post('/auth/owner/recover', async (c) => {
+  const deps = c.get('deps')
+  const d = parse(z.object({ phone: z.string() }), await body(c))
+  let phone = ''
+  try { phone = normalizePhone(d.phone) } catch { /* misma respuesta: no revela si el número existe */ }
+  const user = phone ? (deps.db.prepare("SELECT * FROM users WHERE role = 'owner' AND phone = ? AND phone_verified = 1 AND active = 1").get(phone) as UserRow | undefined) : undefined
+  if (!user) return c.json({ challengeId: newId() })
+  return c.json({ challengeId: await createChallenge(deps, user, 'recuperar', {}) })
+})
+
+publicAuth.post('/auth/owner/recover/verify', async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const d = parse(z.object({ challengeId: z.string(), code: z.string(), newPassword: z.string() }), await body(c))
+  checkPassword(d.newPassword)
+  const { user } = consumeChallenge(deps, d.challengeId, d.code, 'recuperar')
+  db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?').run(hashSecret(d.newPassword), user.id)
+  db.prepare('UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL').run(iso(now()), user.id)
+  audit(db, now, { businessId: user.business_id, userId: user.id, action: 'dueno.recupero_cuenta', entity: 'user', entityId: user.id })
+  return c.json({ ok: true })
 })
 
 // Empleado: código del negocio + usuario + contraseña.

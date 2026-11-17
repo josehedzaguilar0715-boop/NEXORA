@@ -338,7 +338,27 @@ Reglas:
 
 Pendiente: definir el costo real por sucursal y por usuario (nube, mensajes de verificación, respaldos y soporte) para confirmar que estos precios los cubren.
 
-## 15. Decisiones (2026-11-17)
+## 15. Diseño visual (v1, 2026-11-16)
+
+Referencia visual en Figma: https://www.figma.com/design/qRRsug1u925xuEibZ2xELZ
+
+Estilo: cinematográfico y oscuro. Fondos profundos, resplandores suaves y degradados cian a violeta. Paneles de tarjetas redondeadas, tipografía clara y pocos colores de acento.
+
+Tokens de color (colección "NEXORA" en Figma, ya vinculados a las pantallas):
+- bg/base #07090F · bg/surface #111622 · bg/input #161B26
+- accent/cyan #22D3EE · accent/violet #8B5CF6
+- text/primary #F1F5F9 · text/muted #7C8799
+- status/positive #34D399 · status/negative #F87171
+
+Pantallas de referencia:
+- Intro con logo: al abrir el enlace aparece el logo con una animación corta de entrada (fundido y escala suave). Después pasa al acceso o al panel. Duración objetivo: 2 a 3 segundos, con opción de omitir.
+- Acceso: teléfono y contraseña, botón en degradado.
+- Dashboard: menú lateral, indicadores, gráfica y movimientos recientes.
+- Ventas (POS), inventario, clientes con QR, personal con asistencia, finanzas con la cascada del retiro sugerido, y super panel con estados por negocio.
+
+Pendiente: logo definitivo (la marca actual es provisional), fuente de marca (hoy se usa Inter) y la animación de entrada, que se construye en código.
+
+## 16. Decisiones (2026-11-17)
 
 - Códigos de verificación: por SMS.
 - Presupuesto $0 hasta tener clientes: staging en Cloudflare, plan gratuito, sin tarjeta. SMS con cuenta de prueba de Twilio y correo con el plan gratis de Resend.
@@ -348,4 +368,4 @@ Pendiente: definir el costo real por sucursal y por usuario (nube, mensajes de v
 - Solicitudes de cambio: sin costo.
 - Link de reservas: se cobra como extra con instalación; lo habilita el super panel.
 - Días de prueba por defecto: 14. Días vencido antes de poder suspender: 30 (editables en el super panel).
-- Pendiente: método para verificar la identidad del dueño que pierde su teléfono.
+- Recuperar la cuenta del dueño: con un código a su número de teléfono. Si perdió el aparato, recupera su número con la compañía; el super panel le envía un código a ese número y solo restablece el acceso cuando el dueño se lo dicta.
