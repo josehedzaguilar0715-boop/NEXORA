@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
-import { can, type Me } from '../App'
+import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
 
 type P = Product & { attrs?: Record<string, any>; sellable?: boolean; minStock: number; lastCost: number; suggestedPrice: number | null; categoryId: string | null; version: number }
@@ -68,7 +68,7 @@ function Editor({ me, p, onClose, onSaved }: { me: Me; p: P | null; onClose: () 
   const [f, setF] = useState({ name: p?.name ?? '', barcode: p?.barcode ?? '', unit: p?.unit ?? 'pieza', price: p ? String(p.price / 100) : '', minStock: String(p?.minStock ?? 0), authCode: '', waste: '', wasteReason: '', brand: p?.attrs?.brand ?? '', fragrance: p?.attrs?.fragrance ?? '', sizeMl: p?.attrs?.sizeMl ? String(p.attrs.sizeMl) : '', presentation: p?.attrs?.presentation ?? 'regular' })
   const [err, setErr] = useState('')
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
-  const perfume = me.business.giro === 'perfumeria'
+  const perfume = hasGiro(me, 'perfumeria')
   const attrs = perfume ? { brand: f.brand || undefined, fragrance: f.fragrance || undefined, sizeMl: Number(f.sizeMl) || undefined, presentation: f.presentation } : undefined
   const priceChanged = p && toCents(f.price) !== p.price
   const save = async () => {
@@ -109,7 +109,7 @@ function Editor({ me, p, onClose, onSaved }: { me: Me; p: P | null; onClose: () 
         {priceChanged && (<><label>Código de autorización (cambio de precio)<input type="password" value={f.authCode} onChange={set('authCode')} /></label></>)}
         {err && <p className="error">{err}</p>}
         <p className="row"><button onClick={onClose}>Cancelar</button><button className="primary" onClick={save}>Guardar</button></p>
-        {p && ['ferreteria', 'papeleria'].includes(me.business.giro) && <Escalas p={p} />}
+        {p && hasGiro(me, 'ferreteria', 'papeleria') && <Escalas p={p} />}
         {p && perfume && p.attrs?.sizeMl >= 30 && <Decants p={p} onDone={onSaved} />}
         {p && can(me, 'edit_inventory') && (
           <div style={{ borderTop: '2px solid var(--line)', marginTop: 12 }}>

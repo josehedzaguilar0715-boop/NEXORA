@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
-import type { Me } from '../App'
+import { hasGiro, type Me } from '../App'
 
 export function Usuarios({ me }: { me: Me }) {
   const [users, setUsers] = useState<any[]>([])
@@ -47,7 +47,7 @@ export function Usuarios({ me }: { me: Me }) {
             <button onClick={() => { const p = prompt('Contraseña nueva (mínimo 8):'); if (p) void run(() => api('POST', `/users/${sel.id}/reset-password`, { newPassword: p }), 'Contraseña restablecida.')() }}>Restablecer contraseña</button>
             {me.user.role === 'owner' && <button onClick={() => { const c = prompt('Código de autorización para esta persona (mínimo 4):'); if (c) void run(() => api('PUT', `/users/${sel.id}/auth-code`, { code: c }), 'Código asignado.')() }}>Asignar código</button>}
           </p>
-          {me.user.role === 'owner' && ['barberia', 'unas'].includes(me.business.giro) && <Horario userId={sel.id} />}
+          {me.user.role === 'owner' && hasGiro(me, 'barberia', 'unas') && <Horario userId={sel.id} />}
         </section>
       )}
       {!sel && me.user.role === 'owner' && (

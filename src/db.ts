@@ -1262,6 +1262,10 @@ const MIGRATIONS: Migration[] = [
     revoked_at TEXT
   );
   `,
+  `
+  -- Negocios mixtos: además del giro principal, otros giros cuyas pantallas también se usan (p. ej. abarrotes + papelería).
+  ALTER TABLE businesses ADD COLUMN extra_giros TEXT NOT NULL DEFAULT '[]';
+  `,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

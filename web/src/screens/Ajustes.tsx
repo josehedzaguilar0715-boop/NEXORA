@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
-import type { Me } from '../App'
+import { hasGiro, type Me } from '../App'
 
 const GIROS: Record<string, string> = { abarrotes: 'Abarrotes', ferreteria: 'Ferretería', papeleria: 'Papelería', barberia: 'Barbería', unas: 'Estudio de uñas', perfumeria: 'Perfumería', banos: 'Baños públicos', turistico: 'Lugar turístico', palapa: 'Palapa', restaurante: 'Restaurante', comedor: 'Comedor', taqueria: 'Taquería', verduleria: 'Verdulería' }
 const MODULES: Record<string, string> = { membresias: 'Membresías y paquetes', promociones: 'Promociones', fidelidad: 'Puntos o sellos', asistencia: 'Asistencia con QR', reservas: 'Reservas y venta por link', recordatorios: 'Recordatorios (solo prepara el mensaje)' }
 
 /** Ajustes del negocio (solo el dueño): datos del ticket, giro, módulos y opciones. Todo lo opcional viene apagado. */
 export function Ajustes({ me }: { me: Me }) {
-  const [biz, setBiz] = useState({ name: me.business.name, phone: me.business.phone ?? '', logoUrl: '', giro: me.business.giro, forcePasswordChange: true })
+  const [biz, setBiz] = useState({ name: me.business.name, phone: me.business.phone ?? '', logoUrl: '', giro: me.business.giro, extraGiros: (me.business.giros ?? []).slice(1), forcePasswordChange: true })
   const [mods, setMods] = useState<string[]>([])
   const [addons, setAddons] = useState<string[]>([])
   const [st, setSt] = useState<Record<string, any>>({})
@@ -31,9 +31,11 @@ export function Ajustes({ me }: { me: Me }) {
         <label>Nombre<input value={biz.name} onChange={(e) => setBiz({ ...biz, name: e.target.value })} /></label>
         <label>Teléfono en el ticket<input inputMode="tel" value={biz.phone} onChange={(e) => setBiz({ ...biz, phone: e.target.value })} /></label>
         <label>Logo (dirección de la imagen)<input value={biz.logoUrl} onChange={(e) => setBiz({ ...biz, logoUrl: e.target.value })} placeholder="https://…" /></label>
-        <label>Giro<select value={biz.giro} onChange={(e) => setBiz({ ...biz, giro: e.target.value })}>{Object.entries(GIROS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label>Giro principal<select value={biz.giro} onChange={(e) => setBiz({ ...biz, giro: e.target.value, extraGiros: biz.extraGiros.filter((g) => g !== e.target.value) })}>{Object.entries(GIROS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <p style={{ marginBottom: 4 }}><b>Negocio mixto</b> <span className="muted">— marca los otros giros que también maneja tu negocio (p. ej. abarrotes con papelería).</span></p>
+        <div className="checks">{Object.entries(GIROS).filter(([k]) => k !== biz.giro).map(([k, v]) => <label key={k} style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={biz.extraGiros.includes(k)} onChange={() => setBiz({ ...biz, extraGiros: biz.extraGiros.includes(k) ? biz.extraGiros.filter((x) => x !== k) : [...biz.extraGiros, k] })} />{v}</label>)}</div>
         <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={biz.forcePasswordChange} onChange={(e) => setBiz({ ...biz, forcePasswordChange: e.target.checked })} />Pedir cambio de contraseña en el primer ingreso</label>
-        <p><button className="primary" onClick={run(() => api('PATCH', '/business', { name: biz.name, phone: biz.phone, logoUrl: biz.logoUrl || undefined, giro: biz.giro, forcePasswordChange: biz.forcePasswordChange }), 'Guardado. Vuelve a entrar para ver las pantallas del giro.')}>Guardar</button></p>
+        <p><button className="primary" onClick={run(() => api('PATCH', '/business', { name: biz.name, phone: biz.phone, logoUrl: biz.logoUrl || undefined, giro: biz.giro, extraGiros: biz.extraGiros, forcePasswordChange: biz.forcePasswordChange }).then(() => setTimeout(() => location.reload(), 900)), 'Guardado. Cargando las pantallas de tus giros…')}>Guardar</button></p>
         <h2 style={{ marginTop: 16 }}>Módulos</h2>
         {Object.entries(MODULES).map(([k, v]) => {
           // El link de reservas se contrata con instalación: lo habilita soporte.
@@ -41,16 +43,17 @@ export function Ajustes({ me }: { me: Me }) {
           return <label key={k} style={{ fontWeight: 500, opacity: locked ? 0.6 : 1 }}><input type="checkbox" disabled={locked} style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={mods.includes(k)} onChange={() => toggle(k)} />{v}{locked ? ' — con costo de instalación; pídelo en el Buzón' : ''}</label>
         })}
         <p><button className="primary" onClick={run(() => api('PUT', '/modules', { active: mods }))}>Guardar módulos</button></p>
-        {mods.includes('reservas') && <p className="muted">Link de reservas: {location.origin}/{me.business.giro === 'turistico' ? 'boletos' : 'reservar'}/{me.business.code}</p>}
+        {mods.includes('reservas') && hasGiro(me, 'turistico') && <p className="muted">Link de boletos: {location.origin}/boletos/{me.business.code}</p>}
+        {mods.includes('reservas') && (!hasGiro(me, 'turistico') || (me.business.giros ?? []).length > 1) && <p className="muted">Link de reservas: {location.origin}/reservar/{me.business.code}</p>}
       </section>
       <section className="card">
         <h2>Opciones</h2>
         {check('tipsEnabled', 'Propinas')}
-        {me.business.giro === 'comedor' && check('tablesEnabled', 'Mapa de mesas')}
-        {['restaurante', 'taqueria'].includes(me.business.giro) && check('pickupScheduling', 'Reservar hora para pedidos para recoger')}
-        {me.business.giro === 'verduleria' && check('phoneOrdersPrepaid', 'Cobrar pedidos por teléfono antes de entregar')}
-        {me.business.giro === 'unas' && <label>Cargo por traslado a domicilio (vacío = apagado)<input inputMode="decimal" value={st.travelFee != null ? String(st.travelFee / 100) : ''} onChange={(e) => setSt({ ...st, travelFee: e.target.value.trim() ? toCents(e.target.value) : null })} /></label>}
-        {me.business.giro === 'banos' && <label>Minutos para volver a entrar con el mismo pase<input inputMode="numeric" value={st.passReentryMin ?? 30} onChange={(e) => setSt({ ...st, passReentryMin: Number(e.target.value) || 0 })} /></label>}
+        {hasGiro(me, 'comedor') && check('tablesEnabled', 'Mapa de mesas')}
+        {hasGiro(me, 'restaurante', 'taqueria') && check('pickupScheduling', 'Reservar hora para pedidos para recoger')}
+        {hasGiro(me, 'verduleria') && check('phoneOrdersPrepaid', 'Cobrar pedidos por teléfono antes de entregar')}
+        {hasGiro(me, 'unas') && <label>Cargo por traslado a domicilio (vacío = apagado)<input inputMode="decimal" value={st.travelFee != null ? String(st.travelFee / 100) : ''} onChange={(e) => setSt({ ...st, travelFee: e.target.value.trim() ? toCents(e.target.value) : null })} /></label>}
+        {hasGiro(me, 'banos') && <label>Minutos para volver a entrar con el mismo pase<input inputMode="numeric" value={st.passReentryMin ?? 30} onChange={(e) => setSt({ ...st, passReentryMin: Number(e.target.value) || 0 })} /></label>}
         <p><button className="primary" onClick={run(() => api('PUT', '/settings', st))}>Guardar opciones</button></p>
         {msg.err && <p className="error">{msg.err}</p>}
         {msg.ok && <p className="okmsg">{msg.ok}</p>}
@@ -59,8 +62,8 @@ export function Ajustes({ me }: { me: Me }) {
           <tr key={s.id}><td>{s.deviceName ?? 'Equipo'}<br /><small className="muted">última vez {new Date(s.lastSeenAt).toLocaleString('es-MX')}</small></td>
             <td><button onClick={async () => { await api('DELETE', `/auth/sessions/${s.id}`); setSessions(sessions.filter((x) => x.id !== s.id)) }}>Cerrar sesión</button></td></tr>
         ))}</tbody></table>
-        <h2 style={{ marginTop: 16 }}>Equipos de confianza</h2>
-        <p className="muted">En estos equipos no se pide código por SMS al entrar (30 días).</p>
+        {trusted.length > 0 && <><h2 style={{ marginTop: 16 }}>Equipos de confianza</h2>
+        <p className="muted">En estos equipos no se pide código por SMS al entrar (30 días).</p></>}
         <table className="list"><tbody>{trusted.map((t) => (
           <tr key={t.id}><td>{t.deviceName ?? 'Equipo'}<br /><small className="muted">vence {new Date(t.expiresAt).toLocaleDateString('es-MX')}</small></td>
             <td><button onClick={async () => { await api('DELETE', `/auth/trusted-devices/${t.id}`); setTrusted(trusted.filter((x) => x.id !== t.id)) }}>Quitar</button></td></tr>

@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
 import { audit } from './audit.js'
-import { enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, refreshStatus, setting, type BusinessRow, type Plan } from './billing.js'
+import { businessGiros, enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, refreshStatus, setting, type BusinessRow, type Plan } from './billing.js'
 import { body, LOCK_MINUTES, MAX_FAILED, parse, smsOn, type Deps, type UserRow } from './context.js'
 import { consumeChallenge, createChallenge, forgetDevices } from './auth.js'
 import { ticketView } from './support.js'
@@ -107,7 +107,7 @@ function businessView(db: Deps['db'], b: BusinessRow, now: Date = new Date()) {
   const unread = (db.prepare('SELECT COUNT(*) n FROM tickets WHERE business_id = ? AND unread_by_support = 1').get(b.id) as { n: number }).n
   const overdueDays = b.status === 'vencido' && b.overdue_since ? Math.floor((now.getTime() - Date.parse(b.overdue_since)) / 86_400_000) : null
   return {
-    id: b.id, code: b.code, name: b.name, giro: (b as BusinessRow & { giro: string }).giro, status: b.status, owner, createdAt: b.created_at,
+    id: b.id, code: b.code, name: b.name, giro: (b as BusinessRow & { giro: string }).giro, giros: businessGiros(db, b.id), status: b.status, owner, createdAt: b.created_at,
     trialDays: b.trial_days, trialEndsAt: b.trial_ends_at, paidUntil: b.paid_until, overdueSince: b.overdue_since, overdueDays,
     suspendedReason: b.suspended_reason,
     plan: cfg, pendingPlan: b.pending_plan ? JSON.parse(b.pending_plan) : null, monthlyFee: monthlyFee(cfg), limits: limits(cfg),
@@ -140,6 +140,7 @@ admin.post('/admin/businesses', async (c) => {
     z.object({
       businessName: z.string().trim().min(2).max(100), ownerName: z.string().trim().min(2).max(100), phone: z.string(), tempPassword: z.string(),
       trialDays: z.number().int().min(0).max(365).optional(), plan: z.enum(PLAN_KEYS).optional(), giro: z.enum(GIROS).optional(),
+      extraGiros: z.array(z.enum(GIROS)).max(GIROS.length).optional(),
     }),
     await body(c),
   )
@@ -151,8 +152,9 @@ admin.post('/admin/businesses', async (c) => {
   const bizId = newId(), branchId = newId(), ownerId = newId()
   const code = businessCode()
   db.transaction(() => {
-    db.prepare('INSERT INTO businesses (id, code, name, phone, trial_days, trial_ends_at, plan, giro, created_at) VALUES (?,?,?,?,?,?,?,?,?)').run(
-      bizId, code, d.businessName, phone, trialDays, iso(new Date(t.getTime() + trialDays * 86_400_000)), d.plan ?? 'inicial', d.giro ?? 'abarrotes', iso(t),
+    const giro = d.giro ?? 'abarrotes'
+    db.prepare('INSERT INTO businesses (id, code, name, phone, trial_days, trial_ends_at, plan, giro, extra_giros, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
+      bizId, code, d.businessName, phone, trialDays, iso(new Date(t.getTime() + trialDays * 86_400_000)), d.plan ?? 'inicial', giro, JSON.stringify([...new Set(d.extraGiros ?? [])].filter((g) => g !== giro)), iso(t),
     )
     db.prepare('INSERT INTO branches (id, business_id, name, created_at) VALUES (?,?,?,?)').run(branchId, bizId, 'Principal', iso(t))
     // El teléfono lo verificó el super panel; el dueño cambia la contraseña temporal al entrar.

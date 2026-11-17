@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { businessGiros } from './billing.js'
 import { audit } from './audit.js'
 import { body, parse, requirePerm, type Env } from './context.js'
 import { returnValidators } from './hardware.js'
@@ -84,8 +85,10 @@ perfume.post('/testers/use', requirePerm('edit_inventory'), async (c) => {
 // Devoluciones en perfumería: solo productos sellados o sin usar, con ticket (y código, como siempre).
 returnValidators.push(({ c, productId, input }) => {
   const { db } = c.get('deps')
-  const giro = (db.prepare('SELECT giro FROM businesses WHERE id = ?').get(c.get('session').user.business_id) as { giro: string }).giro
-  if (giro !== 'perfumeria') return
+  const giros = businessGiros(db, c.get('session').user.business_id)
+  if (!giros.includes('perfumeria')) return
+  // Negocio mixto: la regla de perfumería aplica solo a los perfumes (productos con presentación de perfumería).
+  if (giros[0] !== 'perfumeria' && productId && (JSON.parse((db.prepare('SELECT attrs FROM products WHERE id = ?').get(productId) as { attrs: string }).attrs) as { presentation?: string }).presentation === undefined) return
   if (!input.saleItemId) throw new AppError(400, 'requiere_ticket', 'En perfumería las devoluciones son con ticket.')
   if (productId) {
     const p = db.prepare('SELECT attrs, sellable FROM products WHERE id = ?').get(productId) as { attrs: string; sellable: number }

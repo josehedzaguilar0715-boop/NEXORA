@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { api, mxn } from '../api'
-import type { Me } from '../App'
+import { hasGiro, type Me } from '../App'
 
 /** Devoluciones con ticket original (por folio) o sin ticket. Siempre piden código. */
 export function Devoluciones({ me }: { me: Me }) {
-  const perfume = me.business.giro === 'perfumeria'
+  const perfume = hasGiro(me, 'perfumeria')
   const [sealed, setSealed] = useState<Record<string, boolean>>({})
   const [folio, setFolio] = useState('')
   const [sale, setSale] = useState<any>(null)

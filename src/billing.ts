@@ -90,3 +90,10 @@ export const businessGate = createMiddleware<Env>(async (c, next) => {
   }
   await next()
 })
+
+/** Giros del negocio: el principal primero y luego los adicionales (negocio mixto). */
+export function businessGiros(db: import('./db.js').Db, businessId: string): string[] {
+  const r = db.prepare('SELECT giro, extra_giros FROM businesses WHERE id = ?').get(businessId) as { giro: string; extra_giros: string } | undefined
+  if (!r) return []
+  return [r.giro, ...(JSON.parse(r.extra_giros) as string[]).filter((g) => g !== r.giro)]
+}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, ApiError, cache, flush, mxn, outbox, toCents } from '../api'
-import { can, type Me } from '../App'
+import { can, type Me, hasGiro } from '../App'
 
 export interface Product {
   id: string; name: string; barcode: string | null; unit: 'pieza' | 'kg' | 'metro' | 'litro'; price: number; stock?: number
@@ -33,10 +33,10 @@ export function Caja({ me }: { me: Me }) {
   const [cart, setCart] = useState<Line[]>([])
   const [modal, setModal] = useState<null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product } | { kind: 'libre' } | { kind: 'pago'; method: string } | { kind: 'ticket'; text: string; change?: number | null; provisional: boolean } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' }>(null)
   const [discount, setDiscount] = useState<{ amount: number; code: string } | null>(null)
-  const withStaff = ['barberia', 'unas', 'perfumeria'].includes(me.business.giro)
+  const withStaff = hasGiro(me, 'barberia', 'unas', 'perfumeria')
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([])
   const [staffId, setStaffId] = useState('')
-  useEffect(() => { if (withStaff) api<any>('GET', me.business.giro === 'perfumeria' ? '/users' : '/agenda/staff').then((r) => setStaff((r.staff ?? r.users).filter((x: any) => x.active !== false))).catch(() => {}) }, [])
+  useEffect(() => { if (withStaff) api<any>('GET', hasGiro(me, 'barberia', 'unas') ? '/agenda/staff' : '/users').then((r) => setStaff((r.staff ?? r.users).filter((x: any) => x.active !== false))).catch(() => {}) }, [])
   const [msg, setMsg] = useState('')
   const search = useRef<HTMLInputElement>(null)
 
@@ -67,7 +67,7 @@ export function Caja({ me }: { me: Me }) {
   }
   useEffect(() => { void refresh() }, [])
 
-  const quick = ['comedor', 'taqueria'].includes(me.business.giro)
+  const quick = hasGiro(me, 'comedor', 'taqueria')
   const [soldOut, setSoldOut] = useState<string[]>([])
   const [top, setTop] = useState<string[]>([])
   useEffect(() => {
@@ -158,7 +158,7 @@ export function Caja({ me }: { me: Me }) {
   }
 
   if (!loaded && !shift) return <p className="muted">Cargando caja…</p>
-  if (!shift) return <OpenShift meals={me.business.giro === 'comedor'} onOpen={(s) => { setShift(s); cache.set('shift', s) }} />
+  if (!shift) return <OpenShift meals={hasGiro(me, 'comedor')} onOpen={(s) => { setShift(s); cache.set('shift', s) }} />
 
   return (
     <div className="sell">
@@ -219,7 +219,7 @@ export function Caja({ me }: { me: Me }) {
           <button onClick={() => setModal({ kind: 'ventas' })}>Ventas del turno</button>
           {can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'mov' })}>Retiro / depósito</button>}
           {can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'corte' })}>Corte de caja</button>}
-          {me.business.giro === 'papeleria' && can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'contador' })}>Contador copiadora</button>}
+          {hasGiro(me, 'papeleria') && can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'contador' })}>Contador copiadora</button>}
         </div>
       </section>
 

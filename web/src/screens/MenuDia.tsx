@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mxn } from '../api'
-import type { Me } from '../App'
+import { hasGiro, type Me } from '../App'
 
 const MEALS: Record<string, string> = { dia: 'Todo el día', desayuno: 'Desayuno', comida: 'Comida', cena: 'Cena' }
 
@@ -8,7 +8,9 @@ const MEALS: Record<string, string> = { dia: 'Todo el día', desayuno: 'Desayuno
 export function MenuDia({ me }: { me: Me }) {
   const [data, setData] = useState<any>(null)
   const [products, setProducts] = useState<any[]>([])
-  const [meal, setMeal] = useState(me.business.giro === 'taqueria' ? 'dia' : 'comida')
+  // Taquería sola: guisados del día; si también es comedor, se usan los tiempos de comida.
+  const onlyTaco = hasGiro(me, 'taqueria') && !hasGiro(me, 'comedor')
+  const [meal, setMeal] = useState(onlyTaco ? 'dia' : 'comida')
   const [sel, setSel] = useState<string[]>([])
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = async () => {
@@ -25,8 +27,8 @@ export function MenuDia({ me }: { me: Me }) {
   return (
     <div className="grid2">
       <section className="card">
-        <h2>Publicar {me.business.giro === 'taqueria' ? 'guisados del día' : 'menú del día'}</h2>
-        {me.business.giro !== 'taqueria' && <div className="tabs">{Object.entries(MEALS).map(([k, v]) => <button key={k} className={meal === k ? 'on' : ''} onClick={() => setMeal(k)}>{v}</button>)}</div>}
+        <h2>Publicar {onlyTaco ? 'guisados del día' : 'menú del día'}</h2>
+        {!onlyTaco && <div className="tabs">{Object.entries(MEALS).map(([k, v]) => <button key={k} className={meal === k ? 'on' : ''} onClick={() => setMeal(k)}>{v}</button>)}</div>}
         <div className="results">{products.map((p) => (
           <button key={p.id} className={sel.includes(p.id) ? 'primary' : ''} onClick={() => setSel(sel.includes(p.id) ? sel.filter((x) => x !== p.id) : [...sel, p.id])}>{p.name}<small>{mxn(p.price)}</small></button>
         ))}</div>

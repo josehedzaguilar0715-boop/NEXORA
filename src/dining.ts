@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { businessGiros } from './billing.js'
 import { audit } from './audit.js'
 import { authorize } from './authcode.js'
 import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Deps, type Env, type UserRow } from './context.js'
@@ -157,7 +158,7 @@ dining.post('/tabs/:id/items', requirePerm('sell'), async (c) => {
   if (!['abierta', 'por_cobrar'].includes(t.status)) throw conflict('Esa cuenta ya está cerrada.', 'cuenta_cerrada')
   const d = parse(z.object({ items: z.array(itemBody).min(1).max(100), authCode: z.string().optional() }), await body(c))
   // En giros de comida todo pasa por cocina (o la estación indicada); en los demás no hay comandas.
-  const food = ['palapa', 'restaurante', 'comedor', 'taqueria'].includes((db.prepare('SELECT giro FROM businesses WHERE id = ?').get(u.business_id) as { giro: string }).giro)
+  const food = businessGiros(db, u.business_id).some((g) => ['palapa', 'restaurante', 'comedor', 'taqueria'].includes(g))
   const rows = d.items.map((it) => {
     if (it.id && db.prepare('SELECT 1 FROM tab_items WHERE id = ?').get(it.id)) return null // ya registrado (reenvío)
     for (const v of tabItemValidators) v({ db, user: u, productId: it.productId ?? null, quantity: it.quantity, now: now() })

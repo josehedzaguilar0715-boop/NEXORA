@@ -72,7 +72,7 @@ function Negocios() {
         <div className="tabs">{['', 'prueba', 'activo', 'vencido', 'suspendido'].map((s) => <button key={s} className={filter === s ? 'on' : ''} onClick={() => setFilter(s)}>{s ? STATUS[s] : 'Todos'}</button>)}</div>
         <table className="list"><tbody>{list.map((b) => (
           <tr key={b.id} onClick={() => setSel(b)} style={{ cursor: 'pointer' }}>
-            <td><b>{b.name}</b> <small className="muted">{b.code} · {b.giro}</small><br /><small className="muted">{b.owner?.name} · {b.owner?.phone}{b.unreadTickets ? ` · ✉ ${b.unreadTickets}` : ''}</small></td>
+            <td><b>{b.name}</b> <small className="muted">{b.code} · {(b.giros ?? [b.giro]).join(' + ')}</small><br /><small className="muted">{b.owner?.name} · {b.owner?.phone}{b.unreadTickets ? ` · ✉ ${b.unreadTickets}` : ''}</small></td>
             <td style={{ color: COLOR[b.status], fontWeight: 700 }}>{STATUS[b.status]}{b.overdueDays != null ? ` (${b.overdueDays} d)` : ''}</td>
             <td className="num">{mxn(b.monthlyFee)}</td>
           </tr>
@@ -151,8 +151,10 @@ function Plan({ b, onSave }: { b: any; onSave: (body: any) => void }) {
   )
 }
 
+const GIRO_KEYS = ['abarrotes', 'ferreteria', 'papeleria', 'barberia', 'unas', 'perfumeria', 'banos', 'turistico', 'palapa', 'restaurante', 'comedor', 'taqueria', 'verduleria']
+
 function Alta({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({ businessName: '', ownerName: '', phone: '', tempPassword: '', trialDays: '', giro: 'abarrotes' })
+  const [f, setF] = useState({ businessName: '', ownerName: '', phone: '', tempPassword: '', trialDays: '', giro: 'abarrotes', extraGiros: [] as string[] })
   const [err, setErr] = useState('')
   const [done, setDone] = useState<any>(null)
   if (done) return <div className="card login"><h2>Negocio creado</h2><p>Entrégale al dueño: teléfono <b>{f.phone}</b>, contraseña temporal <b>{f.tempPassword}</b>. Código del negocio para sus empleados: <b>{done.code}</b>.</p><button className="primary" onClick={onDone}>Listo</button></div>
@@ -160,7 +162,9 @@ function Alta({ onDone }: { onDone: () => void }) {
     <div className="card login">
       <h2>Alta asistida</h2>
       <label>Nombre del negocio<input value={f.businessName} onChange={(e) => setF({ ...f, businessName: e.target.value })} /></label>
-      <label>Giro<select value={f.giro} onChange={(e) => setF({ ...f, giro: e.target.value })}>{['abarrotes', 'ferreteria', 'papeleria', 'barberia', 'unas', 'perfumeria', 'banos', 'turistico', 'palapa', 'restaurante', 'comedor', 'taqueria', 'verduleria'].map((g) => <option key={g} value={g}>{g}</option>)}</select></label>
+      <label>Giro principal<select value={f.giro} onChange={(e) => setF({ ...f, giro: e.target.value, extraGiros: f.extraGiros.filter((g) => g !== e.target.value) })}>{GIRO_KEYS.map((g) => <option key={g} value={g}>{g}</option>)}</select></label>
+      <p style={{ marginBottom: 4 }}><b>Negocio mixto</b> <span className="muted">— otros giros que también maneja (opcional)</span></p>
+      <div className="checks">{GIRO_KEYS.filter((g) => g !== f.giro).map((g) => <label key={g} style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={f.extraGiros.includes(g)} onChange={() => setF({ ...f, extraGiros: f.extraGiros.includes(g) ? f.extraGiros.filter((x) => x !== g) : [...f.extraGiros, g] })} />{g}</label>)}</div>
       <label>Nombre del dueño<input value={f.ownerName} onChange={(e) => setF({ ...f, ownerName: e.target.value })} /></label>
       <label>Teléfono del dueño<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
       <label>Contraseña temporal<input value={f.tempPassword} onChange={(e) => setF({ ...f, tempPassword: e.target.value })} /></label>

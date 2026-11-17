@@ -162,19 +162,26 @@ users.patch('/business', ownerOnly, async (c) => {
       logoUrl: z.string().url().max(500).nullable().optional(),
       forcePasswordChange: z.boolean().optional(),
       giro: z.enum(GIROS).optional(),
+      extraGiros: z.array(z.enum(GIROS)).max(GIROS.length).optional(),
     }),
     await body(c),
   )
-  const old = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange, giro FROM businesses WHERE id = ?').get(actor.business_id) as Record<string, unknown>
-  db.prepare('UPDATE businesses SET name = ?, phone = ?, logo_url = ?, force_password_change = ?, giro = ? WHERE id = ?').run(
+  const old = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange, giro, extra_giros AS extraGiros FROM businesses WHERE id = ?').get(actor.business_id) as Record<string, unknown>
+  const giro = d.giro ?? (old.giro as string)
+  // Si el nuevo principal era uno de los adicionales, el principal anterior pasa a adicional (se intercambian).
+  const oldExtra = JSON.parse(old.extraGiros as string) as string[]
+  const extraList = d.extraGiros ?? (oldExtra.includes(giro) ? oldExtra.map((g) => (g === giro ? (old.giro as string) : g)) : oldExtra)
+  const extra = JSON.stringify([...new Set(extraList)].filter((g) => g !== giro))
+  db.prepare('UPDATE businesses SET name = ?, phone = ?, logo_url = ?, force_password_change = ?, giro = ?, extra_giros = ? WHERE id = ?').run(
     d.name ?? old.name,
     d.phone ?? old.phone,
     d.logoUrl === undefined ? old.logoUrl : d.logoUrl,
     d.forcePasswordChange === undefined ? old.forcePasswordChange : d.forcePasswordChange ? 1 : 0,
-    d.giro ?? old.giro,
+    giro,
+    extra,
     actor.business_id,
   )
-  const fresh = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange, giro FROM businesses WHERE id = ?').get(actor.business_id)
+  const fresh = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange, giro, extra_giros AS extraGiros FROM businesses WHERE id = ?').get(actor.business_id)
   audit(db, now, { businessId: actor.business_id, userId: actor.id, action: 'negocio.cambio', entity: 'business', entityId: actor.business_id, oldValue: old, newValue: fresh })
   return c.json({ business: fresh })
 })

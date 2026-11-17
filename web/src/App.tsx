@@ -29,11 +29,13 @@ import { Usuarios } from './screens/Usuarios'
 export interface Me {
   user: { id: string; name: string; phone?: string | null; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
   permissions: 'todos' | string[]
-  business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string }
+  business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string; giros?: string[] }
   settings?: Record<string, any>
   modules?: string[]
 }
 /** 'owner' = solo el dueño. Un permiso no marcado no aparece en pantalla. */
+/** ¿El negocio tiene alguno de estos giros? (negocio mixto: principal + adicionales) */
+export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.business.giro]).some((x) => g.includes(x))
 export const can = (me: Me, p: string) => (p === 'owner' ? me.user.role === 'owner' : me.permissions === 'todos' || me.permissions.includes(p))
 
 type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[] }
@@ -141,7 +143,7 @@ function Privada() {
   if (me.user.mustChangePassword) return <Login forceChange onLogin={(m) => { setMe(m); cache.set('me', m) }} />
 
   // Comedor: el mapa de mesas es opcional (apagado por defecto).
-  const giroOk = (s: Screen) => !s.giros || s.giros.includes(me.business.giro) || (s.key === 'mesas' && me.business.giro === 'comedor' && !!me.settings?.tablesEnabled)
+  const giroOk = (s: Screen) => !s.giros || hasGiro(me, ...s.giros) || (s.key === 'mesas' && hasGiro(me, 'comedor') && !!me.settings?.tablesEnabled)
   const needsModule: Record<string, string[]> = { escanear: ['membresias', 'asistencia', 'fidelidad'] }
   const moduleOk = (s: Screen) => !needsModule[s.key] || needsModule[s.key]!.some((m) => me.modules?.includes(m))
   const allowed = SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s))
