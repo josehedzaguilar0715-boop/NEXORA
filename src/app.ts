@@ -17,6 +17,7 @@ import { baths } from './baths.js'
 import { publicTourism, tourism } from './tourism.js'
 import { dining } from './dining.js'
 import { menus } from './menus.js'
+import { taqueria } from './taqueria.js'
 import { cash } from './cash.js'
 import type { Deps, Env } from './context.js'
 import { sales } from './sales.js'
@@ -59,6 +60,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', tourism)
   protectedApp.route('/', dining)
   protectedApp.route('/', menus)
+  protectedApp.route('/', taqueria)
   protectedApp.route('/', inventory)
   protectedApp.route('/', finance)
   app.route('/', protectedApp)

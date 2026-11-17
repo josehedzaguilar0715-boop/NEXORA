@@ -1169,6 +1169,26 @@ const MIGRATIONS: Migration[] = [
   -- Turno de comida del corte (desayuno, comida, cena).
   ALTER TABLE shifts ADD COLUMN meal TEXT;
   `,
+  `
+  -- Taquería: carne del trompo o asada. Se registra lo que se empieza; lo vendido sale de las recetas; al cierre se cuenta el sobrante con código.
+  CREATE TABLE meat_batches (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    shift_id TEXT REFERENCES shifts(id),
+    started_milli INTEGER NOT NULL CHECK (started_milli > 0),
+    started_at TEXT NOT NULL,
+    started_by TEXT NOT NULL,
+    closed_at TEXT,
+    sold_milli INTEGER,
+    expected_milli INTEGER,
+    counted_milli INTEGER,
+    difference_milli INTEGER,
+    reason TEXT,
+    authorized_by TEXT REFERENCES users(id)
+  );
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {

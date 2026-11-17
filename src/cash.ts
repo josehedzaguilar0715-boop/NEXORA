@@ -6,6 +6,9 @@ import { bad, clampTime, conflict, forbidden, iso, localDate, newId, notFound } 
 
 export const cash = new Hono<Env>()
 
+/** Validaciones de un giro antes del corte (p. ej. taquería: contar el sobrante del trompo). */
+export const shiftCloseValidators: ((ctx: { db: import('./db.js').Db; shiftId: string }) => void)[] = []
+
 export interface ShiftRow {
   id: string
   business_id: string
@@ -126,6 +129,7 @@ cash.post('/shifts/:id/close', requirePerm('open_close_cash'), async (c) => {
   const s = loadShift(c)
   ensureCanManage(c, s)
   if (s.status !== 'abierto') throw conflict('Ese turno ya está cerrado.', 'turno_cerrado')
+  for (const v of shiftCloseValidators) v({ db, shiftId: s.id })
   const d = parse(z.object({ at: z.string().datetime().optional(), countedCash: money, reason: z.string().trim().max(300).optional() }), await body(c))
   const totals = shiftTotals(db, s)
   const difference = d.countedCash - totals.expectedCash

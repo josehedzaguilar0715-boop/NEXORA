@@ -20,7 +20,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 13 (palapa)**: mesas con cuenta abierta; comandas a cocina y barra con mesa y hora; cobro en mesa completo o dividido por persona o por producto; propinas por mesero aparte; reservas de mesa confirmadas por dueño o encargado; consumo mínimo por mesa; renta de sillas, camastros y sombrillas con su propio control; recetas e insumos; precio por kilo del día con código; merma de perecederos; bebidas y hielo con costo; tolera reenvíos sin señal. ✅ con pruebas.
 - **Bloque 14 (restaurante)**: plano de mesas por área con estados y mapa en vivo; la mesa pasa a limpieza al cobrar y el mesero la libera; comandas por estación (cada una ve solo lo suyo) que se envían al confirmar, con tiempos de cocina; cuenta dividible; cancelaciones y cortesías con código del dueño; pedidos para llevar y recoger con número y estados, cobrados al hacerlos; reserva de hora para recoger con interruptor (apagada); aviso de pedido listo manual; propinas por mesero; menú editable con variantes y combos. ✅ con pruebas y prueba en navegador.
 - **Bloque 15 (comedor)**: menú del día (o corrido) por turno que el encargado publica con código; agotados que no se venden; venta rápida con botones grandes de lo más vendido; turnos de comida (desayuno, comida, cena) con corte por turno; platillos por porción con receta y costo; crédito a oficinas y talleres con límite (pasarlo pide código del dueño); mapa de mesas opcional (apagado); caja rápida con cambio; propinas opcionales (apagadas). ✅ con pruebas.
-- Siguiente: Bloque 16 (taquería).
+- **Bloque 16 (taquería)**: venta por pieza y por kilo o importe con báscula; catálogo corto con botones grandes; recetas por guisado con insumos por kilo y costo por taco; carne del trompo o asada (lo que se empieza, lo vendido y el sobrante contado con código al cierre; el corte no se hace con carne abierta); guisados del día publicados en la mañana con agotados ocultos; cuenta por mesa o barra; pedidos para llevar por pieza o kilo con número; precio por kilo con código en bitácora. ✅ con pruebas.
+- Siguiente: Bloque 17 (verdulería).
 
 ## Desarrollo local
 
@@ -161,3 +162,9 @@ Importes siempre en centavos enteros (MXN).
 - Venta rápida: `GET /products/top` ordena los botones de la caja por lo más vendido.
 - Turno de comida: la caja se abre con `meal`, y cada turno tiene su corte.
 - Ajustes (`PUT /settings`): `tipsEnabled` (comedor: apagadas por defecto) y `tablesEnabled` (mapa de mesas, apagado).
+
+## Taquería (Bloque 16)
+
+- Carne: `POST /meat/batches { productId, kg }` al empezar; lo vendido se calcula de las recetas de los tacos y de la venta directa por kilo. `POST /meat/batches/:id/close { leftoverKg, reason, authCode }` cuenta el sobrante con código; la diferencia ajusta el inventario (faltante = merma) y queda en bitácora.
+- El corte de caja se rechaza (`trompo_abierto`) mientras haya carne sin contar en ese turno.
+- `GET /recipes/:id/cost` da el costo de un taco o platillo según su receta.

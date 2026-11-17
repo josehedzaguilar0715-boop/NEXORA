@@ -11,6 +11,7 @@ import { Entradas } from './screens/Entradas'
 import { Acceso, MisBoletos, Taquilla, TiendaBoletos } from './screens/Taquilla'
 import { Cocina, Mesas, Pedidos } from './screens/Mesas'
 import { MenuDia } from './screens/MenuDia'
+import { Trompo } from './screens/Trompo'
 import { Comisiones } from './screens/Comisiones'
 import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
@@ -34,6 +35,7 @@ const SCREENS: Screen[] = [
   { key: 'acceso', label: 'Acceso', perm: 'sell', C: Acceso, giros: ['turistico'] },
   { key: 'mesas', label: 'Mesas', perm: 'sell', C: Mesas, giros: ['palapa', 'restaurante', 'taqueria'] },
   { key: 'menu', label: 'Menú del día', perm: 'sell', C: MenuDia, giros: ['comedor', 'taqueria'] },
+  { key: 'carne', label: 'Carne', perm: 'sell', C: Trompo, giros: ['taqueria'] },
   { key: 'pedidos', label: 'Para llevar', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'comedor'] },
   { key: 'cocina', label: 'Cocina', perm: 'sell', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria'] },
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
