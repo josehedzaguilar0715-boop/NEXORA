@@ -1276,6 +1276,19 @@ const MIGRATIONS: Migration[] = [
    WHERE reason NOT LIKE 'Abono de %' AND reason NOT LIKE 'Gasto: %' AND reason NOT LIKE 'Devolución%'
      AND reason NOT LIKE 'Pago de compra %' AND reason NOT LIKE 'Abono a proveedor %' AND reason NOT LIKE 'Reembolso de boletos%';
   `,
+  `
+  -- Pago mixto: una venta puede pagarse con varias formas (p. ej. tarjeta y el resto en efectivo).
+  -- Cada venta tiene aquí sus pagos; los totales de caja y reportes salen de esta tabla.
+  CREATE TABLE sale_payments (
+    id TEXT PRIMARY KEY,
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta','fiado')),
+    amount INTEGER NOT NULL CHECK (amount >= 0)
+  );
+  CREATE INDEX sale_payments_sale ON sale_payments(sale_id);
+  CREATE TRIGGER sale_payments_no_delete BEFORE DELETE ON sale_payments BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  INSERT INTO sale_payments (id, sale_id, method, amount) SELECT 'p-' || id, id, payment_method, total FROM sales;
+  `,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

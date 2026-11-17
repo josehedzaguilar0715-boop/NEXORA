@@ -31,15 +31,15 @@ const money = z.number().int('Usa centavos enteros').min(0)
 export function shiftTotals(db: import('./db.js').Db, shift: ShiftRow) {
   const sales = db
     .prepare(
+      // Por forma de pago (una venta mixta suma a varias).
       `SELECT
-         COALESCE(SUM(CASE WHEN status='completada' AND payment_method='efectivo' THEN total END),0) AS cashSales,
-         COALESCE(SUM(CASE WHEN status='completada' AND payment_method='transferencia' THEN total END),0) AS transferSales,
-         COALESCE(SUM(CASE WHEN status='completada' AND payment_method='tarjeta' THEN total END),0) AS cardSales,
-         COALESCE(SUM(CASE WHEN status='completada' AND payment_method='fiado' THEN total END),0) AS creditSales,
-         COALESCE(SUM(CASE WHEN status='cancelada' THEN 1 END),0) AS cancelled
-       FROM sales WHERE shift_id = ?`,
+         COALESCE((SELECT SUM(p.amount) FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.shift_id = ? AND s.status = 'completada' AND p.method = 'efectivo'),0) AS cashSales,
+         COALESCE((SELECT SUM(p.amount) FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.shift_id = ? AND s.status = 'completada' AND p.method = 'transferencia'),0) AS transferSales,
+         COALESCE((SELECT SUM(p.amount) FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.shift_id = ? AND s.status = 'completada' AND p.method = 'tarjeta'),0) AS cardSales,
+         COALESCE((SELECT SUM(p.amount) FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.shift_id = ? AND s.status = 'completada' AND p.method = 'fiado'),0) AS creditSales,
+         (SELECT COUNT(*) FROM sales WHERE shift_id = ? AND status = 'cancelada') AS cancelled`,
     )
-    .get(shift.id) as { cashSales: number; transferSales: number; cardSales: number; creditSales: number; cancelled: number }
+    .get(shift.id, shift.id, shift.id, shift.id, shift.id) as { cashSales: number; transferSales: number; cardSales: number; creditSales: number; cancelled: number }
   const mv = db
     .prepare(
       `SELECT COALESCE(SUM(CASE WHEN type='retiro' THEN amount END),0) AS withdrawals,

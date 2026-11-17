@@ -63,7 +63,7 @@ type Flow = { category: string; method: string; amount: number }
 export function cashFlow(db: Db, businessId: string, from: string, to: string) {
   const { start, end } = range(from, to)
   const inflows = [
-    ...(db.prepare("SELECT 'ventas' category, payment_method method, SUM(total) amount FROM sales WHERE business_id = ? AND status = 'completada' AND payment_method <> 'fiado' AND created_at >= ? AND created_at < ? GROUP BY payment_method").all(businessId, start, end) as Flow[]),
+    ...(db.prepare("SELECT 'ventas' category, p.method method, SUM(p.amount) amount FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND p.method <> 'fiado' AND s.created_at >= ? AND s.created_at < ? GROUP BY p.method").all(businessId, start, end) as Flow[]),
     ...(db.prepare("SELECT 'cobranza' category, method, -SUM(delta) amount FROM credit_ledger WHERE business_id = ? AND kind = 'abono' AND created_at >= ? AND created_at < ? GROUP BY method").all(businessId, start, end) as Flow[]),
     ...(db.prepare("SELECT 'aportaciones' category, 'efectivo' method, SUM(m.amount) amount FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? AND m.origin = 'manual' AND m.type = 'deposito' AND m.created_at >= ? AND m.created_at < ?").all(businessId, start, end) as Flow[]),
   ].filter((r) => r.amount > 0)
@@ -104,7 +104,7 @@ export function ledger(db: Db, businessId: string, from: string, to: string): En
   const b = businessId
   return db.prepare(`
     SELECT * FROM (
-      SELECT created_at at, 'Venta' type, 'Ticket #' || folio concept, payment_method method, total inflow, 0 outflow FROM sales WHERE business_id = ? AND status = 'completada' AND payment_method <> 'fiado' AND created_at >= ? AND created_at < ?
+      SELECT s.created_at at, 'Venta' type, 'Ticket #' || s.folio concept, p.method method, p.amount inflow, 0 outflow FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND p.method <> 'fiado' AND p.amount > 0 AND s.created_at >= ? AND s.created_at < ?
       UNION ALL SELECT l.created_at, 'Cobro de fiado', COALESCE(c.name, 'Cliente'), l.method, -l.delta, 0 FROM credit_ledger l LEFT JOIN customers c ON c.id = l.customer_id WHERE l.business_id = ? AND l.kind = 'abono' AND l.created_at >= ? AND l.created_at < ?
       UNION ALL SELECT m.created_at, CASE m.type WHEN 'deposito' THEN 'Depósito a caja' ELSE 'Retiro de caja' END, m.reason, 'efectivo', CASE m.type WHEN 'deposito' THEN m.amount ELSE 0 END, CASE m.type WHEN 'retiro' THEN m.amount ELSE 0 END FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? AND m.origin = 'manual' AND m.created_at >= ? AND m.created_at < ?
       UNION ALL SELECT sp.created_at, 'Pago a proveedor', COALESCE(s.name, 'Proveedor') || COALESCE(' · folio ' || p.ticket_ref, ''), sp.method, 0, sp.amount FROM supplier_payments sp JOIN purchases p ON p.id = sp.purchase_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? AND sp.created_at >= ? AND sp.created_at < ?

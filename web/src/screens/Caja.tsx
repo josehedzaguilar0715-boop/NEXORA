@@ -23,6 +23,16 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
   )
 }
 
+interface Held { id: string; at: string; cart: Line[]; discount: { amount: number; code: string } | null; customer: Customer | null; staffId: string }
+type Modal_ = null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product; qty?: number } | { kind: 'libre' } | { kind: 'cobro' } | { kind: 'fiado' } | { kind: 'ticket'; text: string; change?: number | null; provisional: boolean } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' } | { kind: 'espera' } | { kind: 'cliente' } | { kind: 'cancelar' }
+
+/** Atajos de teclado de la caja (se muestran en cada botón). */
+const KEYS = { buscar: 'F2', cliente: 'F3', descuento: 'F4', espera: 'F6', mov: 'F7', libre: 'F8', ventas: 'F9', cobrar: 'F10' } as const
+
+/**
+ * Punto de venta: buscador (código o nombre, Enter; "3*código" para cantidad), ticket en tabla editable,
+ * total y cobro (efectivo, tarjeta, transferencia, mixto o fiado). Ventas en espera y atajos de teclado.
+ */
 export function Caja({ me }: { me: Me }) {
   const [shift, setShift] = useState<Shift | null>(cache.get<Shift | null>('shift', null))
   const [loaded, setLoaded] = useState(false)
@@ -30,15 +40,20 @@ export function Caja({ me }: { me: Me }) {
   const [customers, setCustomers] = useState<Customer[]>(cache.get<Customer[]>('customers', []))
   const [services, setServices] = useState<Service[]>(cache.get<Service[]>('services', []))
   const [q, setQ] = useState('')
+  const [pick, setPick] = useState(0)
   const [cart, setCart] = useState<Line[]>([])
-  const [modal, setModal] = useState<null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product } | { kind: 'libre' } | { kind: 'pago'; method: string } | { kind: 'ticket'; text: string; change?: number | null; provisional: boolean } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' }>(null)
+  const [selLine, setSelLine] = useState<string | null>(null)
+  const [modal, setModal] = useState<Modal_>(null)
   const [discount, setDiscount] = useState<{ amount: number; code: string } | null>(null)
+  const [customer, setCustomer] = useState<Customer | null>(null)
+  const [held, setHeld] = useState<Held[]>(cache.get<Held[]>('held', []))
   const withStaff = hasGiro(me, 'barberia', 'unas', 'perfumeria')
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([])
   const [staffId, setStaffId] = useState('')
   useEffect(() => { if (withStaff) api<any>('GET', hasGiro(me, 'barberia', 'unas') ? '/agenda/staff' : '/users').then((r) => setStaff((r.staff ?? r.users).filter((x: any) => x.active !== false))).catch(() => {}) }, [])
   const [msg, setMsg] = useState('')
   const search = useRef<HTMLInputElement>(null)
+  const fiadoOk = can(me, 'customers_credit') && hasGiro(me, ...FIADO_GIROS)
 
   const refresh = async () => {
     try {
@@ -74,57 +89,95 @@ export function Caja({ me }: { me: Me }) {
   const [soldOut, setSoldOut] = useState<string[]>([])
   const [top, setTop] = useState<string[]>([])
   useEffect(() => {
-    if (!quick) return
-    api<any>('GET', '/daily-menu').then((r) => setSoldOut(r.menus.flatMap((m: any) => m.items.filter((i: any) => i.soldOut).map((i: any) => i.productId)))).catch(() => {})
+    if (quick) api<any>('GET', '/daily-menu').then((r) => setSoldOut(r.menus.flatMap((m: any) => m.items.filter((i: any) => i.soldOut).map((i: any) => i.productId)))).catch(() => {})
     api<any>('GET', '/products/top').then((r) => setTop(r.products.map((p: any) => p.id))).catch(() => {})
   }, [])
-  const results = useMemo(() => {
-    const t = q.trim().toLowerCase()
-    const list = catalog.filter((p) => !soldOut.includes(p.id) && (p as Product & { sellable?: boolean }).sellable !== false)
-    // Venta rápida: primero lo más vendido.
-    if (!t) return [...list].sort((a, b) => (top.indexOf(a.id) + 1 || 999) - (top.indexOf(b.id) + 1 || 999)).slice(0, 24)
-    return list.filter((p) => p.name.toLowerCase().includes(t) || p.barcode === t).slice(0, 24)
-  }, [q, catalog, soldOut, top])
-  const serviceResults = useMemo(() => services.filter((x) => !q.trim() || x.name.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 24), [q, services])
+  const sellable = useMemo(() => catalog.filter((p) => !soldOut.includes(p.id) && (p as Product & { sellable?: boolean }).sellable !== false), [catalog, soldOut])
+  // "3*leche" → cantidad 3 y búsqueda "leche".
+  const parsed = useMemo(() => { const m = q.match(/^\s*(\d+(?:[.,]\d+)?)\s*\*\s*(.*)$/); return m ? { qty: Number(m[1]!.replace(',', '.')), term: m[2]!.trim() } : { qty: 1, term: q.trim() } }, [q])
+  type Hit = { key: string; label: string; sub: string; go: (qty: number) => void }
+  const hits: Hit[] = useMemo(() => {
+    const t = parsed.term.toLowerCase()
+    if (!t) return []
+    const out: Hit[] = []
+    for (const sv of services) if (sv.name.toLowerCase().includes(t)) out.push({ key: sv.id, label: sv.name, sub: `servicio · ${mxn(sv.price)}`, go: (n) => addService(sv, n) })
+    for (const p of sellable) {
+      if (p.name.toLowerCase().includes(t) || p.barcode === parsed.term) out.push({ key: p.id, label: p.name, sub: `${mxn(p.price)} / ${unitLabel(p.unit)}${p.stock !== undefined ? ` · hay ${p.stock}` : ''}`, go: (n) => add(p, undefined, n) })
+      for (const pr of p.presentations) if (`${p.name} ${pr.name}`.toLowerCase().includes(t) || pr.barcode === parsed.term) out.push({ key: pr.id, label: `${p.name} ${pr.name}`, sub: mxn(pr.price), go: (n) => add(p, pr.id, n) })
+    }
+    return out.slice(0, 8)
+  }, [parsed, sellable, services])
+  useEffect(() => setPick(0), [q])
+  // Botones rápidos (pantallas táctiles): lo más vendido primero; servicios arriba.
+  const favorites = useMemo(() => [...sellable].sort((a, b) => (top.indexOf(a.id) + 1 || 999) - (top.indexOf(b.id) + 1 || 999)).slice(0, quick ? 24 : 12), [sellable, top])
 
   const subtotal = cart.reduce((a, l) => a + lineTotal(l), 0)
   const total = Math.max(0, subtotal - (discount?.amount ?? 0))
+  const items = cart.reduce((a, l) => a + (l.amount !== undefined || l.unit !== 'pza' ? 1 : l.quantity), 0)
 
-  const add = (p: Product, presentationId?: string) => {
-    if (!presentationId && p.unit !== 'pieza') return setModal({ kind: 'granel', p })
+  const focusSearch = () => setTimeout(() => search.current?.focus(), 0)
+  function add(p: Product, presentationId?: string, qty = 1) {
+    if (!presentationId && p.unit !== 'pieza') return setModal({ kind: 'granel', p, qty })
     const pr = p.presentations.find((x) => x.id === presentationId)
+    let key = ''
     setCart((c) => {
       const same = c.find((l) => l.productId === p.id && l.presentationId === presentationId && l.amount === undefined)
-      if (same) return c.map((l) => (l === same ? { ...l, quantity: l.quantity + 1 } : l))
-      return [...c, { key: crypto.randomUUID(), productId: p.id, presentationId, name: pr ? `${p.name} ${pr.name}` : p.name, quantity: 1, unitPrice: pr ? pr.price : p.price, total: 0, unit: pr ? 'pza' : unitLabel(p.unit) }]
+      if (same) { key = same.key; return c.map((l) => (l === same ? { ...l, quantity: l.quantity + qty } : l)) }
+      key = crypto.randomUUID()
+      return [...c, { key, productId: p.id, presentationId, name: pr ? `${p.name} ${pr.name}` : p.name, quantity: qty, unitPrice: pr ? pr.price : p.price, total: 0, unit: pr ? 'pza' : unitLabel(p.unit) }]
     })
+    setTimeout(() => setSelLine(key), 0)
     setQ('')
-    search.current?.focus()
+    focusSearch()
+  }
+  function addService(sv: Service, qty = 1) {
+    if (qty === 1 && hasGiro(me, 'papeleria')) return setModal({ kind: 'servicio', sv })
+    setCart((c) => [...c, { key: crypto.randomUUID(), serviceId: sv.id, name: sv.name, quantity: qty, unitPrice: sv.price, total: 0, unit: 'pza', free: false }])
+    setQ('')
+    focusSearch()
   }
 
-  // Lector de código de barras: escribe el código y manda Enter.
+  // Lector de código de barras o Enter: código exacto primero; si no, la sugerencia elegida.
   const onEnter = (code = q) => {
-    const t = code.trim()
-    if (!t) return
-    const byCode = catalog.find((p) => p.barcode === t)
-    if (byCode) return add(byCode)
-    for (const p of catalog) {
+    const m = code.match(/^\s*(\d+(?:[.,]\d+)?)\s*\*\s*(.*)$/)
+    const qty = m ? Number(m[1]!.replace(',', '.')) : 1
+    const t = (m ? m[2]! : code).trim()
+    if (!t) { if (cart.length && code === q) setModal({ kind: 'cobro' }); return }
+    const byCode = sellable.find((p) => p.barcode === t)
+    if (byCode) return add(byCode, undefined, qty)
+    for (const p of sellable) {
       const pr = p.presentations.find((x) => x.barcode === t)
-      if (pr) return add(p, pr.id)
+      if (pr) return add(p, pr.id, qty)
     }
-    if (code === q && results.length === 1) return add(results[0]!)
-    if (code !== q) setQ(t) // de la cámara y no está en el catálogo: se queda escrito para buscarlo
+    if (code === q && hits[pick]) return hits[pick]!.go(qty)
+    if (code !== q) { setQ(t); setMsg(`No hay ningún producto con el código ${t}.`) }
   }
 
-  const setQty = (key: string, delta: number) => setCart((c) => c.flatMap((l) => (l.key !== key ? [l] : l.quantity + delta <= 0 ? [] : [{ ...l, quantity: l.quantity + delta }])))
+  const setQtyTo = (key: string, n: number) => setCart((c) => c.flatMap((l) => (l.key !== key ? [l] : n <= 0 ? [] : [{ ...l, quantity: n }])))
+  const removeLine = (key: string) => { setCart((c) => c.filter((l) => l.key !== key)); setSelLine(null) }
+  const reset = () => { setCart([]); setDiscount(null); setCustomer(null); setStaffId(''); setMsg(''); setSelLine(null) }
 
-  const charge = async (method: string, extra: { cashReceived?: number; customerId?: string; authCode?: string } = {}) => {
+  const hold = () => {
+    if (!cart.length) return setModal({ kind: 'espera' })
+    const h: Held = { id: crypto.randomUUID(), at: new Date().toISOString(), cart, discount, customer, staffId }
+    const next = [...held, h]
+    setHeld(next); cache.set('held', next); reset(); setMsg(`Venta puesta en espera (${next.length}).`); focusSearch()
+  }
+  const recall = (h: Held) => {
+    let next = held.filter((x) => x.id !== h.id)
+    if (cart.length) next = [...next, { id: crypto.randomUUID(), at: new Date().toISOString(), cart, discount, customer, staffId }]
+    setHeld(next); cache.set('held', next)
+    setCart(h.cart); setDiscount(h.discount); setCustomer(h.customer); setStaffId(h.staffId); setModal(null); setMsg(''); focusSearch()
+  }
+
+  const charge = async (method: string, extra: { cashReceived?: number; customerId?: string; authCode?: string; otherPayments?: { method: string; amount: number }[] } = {}) => {
     const id = crypto.randomUUID()
     const body = {
       id, shiftId: shift!.id, paymentMethod: method, createdAt: new Date().toISOString(),
       items: cart.map((l) => (l.serviceId ? { serviceId: l.serviceId, quantity: l.quantity } : l.free ? { description: l.name, quantity: l.quantity, unitPrice: l.unitPrice } : { productId: l.productId, presentationId: l.presentationId, ...(l.amount !== undefined ? { amount: l.amount } : { quantity: l.quantity }) })),
       ...(discount ? { discount: discount.amount, authCode: discount.code } : {}),
       ...(staffId ? { staffId } : {}),
+      ...(customer && !extra.customerId ? { customerId: customer.id } : {}),
       ...extra,
     }
     const needsCode = !!discount || !!extra.authCode
@@ -154,94 +207,173 @@ export function Caja({ me }: { me: Me }) {
         ...cart.map((l) => `${l.quantity} ${l.name}`.slice(0, 22).padEnd(22) + mxn(lineTotal(l)).padStart(10)), '-'.repeat(32),
         `TOTAL ${mxn(total)}`, `Pago: ${method}`, `Atendió: ${me.user.name}`].filter(Boolean).join('\n')
     }
-    setModal({ kind: 'ticket', text, change: extra.cashReceived !== undefined ? (sale?.change ?? extra.cashReceived - total) : null, provisional: !sale })
-    setCart([])
-    setDiscount(null)
-    setMsg('')
+    const cashPart = total - (extra.otherPayments ?? []).reduce((a, p) => a + p.amount, 0)
+    setModal({ kind: 'ticket', text, change: extra.cashReceived !== undefined ? (sale?.change ?? extra.cashReceived - cashPart) : null, provisional: !sale })
+    reset()
   }
+
+  // Atajos de teclado (solo sin ventanas abiertas).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!shift) return
+      if (modal) { if (e.key === 'Escape' && modal.kind !== 'ticket') setModal(null); return }
+      const act: Record<string, () => void> = {
+        F2: () => search.current?.focus(),
+        F3: () => setModal({ kind: 'cliente' }),
+        F4: () => { if (can(me, 'cancel_discount') && cart.length) setModal({ kind: 'descuento' }) },
+        F6: hold,
+        F7: () => { if (can(me, 'open_close_cash')) setModal({ kind: 'mov' }) },
+        F8: () => setModal({ kind: 'libre' }),
+        F9: () => setModal({ kind: 'ventas' }),
+        F10: () => { if (cart.length) setModal({ kind: 'cobro' }) },
+      }
+      if (act[e.key]) { e.preventDefault(); act[e.key]!(); return }
+      if (e.key === 'Escape') { if (q) setQ(''); else if (cart.length) setModal({ kind: 'cancelar' }); return }
+      // Con el buscador vacío: flechas eligen renglón; + y − cambian cantidad; Supr lo quita.
+      const typing = document.activeElement === search.current && q !== ''
+      if (typing || !cart.length) return
+      const idx = cart.findIndex((l) => l.key === selLine)
+      const line = cart[idx]
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        if (document.activeElement !== search.current && document.activeElement?.tagName === 'INPUT') return
+        e.preventDefault()
+        const n = idx < 0 ? cart.length - 1 : Math.max(0, Math.min(cart.length - 1, idx + (e.key === 'ArrowDown' ? 1 : -1)))
+        setSelLine(cart[n]!.key)
+      } else if (line && (e.key === '+' || e.key === '-') && document.activeElement === search.current) {
+        e.preventDefault()
+        if (line.amount === undefined && line.unit === 'pza') setQtyTo(line.key, line.quantity + (e.key === '+' ? 1 : -1))
+      } else if (line && e.key === 'Delete') {
+        e.preventDefault(); removeLine(line.key)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   if (!loaded && !shift) return <p className="muted">Cargando caja…</p>
   if (!shift) return <OpenShift meals={hasGiro(me, 'comedor')} onOpen={(s) => { setShift(s); cache.set('shift', s) }} />
 
+  const K = ({ k }: { k: string }) => <kbd>{k}</kbd>
   return (
-    <div className="sell">
-      <section className="card">
-        <div className="row">
-          <input
-            ref={search} autoFocus placeholder="Escanea o escribe el producto…" value={q} data-testid="buscar"
-            onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && onEnter()}
-          />
-          <ScanButton onCode={(c) => onEnter(c)} />
+    <div className="pos-screen">
+      <section className="pos-main">
+        <div className="pos-search">
+          <div className="row">
+            <input
+              ref={search} autoFocus placeholder="Código o nombre del producto · 3*código para varios" value={q} data-testid="buscar" aria-label="Buscar producto"
+              onChange={(e) => { setQ(e.target.value); setMsg('') }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); onEnter() }
+                else if (q && e.key === 'ArrowDown') { e.preventDefault(); setPick((p) => Math.min(p + 1, hits.length - 1)) }
+                else if (q && e.key === 'ArrowUp') { e.preventDefault(); setPick((p) => Math.max(p - 1, 0)) }
+              }}
+            />
+            <ScanButton onCode={(c) => onEnter(c)} />
+          </div>
+          {q.trim() && (
+            <div className="suggest" role="listbox" aria-label="Productos encontrados">
+              {hits.map((h, i) => <button key={h.key} role="option" aria-selected={i === pick} className={i === pick ? 'on' : ''} onMouseEnter={() => setPick(i)} onClick={() => h.go(parsed.qty)}><span>{parsed.qty !== 1 ? `${parsed.qty} × ` : ''}{h.label}</span><small>{h.sub}</small></button>)}
+              {hits.length === 0 && <p className="muted" style={{ margin: 0, padding: '10px 12px' }}>Nada coincide. Usa <b>Artículo común ({KEYS.libre})</b> para cobrar algo que no está en la lista.</p>}
+            </div>
+          )}
         </div>
-        <div className="results">
-          {serviceResults.map((sv) => (
-            <button key={sv.id} onClick={() => setModal({ kind: 'servicio', sv })}>{sv.name}<small>{mxn(sv.price)}{sv.durationMin ? ` · ${sv.durationMin} min` : ''}</small></button>
-          ))}
-          {results.map((p) => (
-            <button key={p.id} onClick={() => add(p)}>
-              {p.name}
-              <small>{mxn(p.price)} / {unitLabel(p.unit)}{p.stock !== undefined ? ` · hay ${p.stock}` : ''}</small>
-            </button>
-          ))}
-          {results.flatMap((p) => p.presentations.map((pr) => (
-            <button key={pr.id} onClick={() => add(p, pr.id)}>{p.name} {pr.name}<small>{mxn(pr.price)}</small></button>
-          )))}
-          <button onClick={() => setModal({ kind: 'libre' })}>➕ Otro / varios<small>Escribe el precio</small></button>
-        </div>
-      </section>
 
-      <section className="card cart">
-        <h2>Cuenta</h2>
-        {cart.length === 0 ? <p className="muted">Agrega productos para cobrar.</p> : (
+        <div className="ticket-table card">
           <table>
+            <thead><tr><th className="hide-sm">#</th><th>Descripción</th><th className="num">Cant.</th><th className="num hide-sm">Precio</th><th className="num">Importe</th><th /></tr></thead>
             <tbody>
-              {cart.map((l) => (
-                <tr key={l.key}>
-                  <td>{l.name}<br /><small className="muted">{l.amount !== undefined ? `por importe` : `${l.quantity} ${l.unit} × ${mxn(l.unitPrice)}`}</small></td>
-                  <td>{l.amount === undefined && l.unit === 'pza' && (
-                    <div className="qty"><button onClick={() => setQty(l.key, -1)} aria-label="menos">−</button><button onClick={() => setQty(l.key, 1)} aria-label="más">+</button></div>
-                  )}{(l.amount !== undefined || l.unit !== 'pza') && <button onClick={() => setCart((c) => c.filter((x) => x.key !== l.key))}>Quitar</button>}</td>
-                  <td className="num">{mxn(lineTotal(l))}</td>
+              {cart.map((l, i) => (
+                <tr key={l.key} className={selLine === l.key ? 'sel' : ''} onClick={() => setSelLine(l.key)}>
+                  <td className="muted hide-sm">{i + 1}</td>
+                  <td>{l.name}{l.amount !== undefined && <><br /><small className="muted">por importe</small></>}</td>
+                  <td className="num">{l.amount === undefined && l.unit === 'pza'
+                    ? <div className="qty"><button onClick={(e) => { e.stopPropagation(); setQtyTo(l.key, l.quantity - 1) }} aria-label={`Menos ${l.name}`}>−</button><input className="qty-in" aria-label={`Cantidad de ${l.name}`} inputMode="numeric" value={l.quantity} onClick={(e) => e.stopPropagation()} onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n) && n >= 0) setQtyTo(l.key, n || 0.0001) }} onBlur={(e) => { if (!(Number(e.target.value) > 0)) removeLine(l.key) }} onKeyDown={(e) => e.key === 'Enter' && focusSearch()} /><button onClick={(e) => { e.stopPropagation(); setQtyTo(l.key, l.quantity + 1) }} aria-label={`Más ${l.name}`}>+</button></div>
+                    : `${l.amount !== undefined ? '' : `${l.quantity} ${l.unit}`}`}</td>
+                  <td className="num hide-sm">{l.amount === undefined ? mxn(l.unitPrice) : ''}</td>
+                  <td className="num"><b>{mxn(lineTotal(l))}</b></td>
+                  <td className="num"><button className="mini" aria-label={`Quitar ${l.name}`} onClick={(e) => { e.stopPropagation(); removeLine(l.key) }}>✕</button></td>
                 </tr>
               ))}
+              {cart.length === 0 && <tr><td colSpan={6} className="empty">Escanea un código o escribe el nombre del producto y presiona Enter.</td></tr>}
             </tbody>
           </table>
-        )}
-        {withStaff && <label>¿Quién atendió?<select value={staffId} onChange={(e) => setStaffId(e.target.value)}><option value="">— Nadie (sin comisión) —</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
-        {discount && <p className="row"><span>Descuento</span><span className="num">−{mxn(discount.amount)}</span></p>}
-        <div className="total" data-testid="total">{mxn(total)}</div>
-        {msg && <p className="error">{msg}</p>}
-        <div className="pay">
-          <button className="primary big" disabled={!cart.length} onClick={() => setModal({ kind: 'pago', method: 'efectivo' })}>Efectivo</button>
-          <button className="big" disabled={!cart.length} onClick={() => charge('transferencia')}>Transferencia</button>
-          <button className="big" disabled={!cart.length} onClick={() => charge('tarjeta')}>Tarjeta</button>
-          {can(me, 'customers_credit') && hasGiro(me, ...FIADO_GIROS) && <button className="big" disabled={!cart.length} onClick={() => setModal({ kind: 'pago', method: 'fiado' })}>Fiado</button>}
         </div>
-        <div className="pay" style={{ marginTop: 12 }}>
-          {can(me, 'cancel_discount') && <button disabled={!cart.length} onClick={() => setModal({ kind: 'descuento' })}>Descuento</button>}
-          <button onClick={() => setModal({ kind: 'ventas' })}>Ventas del turno</button>
-          {can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'mov' })}>Retiro / depósito</button>}
-          {can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'corte' })}>Corte de caja</button>}
-          {hasGiro(me, 'papeleria') && can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'contador' })}>Contador copiadora</button>}
+
+        <div className="quick-grid">
+          <div className="card-head"><h3>{services.length ? 'Servicios y productos' : 'Productos más vendidos'}</h3><span className="muted small">toca para agregar</span></div>
+          <div className="results">
+            {services.slice(0, 12).map((sv) => <button key={sv.id} onClick={() => addService(sv)}>{sv.name}<small>{mxn(sv.price)}{sv.durationMin ? ` · ${sv.durationMin} min` : ''}</small></button>)}
+            {favorites.map((p) => <button key={p.id} onClick={() => add(p)}>{p.name}<small>{mxn(p.price)} / {unitLabel(p.unit)}{p.stock !== undefined ? ` · hay ${p.stock}` : ''}</small></button>)}
+            <button onClick={() => setModal({ kind: 'libre' })}>➕ Artículo común<small>escribe descripción y precio</small></button>
+          </div>
         </div>
       </section>
 
-      {modal?.kind === 'granel' && <Granel p={modal.p} onClose={() => setModal(null)} onAdd={(l) => { setCart((c) => [...c, l]); setModal(null); setQ('') }} />}
-      {modal?.kind === 'servicio' && <Cantidad sv={modal.sv} onClose={() => setModal(null)} onAdd={(l) => { setCart((c) => [...c, l]); setModal(null); setQ('') }} />}
+      <aside className="pos-side card">
+        <div className="pos-chips">
+          <button className="chip" onClick={() => setModal({ kind: 'cliente' })}>👤 {customer ? customer.name : 'Público en general'} <K k={KEYS.cliente} /></button>
+          {held.length > 0 && <button className="chip" onClick={() => setModal({ kind: 'espera' })}>⏸ En espera: {held.length}</button>}
+        </div>
+        {withStaff && <label>¿Quién atendió?<select value={staffId} onChange={(e) => setStaffId(e.target.value)}><option value="">— Nadie (sin comisión) —</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}
+        <div className="pos-total">
+          <span className="muted">{items} {items === 1 ? 'artículo' : 'artículos'}</span>
+          {discount && <span className="muted">Subtotal {mxn(subtotal)} · descuento {mxn(-discount.amount)}</span>}
+          <div className="total" data-testid="total">{mxn(total)}</div>
+        </div>
+        {msg && <p className={msg.startsWith('Venta puesta') ? 'okmsg' : 'error'}>{msg}</p>}
+        <button className="primary big cobrar" disabled={!cart.length} onClick={() => setModal({ kind: 'cobro' })}>Cobrar <K k={KEYS.cobrar} /></button>
+        <div className="pos-actions">
+          <button onClick={hold}>{cart.length ? 'Apartar venta' : 'Ventas apartadas'} <K k={KEYS.espera} /></button>
+          {can(me, 'cancel_discount') && <button disabled={!cart.length} onClick={() => setModal({ kind: 'descuento' })}>Descuento <K k={KEYS.descuento} /></button>}
+          <button onClick={() => setModal({ kind: 'libre' })}>Artículo común <K k={KEYS.libre} /></button>
+          <button onClick={() => setModal({ kind: 'ventas' })}>Ventas del turno <K k={KEYS.ventas} /></button>
+          {can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'mov' })}>Meter o sacar dinero <K k={KEYS.mov} /></button>}
+          {hasGiro(me, 'papeleria') && can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'contador' })}>Contador copiadora</button>}
+          <button disabled={!cart.length} onClick={() => setModal({ kind: 'cancelar' })}>Cancelar venta <K k="Esc" /></button>
+          {can(me, 'open_close_cash') && <button className="corte" onClick={() => setModal({ kind: 'corte' })}>Corte de caja</button>}
+        </div>
+      </aside>
+
+      {modal?.kind === 'granel' && <Granel p={modal.p} onClose={() => setModal(null)} onAdd={(l) => { setCart((c) => [...c, l]); setModal(null); setQ(''); focusSearch() }} />}
+      {modal?.kind === 'servicio' && <Cantidad sv={modal.sv} onClose={() => setModal(null)} onAdd={(l) => { setCart((c) => [...c, l]); setModal(null); setQ(''); focusSearch() }} />}
       {modal?.kind === 'contador' && <Contador shift={shift} onClose={() => setModal(null)} />}
-      {modal?.kind === 'libre' && <Libre onClose={() => setModal(null)} onAdd={(l) => { setCart((c) => [...c, l]); setModal(null) }} />}
+      {modal?.kind === 'libre' && <Libre onClose={() => setModal(null)} onAdd={(l) => { setCart((c) => [...c, l]); setModal(null); focusSearch() }} />}
       {modal?.kind === 'descuento' && <Descuento max={subtotal} onClose={() => setModal(null)} onSet={(d) => { setDiscount(d); setModal(null) }} />}
-      {modal?.kind === 'pago' && <Pago method={modal.method} total={total} customers={customers} onClose={() => setModal(null)} onPay={(extra) => { setModal(null); void charge(modal.method, extra) }} />}
+      {modal?.kind === 'cobro' && <Cobro total={total} fiado={fiadoOk} onClose={() => { setModal(null); focusSearch() }} onFiado={() => setModal({ kind: 'fiado' })} onPay={(method, extra) => { setModal(null); void charge(method, extra) }} />}
+      {modal?.kind === 'fiado' && <Pago method="fiado" total={total} customers={customers} preselect={customer?.id} onClose={() => setModal(null)} onPay={(extra) => { setModal(null); void charge('fiado', extra) }} />}
+      {modal?.kind === 'cliente' && <ElegirCliente customers={customers} onClose={() => setModal(null)} onPick={(c) => { setCustomer(c); setModal(null); focusSearch() }} />}
+      {modal?.kind === 'espera' && (
+        <Modal onClose={() => setModal(null)}>
+          <h2>Ventas en espera</h2>
+          {held.length === 0 ? <p className="muted">No hay ventas en espera. Con una venta a medias, presiona {KEYS.espera} para apartarla y atender a otro cliente.</p> : (
+            <table className="list"><tbody>{held.map((h) => (
+              <tr key={h.id} className="clickable" onClick={() => recall(h)}>
+                <td><b>{h.customer?.name ?? 'Público en general'}</b><br /><small className="muted">{new Date(h.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} · {h.cart.length} renglones</small></td>
+                <td className="num">{mxn(Math.max(0, h.cart.reduce((a, l) => a + lineTotal(l), 0) - (h.discount?.amount ?? 0)))}</td>
+                <td className="num"><button className="mini">Recuperar</button></td>
+              </tr>
+            ))}</tbody></table>
+          )}
+          <p><button onClick={() => setModal(null)}>Cerrar</button></p>
+        </Modal>
+      )}
+      {modal?.kind === 'cancelar' && (
+        <Modal onClose={() => setModal(null)}>
+          <h2>¿Cancelar esta venta?</h2>
+          <p className="muted">Se borra la cuenta actual ({items} artículos, {mxn(total)}). No se cobró nada.</p>
+          <p className="row"><button autoFocus onClick={() => setModal(null)}>No, seguir</button><button className="danger" onClick={() => { reset(); setModal(null); focusSearch() }}>Sí, cancelar</button></p>
+        </Modal>
+      )}
       {modal?.kind === 'ticket' && (
-        <Modal onClose={() => { setModal(null); search.current?.focus() }}>
+        <Modal onClose={() => { setModal(null); focusSearch() }}>
           <h2>Venta cobrada</h2>
           {modal.change != null && <div className="total">Cambio: {mxn(modal.change)}</div>}
           {modal.provisional && <p className="muted">Sin internet: la venta se guardó en este equipo y se enviará sola.</p>}
-          <pre style={{ fontSize: 14, background: 'var(--bg)', padding: 10, borderRadius: 8 }}>{modal.text}</pre>
+          <pre style={{ fontSize: 14, background: 'var(--bg)', padding: 10, borderRadius: 8, overflowX: 'auto' }}>{modal.text}</pre>
           <div className="ticket">{modal.text}</div>
           <div className="row">
             <button className="big" onClick={() => window.print()}>Imprimir ticket</button>
-            <button className="primary big" autoFocus onClick={() => { setModal(null); search.current?.focus() }}>Nueva venta</button>
+            <button className="primary big" autoFocus onClick={() => { setModal(null); focusSearch() }}>Nueva venta</button>
           </div>
         </Modal>
       )}
@@ -249,6 +381,71 @@ export function Caja({ me }: { me: Me }) {
       {modal?.kind === 'ventas' && <VentasTurno shift={shift} me={me} onClose={() => setModal(null)} />}
       {modal?.kind === 'corte' && <Corte shift={shift} onClose={() => setModal(null)} onClosed={() => { setShift(null); cache.set('shift', null); setModal(null) }} />}
     </div>
+  )
+}
+
+/** Cobro: efectivo (con cambio), tarjeta, transferencia, mixto o fiado. Enter cobra. */
+function Cobro({ total, fiado, onPay, onFiado, onClose }: { total: number; fiado: boolean; onPay: (method: string, extra: { cashReceived?: number; otherPayments?: { method: string; amount: number }[] }) => void; onFiado: () => void; onClose: () => void }) {
+  const [mode, setMode] = useState<'efectivo' | 'tarjeta' | 'transferencia' | 'mixto'>('efectivo')
+  const [r, setR] = useState('')
+  const [card, setCard] = useState('')
+  const [transfer, setTransfer] = useState('')
+  const others = mode === 'mixto' ? [{ method: 'tarjeta', amount: toCents(card || '0') }, { method: 'transferencia', amount: toCents(transfer || '0') }].filter((p) => p.amount > 0) : []
+  const othersTotal = others.reduce((a, p) => a + p.amount, 0)
+  const cashDue = mode === 'efectivo' ? total : mode === 'mixto' ? total - othersTotal : 0
+  const received = r.trim() === '' ? cashDue : parseAmount(r) ?? 0
+  const ok = mode === 'tarjeta' || mode === 'transferencia' ? true : cashDue >= 0 && received >= cashDue && (mode === 'efectivo' || othersTotal > 0)
+  const pay = () => {
+    if (!ok) return
+    if (mode === 'tarjeta' || mode === 'transferencia') return onPay(mode, {})
+    onPay('efectivo', { ...(cashDue > 0 ? { cashReceived: received } : {}), ...(others.length ? { otherPayments: others } : {}) })
+  }
+  const quickBills = [2000, 5000, 10000, 20000, 50000, 100000].filter((v) => v >= cashDue).slice(0, 4)
+  const TAB: [typeof mode, string][] = [['efectivo', 'Efectivo'], ['tarjeta', 'Tarjeta'], ['transferencia', 'Transferencia'], ['mixto', 'Mixto']]
+  return (
+    <Modal onClose={onClose}>
+      <form onSubmit={(e) => { e.preventDefault(); pay() }}>
+        <div className="card-head"><h2>Cobrar</h2><span className="total" style={{ margin: 0 }}>{mxn(total)}</span></div>
+        <div className="tabs">{TAB.map(([k, v]) => <button type="button" key={k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)}>{v}</button>)}{fiado && <button type="button" onClick={onFiado}>Fiado</button>}</div>
+        {mode === 'mixto' && (
+          <div className="row">
+            <label>Con tarjeta<input inputMode="decimal" value={card} onChange={(e) => setCard(e.target.value)} placeholder="$0.00" autoFocus /></label>
+            <label>Con transferencia<input inputMode="decimal" value={transfer} onChange={(e) => setTransfer(e.target.value)} placeholder="$0.00" /></label>
+          </div>
+        )}
+        {(mode === 'efectivo' || mode === 'mixto') && (<>
+          {mode === 'mixto' && <p className="muted">Resto en efectivo: <b>{cashDue >= 0 ? mxn(cashDue) : '—'}</b></p>}
+          {cashDue < 0 && <p className="error">Con tarjeta y transferencia ya pasa del total.</p>}
+          {cashDue > 0 && (<>
+            <label>¿Con cuánto paga?<input inputMode="decimal" autoFocus={mode === 'efectivo'} value={r} onChange={(e) => setR(e.target.value)} placeholder={mxn(cashDue)} /></label>
+            <div className="quick">
+              <button type="button" onClick={() => setR(String(cashDue / 100))}>Exacto</button>
+              {quickBills.map((v) => <button type="button" key={v} onClick={() => setR(String(v / 100))}>{mxn(v).replace('.00', '')}</button>)}
+            </div>
+            <h2 style={{ marginTop: 12 }}>Cambio: {received >= cashDue ? mxn(received - cashDue) : '—'}</h2>
+            {received < cashDue && <p className="error">Falta {mxn(cashDue - received)}</p>}
+          </>)}
+        </>)}
+        {(mode === 'tarjeta' || mode === 'transferencia') && <p className="muted">Cobra {mxn(total)} con {mode === 'tarjeta' ? 'la terminal' : 'transferencia'} y confirma cuando se haya pagado.</p>}
+        <p className="row"><button type="button" onClick={onClose}>Regresar</button><button className="primary big" disabled={!ok} autoFocus={mode === 'tarjeta' || mode === 'transferencia'}>Cobrar {mode === 'mixto' ? 'mixto' : ''}</button></p>
+      </form>
+    </Modal>
+  )
+}
+
+function ElegirCliente({ customers, onPick, onClose }: { customers: Customer[]; onPick: (c: Customer | null) => void; onClose: () => void }) {
+  const [q, setQ] = useState('')
+  const list = customers.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())).slice(0, 10)
+  return (
+    <Modal onClose={onClose}>
+      <h2>Cliente de la venta</h2>
+      <label>Buscar<input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre del cliente…" onKeyDown={(e) => e.key === 'Enter' && list[0] && onPick(list[0])} /></label>
+      <div className="results">
+        <button onClick={() => onPick(null)}>Público en general<small>sin cliente</small></button>
+        {list.map((c) => <button key={c.id} onClick={() => onPick(c)}>{c.name}</button>)}
+      </div>
+      {customers.length === 0 && <p className="muted small">Da de alta clientes en «Clientes» para fiarles o darles puntos.</p>}
+    </Modal>
   )
 }
 
@@ -361,9 +558,9 @@ function Descuento({ max, onSet, onClose }: { max: number; onSet: (d: { amount: 
   )
 }
 
-function Pago({ method, total, customers, onPay, onClose }: { method: string; total: number; customers: Customer[]; onPay: (e: { cashReceived?: number; customerId?: string }) => void; onClose: () => void }) {
+function Pago({ method, total, customers, preselect, onPay, onClose }: { method: string; total: number; customers: Customer[]; preselect?: string; onPay: (e: { cashReceived?: number; customerId?: string }) => void; onClose: () => void }) {
   const [r, setR] = useState('')
-  const [cust, setCust] = useState('')
+  const [cust, setCust] = useState(preselect ?? '')
   const [find, setFind] = useState('')
   const received = r === '' ? total : toCents(r)
   if (method === 'fiado') {
@@ -410,10 +607,10 @@ function Movimiento({ shift, onClose }: { shift: Shift; onClose: () => void }) {
   }
   return (
     <Modal onClose={onClose}>
-      <h2>Retiro o depósito</h2>
-      <div className="tabs"><button className={type === 'retiro' ? 'on' : ''} onClick={() => setType('retiro')}>Retiro</button><button className={type === 'deposito' ? 'on' : ''} onClick={() => setType('deposito')}>Depósito</button></div>
+      <h2>Meter o sacar dinero de la caja</h2>
+      <div className="tabs"><button className={type === 'retiro' ? 'on' : ''} onClick={() => setType('retiro')}>Sacar (salida)</button><button className={type === 'deposito' ? 'on' : ''} onClick={() => setType('deposito')}>Meter (entrada)</button></div>
       <label>Monto<input inputMode="decimal" value={a} onChange={(e) => setA(e.target.value)} placeholder="$0.00" autoFocus /></label>
-      <label>Motivo<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej. pago a proveedor" /></label>
+      <label>Motivo<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={type === 'retiro' ? 'Ej. retiro del dueño, pago al gas' : 'Ej. cambio que trajo el dueño'} /></label>
       {done && <p className={done.startsWith('No') ? 'error' : 'okmsg'}>{done}</p>}
       <p className="row"><button onClick={onClose}>Cerrar</button><button className="primary" disabled={!(toCents(a) > 0 && reason.trim().length >= 2) || !!done} onClick={save}>Guardar</button></p>
     </Modal>

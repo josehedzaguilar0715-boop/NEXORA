@@ -171,14 +171,13 @@ export function periodSummary(db: Db, businessId: string, from: string, to: stri
   const bargs = branchId ? [branchId] : []
   const s = db
     .prepare(
-      `SELECT COUNT(*) tickets, COALESCE(SUM(total),0) total, COALESCE(SUM(discount + promo_discount),0) discounts,
-        COALESCE(SUM(CASE WHEN payment_method='efectivo' THEN total END),0) efectivo,
-        COALESCE(SUM(CASE WHEN payment_method='transferencia' THEN total END),0) transferencia,
-        COALESCE(SUM(CASE WHEN payment_method='tarjeta' THEN total END),0) tarjeta,
-        COALESCE(SUM(CASE WHEN payment_method='fiado' THEN total END),0) fiado
+      `SELECT COUNT(*) tickets, COALESCE(SUM(total),0) total, COALESCE(SUM(discount + promo_discount),0) discounts
        FROM sales WHERE business_id = ? AND status = 'completada' AND created_at >= ? AND created_at < ? ${bf}`,
     )
     .get(businessId, start, end, ...bargs) as Record<string, number>
+  // Por forma de pago, desde los pagos de cada venta (una venta mixta suma a varias).
+  const byMethod = db.prepare(`SELECT p.method, COALESCE(SUM(p.amount),0) a FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? ${bf.replace('branch_id', 's.branch_id')} GROUP BY p.method`).all(businessId, start, end, ...bargs) as { method: string; a: number }[]
+  for (const m of ['efectivo', 'transferencia', 'tarjeta', 'fiado']) s[m] = byMethod.find((x) => x.method === m)?.a ?? 0
   const cogs = (db.prepare(`SELECT COALESCE(SUM(si.cost),0) c FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? ${bf.replace('branch_id', 's.branch_id')}`).get(businessId, start, end, ...bargs) as { c: number }).c
   const waste = -(db.prepare(`SELECT COALESCE(SUM(cost),0) c FROM stock_movements WHERE business_id = ? AND type = 'merma' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { c: number }).c
   const expenses = (db.prepare(`SELECT COALESCE(SUM(amount),0) a FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ${bf}`).get(businessId, from, to, ...bargs) as { a: number }).a

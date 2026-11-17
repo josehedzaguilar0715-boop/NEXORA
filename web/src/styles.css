@@ -291,3 +291,57 @@ table.list td select, table.list td input { min-height: 44px; }
 button.mini.danger { background: rgba(248, 113, 113, 0.12); color: var(--danger); border-color: rgba(248, 113, 113, 0.5); }
 @media (max-width: 520px) { .row.day { flex-wrap: wrap; } }
 tr.sel td { background: rgba(34, 211, 238, 0.08); }
+
+/* ---------- Punto de venta ---------- */
+.pos-screen { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+.pos-main { display: grid; gap: 14px; min-width: 0; }
+.pos-search { position: relative; }
+.pos-search input { font-size: 1.05rem; min-height: 60px; }
+.suggest { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 6; display: grid; background: var(--card); border: 1px solid var(--line-2, #34405a); border-radius: 14px; box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.9); overflow: hidden; }
+.suggest button { display: flex; justify-content: space-between; gap: 12px; text-align: left; min-height: 52px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; font-weight: 600; }
+.suggest button small { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.suggest button.on { background: rgba(34, 211, 238, 0.12); }
+.ticket-table { padding: 6px 10px; min-height: 260px; }
+.ticket-table table { width: 100%; border-collapse: collapse; }
+.ticket-table th { color: var(--muted); font-size: 0.78rem; font-weight: 600; text-align: left; padding: 10px 6px; border-bottom: 1px solid #34405a; }
+.ticket-table td { padding: 8px 6px; border-bottom: 1px solid var(--line); }
+.ticket-table tr.sel td { background: rgba(34, 211, 238, 0.08); }
+.ticket-table .qty { justify-content: flex-end; }
+.qty-in { width: 4em; min-height: 44px; text-align: center; padding: 4px; }
+.quick-grid .results { margin-top: 6px; }
+.quick-grid .results button { min-height: 72px; }
+.pos-side { position: sticky; top: 16px; display: grid; gap: 12px; }
+.pos-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pos-chips .chip { flex: 1 1 auto; text-align: left; }
+.pos-total { display: grid; gap: 2px; text-align: right; padding: 6px 2px; border-bottom: 1px solid var(--line); }
+.pos-total .total { font-size: 3rem; margin: 0; }
+button.cobrar { min-height: 84px; font-size: 1.4rem; display: flex; justify-content: center; align-items: center; gap: 12px; }
+.pos-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pos-actions button { min-height: 54px; font-size: 0.84rem; line-height: 1.2; display: flex; justify-content: space-between; align-items: center; gap: 6px; text-align: left; }
+.pos-actions button.corte { grid-column: 1 / -1; justify-content: center; }
+kbd { font: 700 0.7rem/1 'Inter', system-ui, sans-serif; padding: 4px 6px; border-radius: 6px; border: 1px solid #34405a; background: rgba(255, 255, 255, 0.04); color: var(--muted); }
+button.primary kbd { color: #fff; border-color: rgba(255, 255, 255, 0.45); background: rgba(255, 255, 255, 0.12); }
+@media (max-width: 1100px) { .pos-screen { grid-template-columns: minmax(0, 1fr) 300px; } }
+@media (max-width: 900px) {
+  .pos-screen { grid-template-columns: minmax(0, 1fr); }
+  .pos-side { position: static; order: -1; }
+  .pos-total .total { font-size: 2.2rem; }
+  kbd { display: none; }
+}
+.ticket-table { overflow-x: auto; }
+@media (max-width: 520px) {
+  .ticket-table { padding: 4px; }
+  .ticket-table td, .ticket-table th { padding: 6px 3px; font-size: 0.9rem; }
+  .ticket-table .qty button { min-width: 34px; min-height: 40px; }
+  .qty-in { width: 2.6em; min-height: 40px; }
+  .pos-actions button { font-size: 0.8rem; }
+}
+@media (max-width: 900px) {
+  .pos-screen { display: flex; flex-direction: column; gap: 12px; }
+  .pos-main { display: contents; }
+  .pos-search { order: 1; }
+  .ticket-table { order: 2; min-height: 0; }
+  .pos-side { order: 3; }
+  .quick-grid { order: 4; }
+}
+@media (max-width: 520px) { .quick-grid .results { grid-template-columns: repeat(2, minmax(0, 1fr)); } .quick-grid .results button { min-height: 64px; font-size: 0.9rem; } }

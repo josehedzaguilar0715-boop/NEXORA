@@ -44,6 +44,8 @@ const saleSchema = z
     paymentMethod: z.enum(['efectivo', 'transferencia', 'tarjeta', 'fiado']),
     /** Efectivo que entrega el cliente, para calcular el cambio. */
     cashReceived: z.number().int().min(0).optional(),
+    /** Pago mixto (con paymentMethod "efectivo"): lo que se paga con tarjeta o transferencia; el resto es efectivo. */
+    otherPayments: z.array(z.object({ method: z.enum(['tarjeta', 'transferencia']), amount: z.number().int().min(1) })).max(4).optional(),
     discount: z.number().int().min(0).optional(),
     authCode: z.string().optional(),
     /** Turno en el que se cobró (útil al reenviar ventas hechas sin internet). */
@@ -165,9 +167,11 @@ function resolveLine(deps: Deps, u: UserRow, branchId: string, it: z.infer<typeo
 
 export function saleView(deps: Deps, s: SaleRow) {
   const items = deps.db.prepare('SELECT description, quantity, unit_price AS unitPrice, total, product_id AS productId FROM sale_items WHERE sale_id = ? ORDER BY rowid').all(s.id) as { description: string; quantity: number; unitPrice: number; total: number }[]
+  const payments = deps.db.prepare('SELECT method, amount FROM sale_payments WHERE sale_id = ? ORDER BY rowid').all(s.id) as { method: string; amount: number }[]
+  const cashPart = payments.length ? payments.filter((p) => p.method === 'efectivo').reduce((a, p) => a + p.amount, 0) : s.total
   return {
     id: s.id, folio: s.folio, shiftId: s.shift_id, subtotal: s.subtotal, promoDiscount: s.promo_discount, discount: s.discount, total: s.total, customerId: s.customer_id,
-    paymentMethod: s.payment_method, cashReceived: s.cash_received, change: s.cash_received != null ? s.cash_received - s.total : null,
+    paymentMethod: payments.length > 1 ? 'mixto' : s.payment_method, payments, cashReceived: s.cash_received, change: s.cash_received != null ? s.cash_received - cashPart : null,
     status: s.status, cancelReason: s.cancel_reason, createdAt: s.created_at, items,
   }
 }
@@ -213,9 +217,18 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
   const discount = d.discount ?? 0
   if (discount > subtotal - promo.total) throw bad('El descuento no puede ser mayor al total.')
   const total = subtotal - promo.total - discount
+  // Formas de pago de la venta. Mixto: tarjeta/transferencia y el resto en efectivo.
+  const others = d.otherPayments ?? []
+  if (others.length && d.paymentMethod !== 'efectivo') throw bad('El pago mixto se combina con efectivo.')
+  const othersTotal = others.reduce((a, p) => a + p.amount, 0)
+  if (othersTotal > total) throw bad(`Con tarjeta o transferencia van ${othersTotal / 100} y la venta es de ${total / 100}: revisa los montos.`, 'pago_no_cuadra')
+  const cashPart = d.paymentMethod === 'efectivo' ? total - othersTotal : 0
+  const payments = d.paymentMethod === 'efectivo'
+    ? [...(cashPart > 0 || !others.length ? [{ method: 'efectivo', amount: cashPart }] : []), ...others]
+    : [{ method: d.paymentMethod, amount: total }]
   if (d.cashReceived !== undefined) {
     if (d.paymentMethod !== 'efectivo') throw bad('El efectivo recibido solo aplica a pagos en efectivo.')
-    if (d.cashReceived < total) throw bad('El efectivo recibido no alcanza.', 'efectivo_insuficiente')
+    if (d.cashReceived < cashPart) throw bad('El efectivo recibido no alcanza.', 'efectivo_insuficiente')
   }
   for (const v of saleValidators) v({ deps, user: u, branchId: shift.branch_id, shiftId: shift.id, input: d, lines, total })
 
@@ -256,6 +269,7 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
       if (l.serviceId) db.prepare('UPDATE sale_items SET service_id = ? WHERE id = ?').run(l.serviceId, l.itemId)
       if (l.priceChanged) audit(db, now, { businessId: u.business_id, userId: u.id, action: 'venta.cambio_precio', entity: 'sale', entityId: d.id, newValue: { description: l.description, unitPrice: l.unitPrice }, authorizedBy: priceAuth })
     }
+    for (const p of payments) db.prepare('INSERT INTO sale_payments (id, sale_id, method, amount) VALUES (?,?,?,?)').run(newId(), d.id, p.method, p.amount)
     for (const p of promo.applied) db.prepare('INSERT INTO sale_promotions (sale_id, promotion_id, amount) VALUES (?,?,?)').run(d.id, p.id, p.amount)
     if (d.customerId) earnForSale(db, now, u.business_id, u.id, d.customerId, d.id, total)
     if (d.paymentMethod === 'fiado') {
@@ -344,7 +358,7 @@ sales.get('/sales/:id/ticket', (c) => {
   const v = saleView(deps, s)
   const ticket = {
     business: biz.name, logoUrl: biz.logo_url, phone: biz.phone, folio: String(s.folio).padStart(6, '0'), date: s.created_at,
-    items: v.items, subtotal: s.subtotal, discount: s.discount + s.promo_discount, total: s.total, paymentMethod: s.payment_method, cashier: cashier.name,
+    items: v.items, subtotal: s.subtotal, discount: s.discount + s.promo_discount, total: s.total, paymentMethod: v.paymentMethod, payments: v.payments, cashReceived: s.cash_received, change: v.change, cashier: cashier.name,
     cancelled: s.status === 'cancelada',
   }
   return c.json({ ticket, text: ticketText(ticket) })
@@ -352,7 +366,9 @@ sales.get('/sales/:id/ticket', (c) => {
 
 const mxn = (cents: number) => `$${(cents / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-function ticketText(t: { business: string; phone: string | null; folio: string; date: string; items: { description: string; quantity: number; total: number }[]; subtotal: number; discount: number; total: number; paymentMethod: string; cashier: string; cancelled: boolean }) {
+const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta', fiado: 'Fiado' }
+
+function ticketText(t: { business: string; phone: string | null; folio: string; date: string; items: { description: string; quantity: number; total: number }[]; subtotal: number; discount: number; total: number; paymentMethod: string; payments: { method: string; amount: number }[]; cashReceived: number | null; change: number | null; cashier: string; cancelled: boolean }) {
   const W = 32
   const row = (l: string, r: string) => l.slice(0, W - r.length - 1).padEnd(W - r.length) + r
   const fecha = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'short', timeStyle: 'short' }).format(new Date(t.date))
@@ -361,6 +377,9 @@ function ticketText(t: { business: string; phone: string | null; folio: string; 
     ...t.items.map((i) => row(`${i.quantity} ${i.description}`, mxn(i.total))),
     '-'.repeat(W),
     ...(t.discount ? [row('Subtotal', mxn(t.subtotal)), row('Descuento', `-${mxn(t.discount)}`)] : []),
-    row('TOTAL', mxn(t.total)), `Pago: ${t.paymentMethod}`, `Atendió: ${t.cashier}`,
+    row('TOTAL', mxn(t.total)),
+    ...(t.payments.length > 1 ? t.payments.map((p) => row(METHOD[p.method] ?? p.method, mxn(p.amount))) : [`Pago: ${METHOD[t.paymentMethod] ?? t.paymentMethod}`]),
+    ...(t.cashReceived != null ? [row('Recibido', mxn(t.cashReceived)), row('Cambio', mxn(t.change ?? 0))] : []),
+    `Atendió: ${t.cashier}`, '', '¡Gracias por su compra!',
   ].filter((l) => l !== '').join('\n')
 }
