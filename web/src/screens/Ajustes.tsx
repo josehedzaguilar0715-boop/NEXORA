@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, mxn, toCents } from '../api'
+import { api, cache, mxn, outbox, toCents } from '../api'
 import { hasGiro, type Me } from '../App'
 import { giroLabel } from '../giros'
 
@@ -69,7 +69,44 @@ export function Ajustes({ me }: { me: Me }) {
         ))}</tbody></table></div>
         {st.travelFee != null && <p className="muted">Traslado: {mxn(st.travelFee)}</p>}
       </section>
+      <EmpezarDeCero />
     </div>
+  )
+}
+
+/** Borra las ventas y movimientos de prueba (después de enseñar el sistema) para que el negocio empiece limpio. */
+function EmpezarDeCero() {
+  const [open, setOpen] = useState(false)
+  const [f, setF] = useState({ confirm: '', code: '' })
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  const pending = outbox.pending()
+  return (
+    <section className="card">
+      <h2>Empezar de cero</h2>
+      <p className="muted">Para cuando ya terminaste de enseñar el sistema: borra <b>todas</b> las ventas, cortes, cajas, gastos, fiados, apartados, citas, cuentas de mesa y demás movimientos de prueba. Lo vendido de prueba regresa al inventario y los folios vuelven a empezar en 1.</p>
+      <p className="muted small">Se queda: productos, servicios, clientes, proveedores, compras, personal y configuración. Una venta suelta no se puede borrar; para eso está «Cancelar venta» con código.</p>
+      {!open && <p><button className="danger" onClick={() => setOpen(true)}>Borrar datos de prueba…</button></p>}
+      {open && (
+        <div className="danger-zone">
+          {pending > 0 && <p className="error">Hay {pending} movimiento(s) sin enviar en este equipo. Espera a que diga «Todo enviado».</p>}
+          <label>Escribe BORRAR para confirmar<input value={f.confirm} onChange={(e) => setF({ ...f, confirm: e.target.value })} autoCapitalize="characters" /></label>
+          <label>Tu código de autorización<input type="password" inputMode="numeric" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} /></label>
+          {msg.err && <p className="error">{msg.err}</p>}
+          <p className="row">
+            <button onClick={() => { setOpen(false); setF({ confirm: '', code: '' }); setMsg({}) }}>Cancelar</button>
+            <button className="danger" disabled={pending > 0 || f.confirm.trim().toUpperCase() !== 'BORRAR' || !f.code} onClick={async () => {
+              try {
+                const r = await api<{ sales: number }>('POST', '/business/reset-demo', { confirm: f.confirm, authCode: f.code })
+                cache.set('held', [])
+                setOpen(false); setF({ confirm: '', code: '' })
+                setMsg({ ok: `Listo: se borraron ${r.sales} venta(s) de prueba. El negocio empieza de cero.` })
+              } catch (e) { setMsg({ err: (e as Error).message }) }
+            }}>Borrar todo y empezar de cero</button>
+          </p>
+        </div>
+      )}
+      {msg.ok && <p className="okmsg">{msg.ok}</p>}
+    </section>
   )
 }
 

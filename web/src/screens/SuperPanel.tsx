@@ -90,6 +90,7 @@ function Negocios() {
           <div className="pay">
             <button className="primary big" onClick={() => { const m = Number(prompt('¿Cuántos meses pagó?', '1')); if (m) void run(() => adm('POST', `/admin/businesses/${sel.id}/payments`, { months: m }), 'Pago registrado: el negocio queda activo.')() }}>Registrar pago</button>
             {['prueba', 'vencido'].includes(sel.status) && !sel.paidUntil && <button className="big" onClick={() => { const d = Number(prompt('Días de prueba (desde el alta):', String(sel.trialDays ?? 14))); if (d >= 0) void run(() => adm('PATCH', `/admin/businesses/${sel.id}`, { trialDays: d }), 'Días de prueba cambiados.')() }}>Días de prueba</button>}
+            <button className="danger" onClick={() => { if (prompt(`Esto borra TODAS las ventas y movimientos de ${sel.name}. Escribe BORRAR para confirmar:`)?.trim().toUpperCase() !== 'BORRAR') return; const r = prompt('Motivo (ej. terminó la demostración):'); if (r) void run(async () => { const x = await adm('POST', `/admin/businesses/${sel.id}/reset-demo`, { confirm: 'BORRAR', reason: r }); return x }, 'Listo: datos de prueba borrados. El negocio empieza de cero.')() }}>Borrar datos de prueba</button>
             {sel.status === 'vencido' && <button className="danger big" onClick={() => { const r = prompt('Motivo de la suspensión:'); if (r) void run(() => adm('POST', `/admin/businesses/${sel.id}/suspend`, { reason: r }), 'Suspendido. Sus datos quedan intactos.')() }}>Suspender</button>}
           </div>
           <h3 style={{ marginTop: 14 }}>Tipo de negocio</h3>

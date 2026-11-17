@@ -9,6 +9,7 @@ import { finance } from './finance.js'
 import { accounting } from './accounting.js'
 import { importer } from './importer.js'
 import { layaways } from './layaways.js'
+import { reset } from './reset.js'
 import { inventory } from './inventory.js'
 import { hardware } from './hardware.js'
 import { services } from './services.js'
@@ -69,6 +70,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', accounting)
   protectedApp.route('/', importer)
   protectedApp.route('/', layaways)
+  protectedApp.route('/', reset)
   app.route('/', protectedApp)
 
   app.onError((err, c) => {

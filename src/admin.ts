@@ -5,6 +5,7 @@ import { audit } from './audit.js'
 import { businessGiros, enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, refreshStatus, setting, type BusinessRow, type Plan } from './billing.js'
 import { body, LOCK_MINUTES, MAX_FAILED, parse, smsOn, type Deps, type UserRow } from './context.js'
 import { consumeChallenge, createChallenge, extraOf, forgetDevices } from './auth.js'
+import { resetDemoData } from './reset.js'
 import { ticketView } from './support.js'
 import { exportAll, runBackup } from './backup.js'
 import {
@@ -278,6 +279,17 @@ admin.post('/admin/businesses/:id/users/:userId/reset-password', async (c) => {
   forgetDevices(c.get('deps'), u.id)
   audit(db, now, { businessId: b.id, userId: a.id, action: 'admin.restablecer_acceso', entity: 'user', entityId: u.id, reason: d.reason })
   return c.json({ ok: true })
+})
+
+/** Empezar de cero: borrar las ventas y movimientos de prueba de una cuenta asistida (se escribe BORRAR y un motivo). */
+admin.post('/admin/businesses/:id/reset-demo', async (c) => {
+  const { db, now } = c.get('deps')
+  const b = loadBusiness(c)
+  const d = parse(z.object({ confirm: z.string(), reason: z.string().trim().min(3).max(300) }), await body(c))
+  if (d.confirm.trim().toUpperCase() !== 'BORRAR') throw bad('Escribe BORRAR para confirmar.')
+  const r = resetDemoData(db, b.id)
+  audit(db, now, { businessId: b.id, userId: c.get('admin').id, action: 'admin.empezar_de_cero', entity: 'business', entityId: b.id, newValue: r, reason: d.reason })
+  return c.json(r)
 })
 
 /** Cambiar el teléfono con el que entra el dueño (cuando cambia de número y no puede hacerlo él). */
