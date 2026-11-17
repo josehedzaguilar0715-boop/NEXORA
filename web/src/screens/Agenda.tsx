@@ -146,9 +146,9 @@ function Retoques() {
   return (
     <section className="card" style={{ marginTop: 16 }}>
       <h2>Les toca retoque</h2>
-      <table className="list"><tbody>{list.map((r, i) => (
+      <div className="table-wrap"><table className="list"><tbody>{list.map((r, i) => (
         <tr key={i}><td>{r.customerName}<br /><small className="muted">{r.service} · última vez {new Date(r.lastVisit).toLocaleDateString('es-MX')}</small></td><td>{r.whatsapp ? <a href={r.whatsapp} target="_blank" rel="noreferrer">Preparar WhatsApp</a> : <span className="muted">sin teléfono</span>}</td></tr>
-      ))}</tbody></table>
+      ))}</tbody></table></div>
     </section>
   )
 }

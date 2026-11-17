@@ -118,13 +118,13 @@ function Resumen({ from, to, onErr, go }: { from: string; to: string; onErr: (e:
         <section className="card">
           <div className="card-head"><h2>Situación hoy</h2><button className="link" onClick={() => go('balance')}>Ver balance →</button></div>
           {bal && (
-            <table className="list statement"><tbody>
+            <div className="table-wrap"><table className="list statement"><tbody>
               <tr><td>Efectivo en cajas abiertas</td><td className="num">{mxn(bal.cashInRegisters)}</td></tr>
               <tr><td>Mercancía (a costo)</td><td className="num">{mxn(bal.inventory)}</td></tr>
               <tr><td>Te deben (fiado)</td><td className="num">{mxn(bal.receivables)}</td></tr>
               <tr><td>Debes a proveedores</td><td className={`num ${bal.payables ? "neg" : ""}`}>{mxn(bal.payables ? -bal.payables : 0)}</td></tr>
               <tr className="total"><td>Valor del negocio</td><td className="num">{mxn(bal.equity)}</td></tr>
-            </tbody></table>
+            </tbody></table></div>
           )}
         </section>
       </div>
@@ -159,7 +159,7 @@ function Resultados({ from, to, onErr }: { from: string; to: string; onErr: (e: 
   return (
     <section className="card">
       <div className="card-head"><h2>Estado de resultados</h2><button onClick={() => download('resultados', from, to).catch((e) => onErr(e.message))}>⬇ Exportar a Excel</button></div>
-      <table className="list statement">
+      <div className="table-wrap"><table className="list statement">
         <thead><tr><th>Concepto</th><th className="num">Este periodo</th><th className="num hide-sm">% ventas</th><th className="num hide-sm">Periodo anterior</th><th className="num hide-sm">Cambio</th></tr></thead>
         <tbody>
           {line('Ventas', c.grossSales, p.grossSales)}
@@ -175,7 +175,7 @@ function Resultados({ from, to, onErr }: { from: string; to: string; onErr: (e: 
           {line('Total de gastos', c.operatingExpenses, p.operatingExpenses, { cls: 'sub', neg: true, invert: true })}
           {line('Utilidad neta', c.netProfit, p.netProfit, { cls: `total ${c.netProfit < 0 ? 'neg' : ''}` })}
         </tbody>
-      </table>
+      </table></div>
       <div className="kpis mini">
         <div><span className="muted">Margen bruto</span><b>{pct(c.grossMargin)}</b></div>
         <div><span className="muted">Margen neto</span><b>{pct(c.netMargin)}</b></div>
@@ -193,7 +193,7 @@ function Flujo({ from, to, onErr }: { from: string; to: string; onErr: (e: strin
   const block = (title: string, rows: any[], total: number, sign: string) => (
     <section className="card">
       <h2>{title}</h2>
-      <table className="list statement"><tbody>
+      <div className="table-wrap"><table className="list statement"><tbody>
         {group(rows).map(([k, rs]) => (
           <Fragment key={k}>
             <tr><td>{FLOW[k] ?? k}</td><td className="num">{sign}{mxn(rs.reduce((a, r) => a + r.amount, 0))}</td></tr>
@@ -203,7 +203,7 @@ function Flujo({ from, to, onErr }: { from: string; to: string; onErr: (e: strin
         ))}
         {rows.length === 0 && <tr><td className="muted">Sin movimientos.</td><td /></tr>}
         <tr className="total"><td>Total</td><td className="num">{sign}{mxn(total)}</td></tr>
-      </tbody></table>
+      </tbody></table></div>
     </section>
   )
   return (
@@ -230,21 +230,21 @@ function Balance({ onErr }: { onErr: (e: string) => void }) {
       <div className="grid2">
         <section className="card">
           <h2>Lo que tiene el negocio</h2>
-          <table className="list statement"><tbody>
+          <div className="table-wrap"><table className="list statement"><tbody>
             <tr><td>Efectivo en cajas abiertas<br /><small className="muted">{b.openRegisters} caja(s) abierta(s); sin propinas</small></td><td className="num">{mxn(b.cashInRegisters)}</td></tr>
             <tr><td>Mercancía en inventario<br /><small className="muted">a lo que te costó</small></td><td className="num">{mxn(b.inventory)}</td></tr>
             <tr><td>Cuentas por cobrar<br /><small className="muted">fiado de clientes</small></td><td className="num">{mxn(b.receivables)}</td></tr>
             <tr className="total"><td>Total</td><td className="num">{mxn(b.assets)}</td></tr>
-          </tbody></table>
+          </tbody></table></div>
         </section>
         <section className="card">
           <h2>Lo que debe el negocio</h2>
-          <table className="list statement"><tbody>
+          <div className="table-wrap"><table className="list statement"><tbody>
             <tr><td>Cuentas por pagar<br /><small className="muted">compras a crédito sin liquidar</small></td><td className="num">{mxn(b.payables)}</td></tr>
             <tr><td>Saldo a favor de clientes<br /><small className="muted">devoluciones como saldo</small></td><td className="num">{mxn(b.customerCredit)}</td></tr>
             {b.layawayDeposits > 0 && <tr><td>Anticipos de apartados<br /><small className="muted">dinero recibido por mercancía sin entregar</small></td><td className="num">{mxn(b.layawayDeposits)}</td></tr>}
             <tr className="total"><td>Total</td><td className="num">{mxn(b.liabilities)}</td></tr>
-          </tbody></table>
+          </tbody></table></div>
         </section>
       </div>
       <section className="card hero-total">
@@ -284,10 +284,10 @@ function Gastos({ from, to, onErr, canEdit }: { from: string; to: string; onErr:
       </section>}
       <section className="card">
         <div className="card-head"><h2>Gastos del periodo</h2><button onClick={() => download('gastos', from, to).catch((e) => onErr(e.message))}>⬇ Exportar</button></div>
-        <table className="list"><thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th></tr></thead><tbody>
+        <div className="table-wrap"><table className="list"><thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th></tr></thead><tbody>
           {(list?.expenses ?? []).map((e: any) => <tr key={e.id}><td className="nowrap">{fmtDate(e.date)}</td><td>{e.concept}<br /><small className="muted">{CATEGORIES[e.category] ?? e.category} · {e.kind} · {METHOD[e.method] ?? e.method}</small></td><td className="num">{mxn(e.amount)}</td></tr>)}
           {list && list.expenses.length === 0 && <tr><td colSpan={3} className="muted">No hay gastos en este periodo.</td></tr>}
-        </tbody>{total > 0 && <tfoot><tr className="total"><td colSpan={2}>Total</td><td className="num">{mxn(total)}</td></tr></tfoot>}</table>
+        </tbody>{total > 0 && <tfoot><tr className="total"><td colSpan={2}>Total</td><td className="num">{mxn(total)}</td></tr></tfoot>}</table></div>
       </section>
     </div>
   )

@@ -33,7 +33,7 @@ export function Usuarios({ me }: { me: Me }) {
       <div className="grid2 config">
         <section className="card">
           <h2>Equipo</h2>
-          <table className="list">
+          <div className="table-wrap"><table className="list">
             <thead><tr><th>Nombre</th><th className="hide-sm">Usuario</th><th>Puesto</th><th /></tr></thead>
             <tbody>
               {users.map((u) => (
@@ -46,7 +46,7 @@ export function Usuarios({ me }: { me: Me }) {
               ))}
               {users.length <= 1 && <tr><td colSpan={4} className="empty">Todavía no hay empleados. Agrega al primero con «+ Nuevo empleado».</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </section>
         <div className="stack">
           <Asistencia />
@@ -184,7 +184,7 @@ function Asistencia() {
       <h2>Asistencia de hoy</h2>
       <div className="pay"><button className="big" onClick={() => clock('entrada')}>Registrar mi entrada</button><button className="big" onClick={() => clock('salida')}>Registrar mi salida</button></div>
       {msg && <p className="error">{msg}</p>}
-      <table className="list"><tbody>{rows.map((r, i) => <tr key={i}><td>{r.name}</td><td>{r.type === 'entrada' ? 'Entrada' : 'Salida'}</td><td className="num">{new Date(r.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td></tr>)}</tbody></table>
+      <div className="table-wrap"><table className="list"><tbody>{rows.map((r, i) => <tr key={i}><td>{r.name}</td><td>{r.type === 'entrada' ? 'Entrada' : 'Salida'}</td><td className="num">{new Date(r.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td></tr>)}</tbody></table></div>
       {rows.length === 0 && <p className="muted">Nadie ha registrado hoy.</p>}
     </section>
   )

@@ -139,6 +139,8 @@ function productView(db: Db, p: ProductRow, branchId: string | null) {
     minStock: fromMilli(p.min_stock_milli), trackExpiry: !!p.track_expiry, sellable: !!p.sellable, attrs: JSON.parse(p.attrs), trackStock: !!(p as ProductRow & { track_stock: number }).track_stock, lastCost: p.last_cost, version: p.version, updatedAt: p.updated_at, active: !!p.active,
     ...(branchId ? { price: currentPrice(db, branchId, p), stock: fromMilli(stockOf(db, branchId, p.id)), reserved: fromMilli((db.prepare("SELECT COALESCE(SUM(i.qty_milli),0) v FROM layaway_items i JOIN layaways l ON l.id = i.layaway_id WHERE l.branch_id = ? AND l.status = 'abierto' AND i.product_id = ?").get(branchId, p.id) as { v: number }).v) } : {}),
     suggestedPrice: suggestedPrice(db, p), presentations, tiers,
+    // Set o combo: lo que descuenta al venderse (perfumería, papelería).
+    combo: (db.prepare('SELECT ci.product_id AS productId, x.name, ci.qty_milli FROM combo_items ci JOIN products x ON x.id = ci.product_id WHERE ci.combo_id = ?').all(p.id) as { productId: string; name: string; qty_milli: number }[]).map(({ qty_milli, ...r }) => ({ ...r, quantity: fromMilli(qty_milli) })),
   }
 }
 

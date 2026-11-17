@@ -71,13 +71,13 @@ function Negocios() {
     <div className="grid2">
       <section className="card">
         <div className="tabs">{['', 'prueba', 'activo', 'vencido', 'suspendido'].map((s) => <button key={s} className={filter === s ? 'on' : ''} onClick={() => setFilter(s)}>{s ? STATUS[s] : 'Todos'}</button>)}</div>
-        <table className="list"><tbody>{list.map((b) => (
+        <div className="table-wrap"><table className="list"><tbody>{list.map((b) => (
           <tr key={b.id} onClick={() => setSel(b)} style={{ cursor: 'pointer' }}>
             <td><b>{b.name}</b> <small className="muted">{b.code} · {(b.giros ?? [b.giro]).map(giroLabel).join(' + ')}</small><br /><small className="muted">{b.owner?.name} · {b.owner?.phone}{b.unreadTickets ? ` · ✉ ${b.unreadTickets}` : ''}</small></td>
             <td style={{ color: COLOR[b.status], fontWeight: 700 }}>{STATUS[b.status]}{b.overdueDays != null ? ` (${b.overdueDays} d)` : ''}</td>
             <td className="num">{mxn(b.monthlyFee)}</td>
           </tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
       </section>
       {sel && (
         <section className="card">
@@ -205,9 +205,9 @@ function BuzonAdmin() {
     <div className="grid2">
       <section className="card">
         <h2>Buzón</h2>
-        <table className="list"><tbody>{list.map((t) => (
+        <div className="table-wrap"><table className="list"><tbody>{list.map((t) => (
           <tr key={t.id} onClick={() => open(t)} style={{ cursor: 'pointer', fontWeight: t.unread_by_support ? 700 : 400 }}><td>{t.business_name}<br /><small className="muted">{t.type === 'cambio' ? `Cambio · ${t.module}` : 'Soporte'} · {t.subject}</small></td><td>{t.status}</td></tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
       </section>
       {sel && (
         <section className="card">
@@ -280,9 +280,9 @@ function Respaldos() {
       <p className="muted">Se hace uno solo cada noche (3:17 a. m.) y se guardan 30 días. Si hay correo configurado, también te llega a tu correo.</p>
       {enabled && <p><button className="primary" onClick={async () => { try { const r = await adm('POST', '/admin/backups'); setMsg(`Respaldo listo: ${r.name}${r.emailed ? ' (enviado a tu correo)' : ''}`); void load() } catch (e) { setMsg((e as Error).message) } }}>Respaldar ahora</button></p>}
       {msg && <p className="muted">{msg}</p>}
-      <table className="list"><tbody>{list.map((b) => (
+      <div className="table-wrap"><table className="list"><tbody>{list.map((b) => (
         <tr key={b.name}><td>{b.name.slice(7, 17)} {b.name.slice(18, 23).replace('-', ':')} UTC<br /><small className="muted">{(b.size / 1024).toFixed(0)} KB</small></td><td><button onClick={() => download(b.name)}>Descargar</button></td></tr>
-      ))}</tbody></table>
+      ))}</tbody></table></div>
       {enabled && list.length === 0 && <p className="muted">Todavía no hay respaldos.</p>}
       <p><button onClick={async () => { const d = await adm('GET', '/admin/export'); const url = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `nexora-${d.exportedAt.slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url) }}>Descargar todo ahora (sin comprimir)</button></p>
     </>

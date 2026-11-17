@@ -40,10 +40,10 @@ export function Taquilla(_: { me: Me }) {
         ))}</div>
         {slots.length === 0 && <p className="muted">No hay horarios para este día. Configúralos en <a href="#/configurar">Configurar negocio → Horarios y aforo</a>.</p>}
         <h3 style={{ marginTop: 12 }}>Boletos</h3>
-        <table className="list"><tbody>{types.map((t) => (
+        <div className="table-wrap"><table className="list"><tbody>{types.map((t) => (
           <tr key={t.id}><td>{t.name}<br /><small className="muted">{mxn(t.price)}</small></td>
             <td><div className="qty"><button onClick={() => setQty({ ...qty, [t.id]: Math.max(0, (qty[t.id] ?? 0) - 1) })}>−</button><b style={{ minWidth: 40, textAlign: 'center' }}>{qty[t.id] ?? 0}</b><button onClick={() => setQty({ ...qty, [t.id]: (qty[t.id] ?? 0) + 1 })}>+</button></div></td></tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
         {types.length === 0 && <p className="muted">No hay tipos de boleto. Agrégalos en <a href="#/configurar">Configurar negocio → Tipos de boleto</a>.</p>}
         <div className="total">{mxn(total)}</div>
         <div className="pay">
@@ -115,9 +115,9 @@ export function TiendaBoletos({ code }: { code: string }) {
       <div className="card">
         <label>Día de tu visita<input type="date" min={today()} value={date} onChange={(e) => { setDate(e.target.value); setF({ ...f, start: '' }) }} /></label>
         <div className="results" style={{ marginTop: 8 }}>{info.slots.map((s: any) => <button key={s.start} disabled={!s.available} className={f.start === s.start ? 'primary' : ''} onClick={() => setF({ ...f, start: s.start })}>{s.start}–{s.end}<small>{s.available} lugares</small></button>)}</div>
-        <table className="list" style={{ marginTop: 8 }}><tbody>{info.types.map((t: any) => (
+        <div className="table-wrap"><table className="list" style={{ marginTop: 8 }}><tbody>{info.types.map((t: any) => (
           <tr key={t.id}><td>{t.name} · {mxn(t.price)}</td><td><div className="qty"><button onClick={() => setQty({ ...qty, [t.id]: Math.max(0, (qty[t.id] ?? 0) - 1) })}>−</button><b style={{ minWidth: 40, textAlign: 'center' }}>{qty[t.id] ?? 0}</b><button onClick={() => setQty({ ...qty, [t.id]: (qty[t.id] ?? 0) + 1 })}>+</button></div></td></tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
         <div className="total">{mxn(total)}</div>
         <label>Nombre<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
         <label>Teléfono (10 dígitos)<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>

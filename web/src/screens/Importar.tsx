@@ -236,7 +236,7 @@ export function Importar(_: { me: Me }) {
           <div className="card" style={{ marginTop: 12 }}>
             <h3>Listo</h3>
             <p><span className="pos">{result.created} nuevos</span> · {result.updated} actualizados · {result.skipped} sin cambios{result.failed ? <> · <span className="neg">{result.failed} con problema</span></> : null}</p>
-            {result.errors.length > 0 && <table className="list"><tbody>{result.errors.slice(0, 50).map((e, i) => <tr key={i}><td className="muted nowrap">Fila {e.line}</td><td>{e.message}</td></tr>)}</tbody></table>}
+            {result.errors.length > 0 && <div className="table-wrap"><table className="list"><tbody>{result.errors.slice(0, 50).map((e, i) => <tr key={i}><td className="muted nowrap">Fila {e.line}</td><td>{e.message}</td></tr>)}</tbody></table></div>}
             {result.errors.length > 50 && <p className="muted small">…y {result.errors.length - 50} más.</p>}
           </div>
         )}

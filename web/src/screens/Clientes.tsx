@@ -31,7 +31,7 @@ export function Clientes({ me }: { me: Me }) {
       {msg && <p className="error">{msg}</p>}
       <div className="grid2 config">
         <section className="card">
-          <table className="list">
+          <div className="table-wrap"><table className="list">
             <thead><tr><th>Cliente</th>{fiado && <th className="num">Debe</th>}</tr></thead>
             <tbody>
               {list.map((c) => (
@@ -42,7 +42,7 @@ export function Clientes({ me }: { me: Me }) {
               ))}
               {list.length === 0 && <tr><td colSpan={2} className="empty">{q ? 'Nadie coincide con la búsqueda.' : 'Todavía no hay clientes.'}</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </section>
         {sel ? <Cliente me={me} c={sel} fiado={fiado} onChanged={() => void load()} /> : <section className="card"><p className="muted">Elige un cliente para ver {fiado ? 'su cuenta, ' : ''}sus compras{hasGiro(me, 'barberia', 'unas', 'banos') ? ' y membresías' : ''}.</p></section>}
       </div>
@@ -75,6 +75,7 @@ function Cliente({ me, c, fiado, onChanged }: { me: Me; c: any; fiado: boolean; 
     ...(membresias ? [['membresias', 'Membresías']] : []),
     ...(puntos ? [['puntos', 'Puntos']] : []),
     ['compras', 'Compras'],
+    ['datos', 'Datos'],
     ['qr', 'Su QR'],
   ] as [string, string][]
   const [tab, setTab] = useState(tabs[0]![0])
@@ -88,6 +89,7 @@ function Cliente({ me, c, fiado, onChanged }: { me: Me; c: any; fiado: boolean; 
       {tab === 'membresias' && <Membresias c={c} />}
       {tab === 'puntos' && <Puntos c={c} />}
       {tab === 'compras' && <Compras c={c} />}
+      {tab === 'datos' && <Datos me={me} c={c} onChanged={onChanged} />}
       {tab === 'qr' && (
         <div className="row" style={{ alignItems: 'center' }}>
           <img alt={`QR de ${c.name}`} src={`/api/public/qr/${c.code}.svg`} width={150} height={150} style={{ flex: '0 0 auto', background: '#fff', borderRadius: 12, padding: 6 }} />
@@ -127,10 +129,10 @@ function Cuenta({ me, c, onChanged }: { me: Me; c: any; onChanged: () => void })
       </>)}
       {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
       <h3 style={{ marginTop: 14 }}>Movimientos</h3>
-      <table className="list"><tbody>
+      <div className="table-wrap"><table className="list"><tbody>
         {credit.ledger.map((l: any, i: number) => <tr key={i}><td>{KIND[l.kind] ?? l.kind}{l.method ? ` · ${METHOD[l.method] ?? l.method}` : ''}{l.note ? <><br /><small className="muted">{l.note}</small></> : null}<br /><small className="muted">{new Date(l.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</small></td><td className={`num ${l.delta > 0 ? 'neg' : 'pos'}`}>{mxn(l.delta)}</td></tr>)}
         {credit.ledger.length === 0 && <tr><td className="muted">Sin movimientos.</td></tr>}
-      </tbody></table>
+      </tbody></table></div>
     </div>
   )
 }
@@ -158,7 +160,7 @@ function Membresias({ c }: { c: any }) {
   return (
     <div>
       {status?.memberships.length ? (
-        <table className="list"><tbody>{status.memberships.map((m: any) => <tr key={m.id}><td><b>{m.name}</b><br /><small className="muted">vence {new Date(m.endsAt).toLocaleDateString('es-MX')}</small></td><td className="num">quedan {m.remaining} de {m.usesPerPeriod}</td></tr>)}</tbody></table>
+        <div className="table-wrap"><table className="list"><tbody>{status.memberships.map((m: any) => <tr key={m.id}><td><b>{m.name}</b><br /><small className="muted">vence {new Date(m.endsAt).toLocaleDateString('es-MX')}</small></td><td className="num">quedan {m.remaining} de {m.usesPerPeriod}</td></tr>)}</tbody></table></div>
       ) : <p className="muted">No tiene membresías activas.</p>}
       <h3 style={{ marginTop: 14 }}>Vender membresía o paquete</h3>
       {plans.length === 0 ? <p className="muted small">Primero crea tus membresías en «Membresías y promos».</p> : (<>
@@ -192,14 +194,44 @@ function Puntos({ c }: { c: any }) {
   )
 }
 
+/** Datos del cliente; notas (solo el dueño) y, en uñas, su dirección para servicios a domicilio. */
+function Datos({ me, c, onChanged }: { me: Me; c: any; onChanged: () => void }) {
+  const owner = me.user.role === 'owner'
+  const home = hasGiro(me, 'unas')
+  const [f, setF] = useState<{ name: string; phone: string; notes: string; address: string; homeAll: boolean } | null>(null)
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  useEffect(() => { api<any>('GET', `/customers/${c.id}`).then((r) => setF({ name: r.customer.name, phone: r.customer.phone ?? '', notes: r.customer.notes ?? '', address: r.customer.address ?? '', homeAll: !!r.customer.home_all })).catch((e) => setMsg({ err: e.message })) }, [c.id])
+  if (!f) return <p className="muted">Cargando…</p>
+  return (
+    <div>
+      <div className="row">
+        <label>Nombre<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+        <label>Teléfono<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
+      </div>
+      {home && (<>
+        <label>Dirección (solo la ve el negocio)<input value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} /></label>
+        <label className="check"><input type="checkbox" checked={f.homeAll} onChange={(e) => setF({ ...f, homeAll: e.target.checked })} />Todos sus servicios son a domicilio</label>
+      </>)}
+      {owner && <label>Notas (solo las ve el dueño; no escribas datos de salud)<textarea rows={3} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} /></label>}
+      {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
+      <p><button className="primary" disabled={f.name.trim().length < 2} onClick={async () => {
+        try {
+          await api('PATCH', `/customers/${c.id}`, { name: f.name, phone: f.phone || null, ...(home ? { address: f.address || null, homeAll: f.homeAll } : {}), ...(owner ? { notes: f.notes || null } : {}) })
+          setMsg({ ok: 'Datos guardados.' }); onChanged()
+        } catch (e) { setMsg({ err: (e as Error).message }) }
+      }}>Guardar datos</button></p>
+    </div>
+  )
+}
+
 function Compras({ c }: { c: any }) {
   const [sales, setSales] = useState<any[] | null>(null)
   useEffect(() => { api<any>('GET', `/customers/${c.id}/sales`).then((r) => setSales(r.sales)).catch(() => setSales([])) }, [c.id])
   if (!sales) return <p className="muted">Cargando…</p>
   return (
-    <table className="list"><tbody>
+    <div className="table-wrap"><table className="list"><tbody>
       {sales.map((s) => <tr key={s.id}><td>Ticket #{s.folio}<br /><small className="muted">{new Date(s.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })} · {METHOD[s.paymentMethod] ?? s.paymentMethod}{s.status === 'cancelada' ? ' · cancelada' : ''}</small></td><td className="num">{mxn(s.total)}</td></tr>)}
       {sales.length === 0 && <tr><td className="muted">Sin compras registradas a su nombre.</td></tr>}
-    </tbody></table>
+    </tbody></table></div>
   )
 }

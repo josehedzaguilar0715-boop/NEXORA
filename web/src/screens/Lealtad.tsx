@@ -57,7 +57,7 @@ export function Lealtad(_: { me: Me }) {
       {mods.includes('membresias') && (
         <section className="card">
           <h2>Membresías y paquetes</h2>
-          <table className="list"><tbody>{plans.map((x) => <tr key={x.id}><td>{x.name}<br /><small className="muted">{x.kind === 'paquete' ? `${x.uses_per_period} sesiones en ${x.validity_days} días` : x.kind === 'pase' ? `pase por ${x.period}` : `${x.uses_per_period} usos por ${x.period}`}</small></td><td className="num">{mxn(x.price)}</td></tr>)}</tbody></table>
+          <div className="table-wrap"><table className="list"><tbody>{plans.map((x) => <tr key={x.id}><td>{x.name}<br /><small className="muted">{x.kind === 'paquete' ? `${x.uses_per_period} sesiones en ${x.validity_days} días` : x.kind === 'pase' ? `pase por ${x.period}` : `${x.uses_per_period} usos por ${x.period}`}</small></td><td className="num">{mxn(x.price)}</td></tr>)}</tbody></table></div>
           <label>Nombre<input value={p.name} onChange={(e) => setP({ ...p, name: e.target.value })} placeholder="4 cortes al mes" /></label>
           <div className="row">
             <label>Tipo<select value={p.kind} onChange={(e) => setP({ ...p, kind: e.target.value })}><option value="periodo">Usos por periodo</option><option value="paquete">Paquete de sesiones</option><option value="pase">Pase (entradas libres)</option></select></label>
@@ -72,7 +72,7 @@ export function Lealtad(_: { me: Me }) {
       {mods.includes('promociones') && (
         <section className="card">
           <h2>Promociones</h2>
-          <table className="list"><tbody>{promos.map((x) => <tr key={x.id}><td>{x.name}<br /><small className="muted">{x.kind === 'porcentaje' ? `${x.value / 100}%` : mxn(x.value)} · {x.starts_at.slice(0, 10)} a {x.ends_at.slice(0, 10)}{x.min_quantity ? ` · desde ${x.min_quantity}` : ''}{x.combinable ? ' · combinable' : ''}</small></td></tr>)}</tbody></table>
+          <div className="table-wrap"><table className="list"><tbody>{promos.map((x) => <tr key={x.id}><td>{x.name}<br /><small className="muted">{x.kind === 'porcentaje' ? `${x.value / 100}%` : mxn(x.value)} · {x.starts_at.slice(0, 10)} a {x.ends_at.slice(0, 10)}{x.min_quantity ? ` · desde ${x.min_quantity}` : ''}{x.combinable ? ' · combinable' : ''}</small></td></tr>)}</tbody></table></div>
           <label>Nombre<input value={pr.name} onChange={(e) => setPr({ ...pr, name: e.target.value })} /></label>
           <div className="row"><label>Tipo<select value={pr.kind} onChange={(e) => setPr({ ...pr, kind: e.target.value })}><option value="porcentaje">Porcentaje</option><option value="monto">Monto</option></select></label><label>{pr.kind === 'porcentaje' ? '%' : '$'}<input inputMode="decimal" value={pr.value} onChange={(e) => setPr({ ...pr, value: e.target.value })} /></label></div>
           <div className="row"><label>Desde<input type="date" value={pr.from} onChange={(e) => setPr({ ...pr, from: e.target.value })} /></label><label>Hasta<input type="date" value={pr.to} onChange={(e) => setPr({ ...pr, to: e.target.value })} /></label></div>
@@ -90,7 +90,7 @@ export function Lealtad(_: { me: Me }) {
             <label>Para<select value={lp.scope} onChange={(e) => setLp({ ...lp, scope: e.target.value })}><option value="todos">Todos los clientes</option><option value="por_persona">Solo inscritos</option></select></label></div>
           <p><button className="primary" onClick={run(() => api('PUT', '/loyalty', { unit: lp.unit, earnBy: lp.earnBy, earnAmount: lp.earnBy === 'monto' ? toCents(lp.earnAmount) : undefined, earnPoints: Number(lp.earnPoints) || 1, scope: lp.scope }))}>Guardar programa</button></p>
           <h3>Premios</h3>
-          <table className="list"><tbody>{loyal?.rewards.map((r: any) => <tr key={r.id}><td>{r.name}</td><td className="num">{r.cost}</td></tr>)}</tbody></table>
+          <div className="table-wrap"><table className="list"><tbody>{loyal?.rewards.map((r: any) => <tr key={r.id}><td>{r.name}</td><td className="num">{r.cost}</td></tr>)}</tbody></table></div>
           <div className="row"><input aria-label="Premio" placeholder="Premio" value={lp.reward} onChange={(e) => setLp({ ...lp, reward: e.target.value })} /><input aria-label="Cuesta" placeholder="Cuesta" inputMode="numeric" value={lp.cost} onChange={(e) => setLp({ ...lp, cost: e.target.value })} /><button onClick={run(() => api('POST', '/loyalty/rewards', { name: lp.reward, cost: Number(lp.cost) }))}>Agregar</button></div>
         </section>
       )}

@@ -57,16 +57,16 @@ export function Ajustes({ me }: { me: Me }) {
         {msg.err && <p className="error">{msg.err}</p>}
         {msg.ok && <p className="okmsg">{msg.ok}</p>}
         <h2 style={{ marginTop: 16 }}>Mis dispositivos</h2>
-        <table className="list"><tbody>{sessions.map((s) => (
+        <div className="table-wrap"><table className="list"><tbody>{sessions.map((s) => (
           <tr key={s.id}><td>{s.deviceName ?? 'Equipo'}<br /><small className="muted">última vez {new Date(s.lastSeenAt).toLocaleString('es-MX')}</small></td>
             <td><button onClick={async () => { await api('DELETE', `/auth/sessions/${s.id}`); setSessions(sessions.filter((x) => x.id !== s.id)) }}>Cerrar sesión</button></td></tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
         {trusted.length > 0 && <><h2 style={{ marginTop: 16 }}>Equipos de confianza</h2>
         <p className="muted">En estos equipos no se pide código por SMS al entrar (30 días).</p></>}
-        <table className="list"><tbody>{trusted.map((t) => (
+        <div className="table-wrap"><table className="list"><tbody>{trusted.map((t) => (
           <tr key={t.id}><td>{t.deviceName ?? 'Equipo'}<br /><small className="muted">vence {new Date(t.expiresAt).toLocaleDateString('es-MX')}</small></td>
             <td><button onClick={async () => { await api('DELETE', `/auth/trusted-devices/${t.id}`); setTrusted(trusted.filter((x) => x.id !== t.id)) }}>Quitar</button></td></tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
         {st.travelFee != null && <p className="muted">Traslado: {mxn(st.travelFee)}</p>}
       </section>
     </div>
@@ -122,7 +122,7 @@ export function Buzon(_: { me: Me }) {
         {msg && <p className="error">{msg}</p>}
         <p><button className="primary" onClick={async () => { try { await api('POST', '/support/tickets', { type: f.type, subject: f.subject, module: f.type === 'cambio' ? f.module : undefined, message: f.message }); setF({ ...f, subject: '', module: '', message: '' }); void load() } catch (e) { setMsg((e as Error).message) } }}>Enviar</button></p>
         <h2 style={{ marginTop: 16 }}>Mis mensajes</h2>
-        <table className="list"><tbody>{list.map((t) => <tr key={t.id} onClick={() => open(t)} style={{ cursor: 'pointer', fontWeight: t.unread ? 700 : 400 }}><td>{t.subject}<br /><small className="muted">{t.type === 'cambio' ? `Cambio · ${t.module}` : 'Soporte'}</small></td><td>{STATUS[t.status] ?? t.status}</td></tr>)}</tbody></table>
+        <div className="table-wrap"><table className="list"><tbody>{list.map((t) => <tr key={t.id} onClick={() => open(t)} style={{ cursor: 'pointer', fontWeight: t.unread ? 700 : 400 }}><td>{t.subject}<br /><small className="muted">{t.type === 'cambio' ? `Cambio · ${t.module}` : 'Soporte'}</small></td><td>{STATUS[t.status] ?? t.status}</td></tr>)}</tbody></table></div>
       </section>
       {sel && (
         <section className="card">

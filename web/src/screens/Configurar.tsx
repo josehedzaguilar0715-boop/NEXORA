@@ -21,6 +21,7 @@ export function Configurar({ me }: { me: Me }) {
     { key: 'horarios', label: 'Horarios y aforo', show: owner && hasGiro(me, 'turistico'), C: Horarios },
     { key: 'copiadoras', label: 'Copiadoras', show: owner && hasGiro(me, 'papeleria'), C: Copiadoras },
     { key: 'mesas', label: 'Mesas', show: owner && (hasGiro(me, 'palapa', 'restaurante', 'taqueria') || (hasGiro(me, 'comedor') && !!me.settings?.tablesEnabled)), C: Mesas },
+    { key: 'rentas', label: 'Rentas (sillas, camastros…)', show: owner && hasGiro(me, 'palapa'), C: Rentas },
     { key: 'limpieza', label: 'Tareas de limpieza', show: owner && hasGiro(me, 'banos'), C: Limpieza },
     { key: 'comisiones', label: 'Comisiones', show: owner && hasGiro(me, 'barberia', 'unas', 'perfumeria'), C: Comisiones },
     { key: 'categorias', label: 'Categorías de productos', show: true, C: Categorias },
@@ -86,7 +87,7 @@ function Servicios({ me }: { me: Me }) {
         <section className="card">
           <div className="card-head"><h2>{agenda || papel ? 'Servicios' : 'Tarifas de entrada'}</h2><label className="check small"><input type="checkbox" checked={showOff} onChange={(e) => setShowOff(e.target.checked)} />Ver quitados</label></div>
           {!agenda && !papel && <p className="muted small">Sanitario, regadera, casillero, toalla… Se combinan al cobrar la entrada.</p>}
-          <table className="list"><thead><tr><th>Nombre</th>{agenda && <th className="num">Duración</th>}<th className="num">Precio</th><th /></tr></thead><tbody>
+          <div className="table-wrap"><table className="list"><thead><tr><th>Nombre</th>{agenda && <th className="num">Duración</th>}<th className="num">Precio</th><th /></tr></thead><tbody>
             {shown.map((s) => (
               <tr key={s.id} className={s.active ? 'clickable' : 'muted'} onClick={() => edit(s)}>
                 <td>{s.name}{s.category && <><br /><small className="muted">{s.category}</small></>}</td>
@@ -96,7 +97,7 @@ function Servicios({ me }: { me: Me }) {
               </tr>
             ))}
             {shown.length === 0 && <tr><td colSpan={4} className="muted">Todavía no hay {noun}s. Agrega el primero.</td></tr>}
-          </tbody></table>
+          </tbody></table></div>
         </section>
       }
       form={
@@ -141,7 +142,7 @@ function Boletos(_: { me: Me }) {
       list={
         <section className="card">
           <h2>Tipos de boleto</h2>
-          <table className="list"><tbody>
+          <div className="table-wrap"><table className="list"><tbody>
             {list.map((s) => (
               <tr key={s.id} className={s.active ? 'clickable' : 'muted'} onClick={() => setF({ id: s.id, name: s.name, price: String(s.price / 100), orig: s.price, authCode: '' })}>
                 <td>{s.name}</td><td className="num">{mxn(s.price)}</td>
@@ -149,7 +150,7 @@ function Boletos(_: { me: Me }) {
               </tr>
             ))}
             {list.length === 0 && <tr><td className="muted">Agrega adulto, niño, adulto mayor, estudiante…</td></tr>}
-          </tbody></table>
+          </tbody></table></div>
         </section>
       }
       form={
@@ -229,7 +230,7 @@ function SimpleList({ title, hint, placeholder, path, listKey }: { title: string
     <section className="card" style={{ maxWidth: 720 }}>
       <h2>{title}</h2>
       <p className="muted">{hint}</p>
-      <table className="list"><tbody>
+      <div className="table-wrap"><table className="list"><tbody>
         {list.map((m) => (
           <tr key={m.id} className={m.active ? '' : 'muted'}>
             <td>{m.name}</td>
@@ -240,10 +241,54 @@ function SimpleList({ title, hint, placeholder, path, listKey }: { title: string
           </tr>
         ))}
         {list.length === 0 && <tr><td className="muted">Todavía no hay ninguno.</td></tr>}
-      </tbody></table>
+      </tbody></table></div>
       <div className="row" style={{ marginTop: 12 }}><input aria-label="Nombre" value={name} onChange={(e) => setName(e.target.value)} placeholder={placeholder} /><button className="primary" style={{ flex: '0 0 auto' }} disabled={name.trim().length < 2} onClick={run(async () => { await api('POST', path, { name }); setName(''); await load() }, 'Agregado.')}>Agregar</button></div>
       {view}
     </section>
+  )
+}
+
+// ---------- Rentas (palapa) ----------
+
+function Rentas(_: { me: Me }) {
+  const empty = { id: '', name: '', quantity: '', price: '' }
+  const [list, setList] = useState<any[]>([])
+  const [f, setF] = useState(empty)
+  const { run, view } = useMsg()
+  const load = async () => setList((await api<any>('GET', '/rental-assets')).assets)
+  useEffect(() => { void load() }, [])
+  return (
+    <Split
+      list={
+        <section className="card">
+          <h2>Lo que se renta</h2>
+          <div className="table-wrap"><table className="list"><thead><tr><th>Activo</th><th className="num">Tienes</th><th className="num">Fuera</th><th className="num">Precio</th></tr></thead><tbody>
+            {list.map((a) => <tr key={a.id} className="clickable" onClick={() => setF({ id: a.id, name: a.name, quantity: String(a.quantity), price: String(a.price / 100) })}><td>{a.name}</td><td className="num">{a.quantity}</td><td className="num">{a.out}</td><td className="num">{mxn(a.price)}</td></tr>)}
+            {list.length === 0 && <tr><td colSpan={4} className="muted">Ej. sillas, mesas plegables, camastros, sombrillas.</td></tr>}
+          </tbody></table></div>
+        </section>
+      }
+      form={
+        <section className="card">
+          <h2>{f.id ? 'Editar' : 'Agregar activo'}</h2>
+          <label>Nombre<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Ej. Camastro" /></label>
+          <div className="row">
+            <label>Cuántos tienes<input inputMode="numeric" value={f.quantity} onChange={(e) => setF({ ...f, quantity: e.target.value })} /></label>
+            <label>Precio de renta<input inputMode="decimal" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} placeholder="$0.00" /></label>
+          </div>
+          {view}
+          <p className="row">
+            {f.id && <button onClick={run(async () => { await api('PATCH', `/rental-assets/${f.id}`, { active: false }); setF(empty); await load() }, 'Quitado.')}>Quitar</button>}
+            {f.id && <button onClick={() => setF(empty)}>Cancelar</button>}
+            <button className="primary" disabled={f.name.trim().length < 2 || f.quantity.trim() === '' || f.price.trim() === ''} onClick={run(async () => {
+              const body = { name: f.name, quantity: Number(f.quantity) || 0, price: toCents(f.price) }
+              if (f.id) await api('PATCH', `/rental-assets/${f.id}`, body); else await api('POST', '/rental-assets', body)
+              setF(empty); await load()
+            }, f.id ? 'Guardado.' : 'Agregado.')}>{f.id ? 'Guardar cambios' : 'Agregar'}</button>
+          </p>
+        </section>
+      }
+    />
   )
 }
 
@@ -357,10 +402,10 @@ function Categorias(_: { me: Me }) {
         <section className="card">
           <h2>Categorías</h2>
           <p className="muted small">Agrupan productos. Con margen, el sistema sugiere el precio de venta según el costo.</p>
-          <table className="list"><tbody>
+          <div className="table-wrap"><table className="list"><tbody>
             {list.map((c) => <tr key={c.id} className="clickable" onClick={() => setF({ id: c.id, name: c.name, margin: c.marginBp != null ? String(c.marginBp / 100) : '' })}><td>{c.name}</td><td className="num muted">{c.marginBp != null ? `margen ${c.marginBp / 100} %` : 'sin margen'}</td></tr>)}
             {list.length === 0 && <tr><td className="muted">Ej. Bebidas, Lácteos, Limpieza.</td></tr>}
-          </tbody></table>
+          </tbody></table></div>
         </section>
       }
       form={

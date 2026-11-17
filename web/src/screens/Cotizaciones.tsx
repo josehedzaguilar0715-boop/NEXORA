@@ -57,18 +57,18 @@ export function Cotizaciones(_: { me: Me }) {
           {matches.map((p) => <button key={p.id} onClick={() => { setRows([...rows, { productId: p.id, name: p.name, quantity: '1' }]); setFind('') }}>{p.name}<small>{mxn(p.price)}</small></button>)}
           {matches.flatMap((p) => p.presentations.map((pr) => <button key={pr.id} onClick={() => { setRows([...rows, { productId: p.id, presentationId: pr.id, name: `${p.name} ${pr.name}`, quantity: '1' }]); setFind('') }}>{p.name} {pr.name}<small>{mxn(pr.price)}</small></button>))}
         </div>
-        <table className="list"><tbody>{rows.map((r, i) => (
+        <div className="table-wrap"><table className="list"><tbody>{rows.map((r, i) => (
           <tr key={i}><td>{r.name}</td><td style={{ width: 120 }}><input aria-label={`Cantidad de ${r.name}`} inputMode="decimal" value={r.quantity} onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))} /></td><td><button onClick={() => setRows(rows.filter((_, j) => j !== i))}>Quitar</button></td></tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
         {msg.err && <p className="error">{msg.err}</p>}
         {msg.ok && <p className="okmsg">{msg.ok}</p>}
         <p><button className="primary big" style={{ width: '100%' }} disabled={!rows.length || rows.some((r) => !(Number(r.quantity) > 0))} onClick={save}>Guardar cotización</button></p>
       </section>
       <section className="card">
         <h2>Cotizaciones abiertas</h2>
-        <table className="list"><tbody>{quotes.map((q) => (
+        <div className="table-wrap"><table className="list"><tbody>{quotes.map((q) => (
           <tr key={q.id}><td>#{q.folio} {q.customerName ?? ''}<br /><small className="muted">vence {q.validUntil} · {q.items.length} renglones</small></td><td className="num">{mxn(q.total)}</td><td><button className="primary" onClick={() => convert(q)}>Vender</button></td></tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
       </section>
     </div>
   )

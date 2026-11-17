@@ -71,7 +71,7 @@ export function Entradas(_: { me: Me }) {
         <div className="card" style={{ marginTop: 16 }}>
           <h2>Limpieza</h2>
           <div className="results">{tasks.map((t) => <button key={t.id} onClick={async () => { await api('POST', '/cleaning/log', { taskId: t.id }); void load() }}>✔ {t.name}</button>)}</div>
-          <table className="list"><tbody>{log.map((l, i) => <tr key={i}><td>{new Date(l.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td><td>{l.task}</td><td className="muted">{l.who}</td></tr>)}</tbody></table>
+          <div className="table-wrap"><table className="list"><tbody>{log.map((l, i) => <tr key={i}><td>{new Date(l.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td><td>{l.task}</td><td className="muted">{l.who}</td></tr>)}</tbody></table></div>
         </div>
       </section>
     </div>

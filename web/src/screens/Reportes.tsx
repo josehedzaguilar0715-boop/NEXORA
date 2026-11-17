@@ -34,7 +34,7 @@ export function Reportes({ me }: { me: Me }) {
         <div className="row"><label>Desde<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label>Hasta<input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label></div>
         {err && <p className="error">{err}</p>}
         {r && (
-          <table className="list statement"><tbody>
+          <div className="table-wrap"><table className="list statement"><tbody>
             <tr><td>Ventas ({r.sales.tickets} {r.sales.tickets === 1 ? 'ticket' : 'tickets'})</td><td className="num"><b>{mxn(r.sales.total)}</b></td></tr>
             {(['efectivo', 'transferencia', 'tarjeta', 'fiado'] as const).filter((k) => k !== 'fiado' || r.sales.fiado).map((k) => <tr key={k} className="indent"><td>{k[0]!.toUpperCase() + k.slice(1)}</td><td className="num muted">{mxn(r.sales[k])}</td></tr>)}
             <tr><td>Costo de lo vendido</td><td className="num">{minus(r.costOfSales)}</td></tr>
@@ -43,13 +43,13 @@ export function Reportes({ me }: { me: Me }) {
             {r.commissions > 0 && <tr><td>Comisiones del personal</td><td className="num">{minus(r.commissions)}</td></tr>}
             <tr className={`total ${r.profit < 0 ? 'neg' : ''}`}><td>Utilidad</td><td className="num">{mxn(r.profit)}</td></tr>
             {r.cancelled > 0 && <tr className="muted"><td>Ventas canceladas</td><td className="num">{r.cancelled}</td></tr>}
-          </tbody></table>
+          </tbody></table></div>
         )}
         <h3 style={{ marginTop: 18 }}>Más vendidos</h3>
-        <table className="list"><tbody>
+        <div className="table-wrap"><table className="list"><tbody>
           {r?.topProducts.map((t: any, i: number) => <tr key={i}><td>{t.description}</td><td className="num muted">{t.qty}</td><td className="num">{mxn(t.total)}</td></tr>)}
           {r && r.topProducts.length === 0 && <tr><td className="empty">Sin ventas en este periodo.</td></tr>}
-        </tbody></table>
+        </tbody></table></div>
         <p className="muted small" style={{ marginTop: 14 }}>Los gastos se registran en <a href="#/finanzas">Finanzas → Gastos</a>.</p>
       </section>
       {owner && (
@@ -58,21 +58,21 @@ export function Reportes({ me }: { me: Me }) {
           <p className="muted small">Cuánto puedes sacar sin descapitalizar el negocio: utilidad − reserva para gastos fijos − lo que cuesta reponer el inventario.</p>
           {w && w.suggested != null && <Cascada profit={w.profit} reserve={w.reserve} restock={w.restock} suggested={w.suggested} />}
           {w && w.suggested != null && (
-            <table className="list statement"><tbody>
+            <div className="table-wrap"><table className="list statement"><tbody>
               <tr><td>Utilidad del mes</td><td className="num">{mxn(w.profit)}</td></tr>
               <tr><td>Reserva ({w.reserveDays} días de gastos fijos)</td><td className="num">{minus(w.reserve)}</td></tr>
               <tr><td>Reponer inventario al mínimo</td><td className="num">{minus(w.restock)}</td></tr>
               <tr className="total"><td>Puedes retirar</td><td className="num">{mxn(w.suggested)}</td></tr>
-            </tbody></table>
+            </tbody></table></div>
           )}
           <h3 style={{ marginTop: 18 }}>Días de reserva</h3>
           <p className="muted small">Cuántos días de gastos fijos quieres tener guardados siempre.{fixed?.reserveDays != null ? ` Hoy: ${fixed.reserveDays} días.` : ''}</p>
           <div className="row"><input aria-label="Días de reserva" inputMode="numeric" placeholder={fixed?.reserveDays != null ? String(fixed.reserveDays) : 'Ej. 30'} value={f.days} onChange={(e) => setF({ ...f, days: e.target.value })} /><button style={{ flex: '0 0 auto' }} disabled={f.days.trim() === ''} onClick={run(async () => { await api('PUT', '/reserve-days', { days: Number(f.days) }); setF({ ...f, days: '' }) })}>Guardar días</button></div>
           <h3 style={{ marginTop: 18 }}>Gastos fijos al mes</h3>
-          <table className="list"><tbody>
+          <div className="table-wrap"><table className="list"><tbody>
             {fixed?.fixedExpenses.map((x: any) => <tr key={x.id}><td>{x.concept}</td><td className="num">{mxn(x.monthlyAmount)}</td></tr>)}
             {fixed && fixed.fixedExpenses.length === 0 && <tr><td className="muted">Renta, luz, agua, internet, sueldos fijos…</td></tr>}
-          </tbody></table>
+          </tbody></table></div>
           <label>Concepto<input placeholder="Ej. Renta del local" value={f.concept} onChange={(e) => setF({ ...f, concept: e.target.value })} /></label>
           <div className="row"><label>Cuánto al mes<input inputMode="decimal" placeholder="$0.00" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label><button style={{ flex: '0 0 auto', alignSelf: 'end' }} disabled={!(toCents(f.amount) > 0 && f.concept.trim().length >= 2)} onClick={run(async () => { await api('POST', '/fixed-expenses', { concept: f.concept, monthlyAmount: toCents(f.amount) }); setF({ ...f, concept: '', amount: '' }) })}>Agregar</button></div>
         </section>

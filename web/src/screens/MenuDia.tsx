@@ -42,10 +42,10 @@ export function MenuDia({ me }: { me: Me }) {
         {data?.menus.map((m: any) => (
           <div key={m.id} style={{ marginBottom: 12 }}>
             <h3>{MEALS[m.meal]}{m.meal === data.currentMeal ? ' (ahora)' : ''}</h3>
-            <table className="list"><tbody>{m.items.map((i: any) => (
+            <div className="table-wrap"><table className="list"><tbody>{m.items.map((i: any) => (
               <tr key={i.productId} style={{ opacity: i.soldOut ? 0.5 : 1 }}><td>{i.name}</td><td className="num">{mxn(i.price)}</td>
                 <td><button className={i.soldOut ? '' : 'danger'} onClick={() => toggle(m.id, i.productId, !i.soldOut)}>{i.soldOut ? 'Hay de nuevo' : 'Se acabó'}</button></td></tr>
-            ))}</tbody></table>
+            ))}</tbody></table></div>
           </div>
         ))}
       </section>

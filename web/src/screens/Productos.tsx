@@ -4,7 +4,7 @@ import { api, mxn, toCents } from '../api'
 import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
 
-type P = Product & { tiers?: { minQuantity: number; price: number }[]; attrs?: Record<string, any>; sellable?: boolean; minStock: number; lastCost: number; suggestedPrice: number | null; categoryId: string | null; version: number; active?: boolean; trackStock?: boolean; trackExpiry?: boolean }
+type P = Product & { combo?: { productId: string; name: string; quantity: number }[]; tiers?: { minQuantity: number; price: number }[]; attrs?: Record<string, any>; sellable?: boolean; minStock: number; lastCost: number; suggestedPrice: number | null; categoryId: string | null; version: number; active?: boolean; trackStock?: boolean; trackExpiry?: boolean }
 
 const UNIT: Record<string, string> = { pieza: 'pieza', kg: 'kg', litro: 'litro', metro: 'metro' }
 const FOOD = ['palapa', 'restaurante', 'taqueria', 'comedor']
@@ -89,6 +89,7 @@ function Editor({ me, p, tab: initialTab, categories, onClose, onSaved }: { me: 
     { key: 'existencia', label: 'Existencia', show: !!p && canStock && p.trackStock !== false && p.active !== false },
     { key: 'presentaciones', label: 'Presentaciones', show: !!p && canEdit && hasGiro(me, 'abarrotes', 'ferreteria', 'papeleria', 'verduleria', 'perfumeria') },
     { key: 'receta', label: 'Receta', show: !!p && canEdit && food },
+    { key: 'combo', label: 'Set o paquete', show: !!p && canEdit && p.unit === 'pieza' && hasGiro(me, 'perfumeria', 'papeleria') },
     { key: 'escalas', label: 'Precio por volumen', show: !!p && canEdit && hasGiro(me, 'ferreteria', 'papeleria') },
     { key: 'decants', label: 'Decants', show: !!p && canStock && perfume && p.attrs?.sizeMl >= 30 },
   ].filter((t) => t.show)
@@ -102,6 +103,7 @@ function Editor({ me, p, tab: initialTab, categories, onClose, onSaved }: { me: 
         {tab === 'existencia' && p && <Existencia p={p} onSaved={() => onSaved(false)} />}
         {tab === 'presentaciones' && p && <Presentaciones p={p} onSaved={() => onSaved(false)} />}
         {tab === 'receta' && p && <Receta ownerId={p.id} />}
+        {tab === 'combo' && p && <Combo p={p} onSaved={() => onSaved(false)} />}
         {tab === 'escalas' && p && <Escalas p={p} />}
         {tab === 'decants' && p && <Decants p={p} onDone={() => onSaved(false)} />}
       </div>
@@ -226,7 +228,7 @@ function Existencia({ p, onSaved }: { p: P; onSaved: () => void }) {
       <div className="tabs" style={{ marginTop: 12 }}>
         <button className={mode === 'agregar' ? 'on' : ''} onClick={() => setMode('agregar')}>Agregar</button>
         <button className={mode === 'ajustar' ? 'on' : ''} onClick={() => setMode('ajustar')}>Ajustar al conteo</button>
-        <button className={mode === 'merma' ? 'on' : ''} onClick={() => setMode('merma')}>Merma</button>
+        <button className={mode === 'merma' ? 'on' : ''} onClick={() => setMode('merma')}>{p.sellable === false ? 'Usar (tester o muestra)' : 'Merma'}</button>
       </div>
       {mode === 'agregar' && (<>
         <label>¿Cuánto agregas?<input inputMode="decimal" value={f.qty} onChange={set('qty')} autoFocus placeholder="Ej. 24" /></label>
@@ -260,13 +262,15 @@ function Existencia({ p, onSaved }: { p: P; onSaved: () => void }) {
         <p><button className="primary" disabled={f.counted.trim() === '' || f.reason.trim().length < 3} onClick={() => go(() => api('POST', '/inventory/count', { productId: p.id, counted: Number(f.counted), reason: f.reason }), 'Existencia ajustada.')}>Ajustar existencia</button></p>
       </>)}
       {mode === 'merma' && (<>
-        <p className="muted small">Lo que se echó a perder, se rompió o caducó.</p>
+        <p className="muted small">{p.sellable === false ? 'Lo que se usó como tester o muestra (no se vende ni se devuelve; su costo cuenta como gasto de uso).' : 'Lo que se echó a perder, se rompió o caducó.'}</p>
         <div className="row">
           <label>Cantidad<input inputMode="decimal" value={f.qty} onChange={set('qty')} /></label>
           <label>Motivo<input value={f.reason} onChange={set('reason')} placeholder="Ej. caducó" /></label>
         </div>
         {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
-        <p><button className="primary" disabled={!(qty > 0) || f.reason.trim().length < 3} onClick={() => go(() => api('POST', '/inventory/waste', { productId: p.id, quantity: qty, reason: f.reason }), 'Merma registrada.')}>Registrar merma</button></p>
+        <p><button className="primary" disabled={!(qty > 0) || (p.sellable !== false && f.reason.trim().length < 3)} onClick={() => go(() => p.sellable === false
+          ? api('POST', '/testers/use', { productId: p.id, quantity: qty, ...(f.reason.trim().length >= 3 ? { reason: f.reason } : {}) })
+          : api('POST', '/inventory/waste', { productId: p.id, quantity: qty, reason: f.reason }), p.sellable === false ? 'Uso registrado.' : 'Merma registrada.')}>{p.sellable === false ? 'Registrar uso' : 'Registrar merma'}</button></p>
       </>)}
     </div>
   )
@@ -282,10 +286,10 @@ function Presentaciones({ p, onSaved }: { p: P; onSaved: () => void }) {
   return (
     <div>
       <p className="muted small">Ej. «Paquete de 6» equivale a 6 {UNIT[p.unit] ?? 'piezas'}: al venderlo descuenta 6 de la existencia.</p>
-      <table className="list"><tbody>
+      <div className="table-wrap"><table className="list"><tbody>
         {list.map((x) => <tr key={x.id}><td>{x.name}<br /><small className="muted">= {x.factorMilli / 1000} {UNIT[p.unit] ?? ''}{x.barcode ? ` · ${x.barcode}` : ''}</small></td><td className="num">{mxn(x.price)}</td><td className="num"><button className="mini" onClick={() => go(() => api('DELETE', `/products/${p.id}/presentations/${x.id}`), 'Presentación quitada.')}>Quitar</button></td></tr>)}
         {list.length === 0 && <tr><td className="muted">Sin presentaciones.</td></tr>}
-      </tbody></table>
+      </tbody></table></div>
       <div className="row" style={{ marginTop: 10 }}>
         <label>Nombre<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Paquete de 6" /></label>
         <label>Equivale a<input inputMode="decimal" value={f.factor} onChange={(e) => setF({ ...f, factor: e.target.value })} placeholder="6" /></label>
@@ -296,6 +300,29 @@ function Presentaciones({ p, onSaved }: { p: P; onSaved: () => void }) {
       </div>
       {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
       <p><button className="primary" disabled={!f.name.trim() || !(Number(f.factor) > 0) || f.price.trim() === ''} onClick={() => go(async () => { await api('POST', `/products/${p.id}/presentations`, { name: f.name, factor: Number(f.factor), price: toCents(f.price), ...(f.barcode.trim().length >= 3 ? { barcode: f.barcode.trim() } : {}) }); setF({ name: '', factor: '', price: '', barcode: '' }) }, 'Presentación agregada.')}>Agregar presentación</button></p>
+    </div>
+  )
+}
+
+/** Set o paquete con un solo precio: al venderlo descuenta cada pieza que lleva (y el empaque, si se agrega). */
+function Combo({ p, onSaved }: { p: P; onSaved: () => void }) {
+  const [items, setItems] = useState<{ productId: string; name: string; quantity: string }[]>((p.combo ?? []).map((i) => ({ ...i, quantity: String(i.quantity) })))
+  const [catalog, setCatalog] = useState<P[]>([])
+  const [find, setFind] = useState('')
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  useEffect(() => { api<{ products: P[] }>('GET', '/products').then((r) => setCatalog(r.products.filter((x) => x.id !== p.id && x.active !== false && !(x.combo ?? []).length))).catch(() => {}) }, [p.id])
+  const matches = find ? catalog.filter((x) => x.name.toLowerCase().includes(find.toLowerCase()) && !items.some((i) => i.productId === x.id)).slice(0, 6) : []
+  return (
+    <div>
+      <p className="muted small">Ej. «Set regalo» = perfume + crema + caja de empaque; o «Paquete 3er grado» = cuadernos, lápices y colores. Se vende al precio de este producto.</p>
+      <div className="table-wrap"><table className="list"><tbody>
+        {items.map((it, i) => <tr key={it.productId}><td>{it.name}</td><td style={{ width: '6em' }}><input aria-label={`Cantidad de ${it.name}`} inputMode="decimal" value={it.quantity} onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))} /></td><td className="num"><button className="mini" onClick={() => setItems(items.filter((_, j) => j !== i))}>✕</button></td></tr>)}
+        {items.length === 0 && <tr><td className="muted">No es set: se vende como producto normal.</td></tr>}
+      </tbody></table></div>
+      <label>Agregar pieza<input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Buscar producto…" /></label>
+      {matches.length > 0 && <div className="results">{matches.map((x) => <button key={x.id} onClick={() => { setItems([...items, { productId: x.id, name: x.name, quantity: '1' }]); setFind('') }}>{x.name}</button>)}</div>}
+      {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
+      <p><button className="primary" onClick={async () => { try { await api('PUT', `/products/${p.id}/combo`, { items: items.filter((i) => Number(i.quantity) > 0).map((i) => ({ productId: i.productId, quantity: Number(i.quantity) })) }); setMsg({ ok: 'Set guardado.' }); onSaved() } catch (e) { setMsg({ err: (e as Error).message }) } }}>Guardar set</button></p>
     </div>
   )
 }
@@ -314,12 +341,12 @@ export function Receta({ ownerId }: { ownerId: string }) {
   return (
     <div>
       <p className="muted small">Lo que se gasta cada vez que se vende (en la unidad del insumo: kg, litro, pieza).</p>
-      <table className="list"><tbody>
+      <div className="table-wrap"><table className="list"><tbody>
         {items.map((it, i) => (
           <tr key={it.productId}><td>{it.name}</td><td style={{ width: '9em' }}><input aria-label={`Cantidad de ${it.name}`} inputMode="decimal" value={it.quantity} onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))} /></td><td className="num"><button className="mini" onClick={() => setItems(items.filter((_, j) => j !== i))}>Quitar</button></td></tr>
         ))}
         {items.length === 0 && <tr><td className="muted">Sin insumos.</td></tr>}
-      </tbody></table>
+      </tbody></table></div>
       <label>Agregar insumo<input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Buscar insumo…" /></label>
       {matches.length > 0 && <div className="results">{matches.map((x) => <button key={x.id} onClick={() => { setItems([...items, { productId: x.id, name: x.name, quantity: '' }]); setFind('') }}>{x.name}<small>{UNIT[x.unit] ?? x.unit}</small></button>)}</div>}
       {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}

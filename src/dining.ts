@@ -458,6 +458,25 @@ dining.post('/tabs/:id/rentals', requirePerm('sell'), async (c) => {
   return c.json({ rentalId: id, tab: tabView(db, loadTab(c)) }, 201)
 })
 
+dining.patch('/rental-assets/:id', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const a = db.prepare('SELECT * FROM rental_assets WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; name: string; quantity: number; price: number; active: number } | undefined
+  if (!a) throw notFound('Ese activo no existe.')
+  const d = parse(z.object({ name: z.string().trim().min(2).max(60).optional(), quantity: z.number().int().min(0).max(10_000).optional(), price: z.number().int().min(0).optional(), active: z.boolean().optional() }), await body(c))
+  db.prepare('UPDATE rental_assets SET name = ?, quantity = ?, price = ?, active = ? WHERE id = ?').run(d.name ?? a.name, d.quantity ?? a.quantity, d.price ?? a.price, d.active === undefined ? a.active : d.active ? 1 : 0, a.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'renta.activo_cambio', entity: 'rental_asset', entityId: a.id, oldValue: a, newValue: d })
+  return c.json({ ok: true })
+})
+
+/** Lo que está rentado ahora (sin regresar), con su mesa. */
+dining.get('/rentals', (c) => {
+  const rows = c.get('deps').db.prepare(`SELECT ar.id, ar.quantity, ar.out_at AS outAt, a.name, t.id AS tabId, dt.name AS tableName, t.customer_name AS customerName
+    FROM asset_rentals ar JOIN rental_assets a ON a.id = ar.asset_id JOIN tabs t ON t.id = ar.tab_id LEFT JOIN dining_tables dt ON dt.id = t.table_id
+    WHERE a.business_id = ? AND ar.returned_at IS NULL ORDER BY ar.out_at`).all(c.get('session').user.business_id)
+  return c.json({ rentals: rows })
+})
+
 dining.post('/rentals/:id/return', requirePerm('sell'), (c) => {
   const { db, now } = c.get('deps')
   const r = db.prepare('SELECT ar.id, ar.returned_at FROM asset_rentals ar JOIN rental_assets a ON a.id = ar.asset_id WHERE ar.id = ? AND a.business_id = ?').get(c.req.param('id'), c.get('session').user.business_id) as { id: string; returned_at: string | null } | undefined

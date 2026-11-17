@@ -355,13 +355,13 @@ export function Caja({ me }: { me: Me }) {
         <Modal onClose={() => setModal(null)}>
           <h2>Ventas en espera</h2>
           {held.length === 0 ? <p className="muted">No hay ventas en espera. Con una venta a medias, presiona {KEYS.espera} para apartarla y atender a otro cliente.</p> : (
-            <table className="list"><tbody>{held.map((h) => (
+            <div className="table-wrap"><table className="list"><tbody>{held.map((h) => (
               <tr key={h.id} className="clickable" onClick={() => recall(h)}>
                 <td><b>{h.customer?.name ?? 'Público en general'}</b><br /><small className="muted">{new Date(h.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} · {h.cart.length} renglones</small></td>
                 <td className="num">{mxn(Math.max(0, h.cart.reduce((a, l) => a + lineTotal(l), 0) - (h.discount?.amount ?? 0)))}</td>
                 <td className="num"><button className="mini">Recuperar</button></td>
               </tr>
-            ))}</tbody></table>
+            ))}</tbody></table></div>
           )}
           <p><button onClick={() => setModal(null)}>Cerrar</button></p>
         </Modal>
@@ -648,7 +648,7 @@ function VentasTurno({ shift, me, onClose }: { shift: Shift; me: Me; onClose: ()
       <h2>Ventas del turno</h2>
       {err && <p className="error">{err}</p>}
       {!list ? <p className="muted">Cargando…</p> : (
-        <table className="list"><tbody>
+        <div className="table-wrap"><table className="list"><tbody>
           {list.map((s) => (
             <tr key={s.id}>
               <td>#{s.folio}<br /><small className="muted">{new Date(s.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} · {s.paymentMethod}</small></td>
@@ -656,7 +656,7 @@ function VentasTurno({ shift, me, onClose }: { shift: Shift; me: Me; onClose: ()
               <td>{s.status === 'completada' && can(me, 'cancel_discount') ? <button onClick={() => cancel(s.id)}>Cancelar</button> : <small className="muted">{s.status}</small>}</td>
             </tr>
           ))}
-        </tbody></table>
+        </tbody></table></div>
       )}
       <p><button onClick={onClose}>Cerrar</button></p>
     </Modal>
@@ -783,7 +783,7 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
         </div>
       )}
       {t && (
-        <table className="list statement"><tbody>
+        <div className="table-wrap"><table className="list statement"><tbody>
           <tr><td>Fondo inicial</td><td className="num">{mxn(t.openingFloat)}</td></tr>
           <tr><td>Ventas en efectivo</td><td className="num">{mxn(t.cashSales)}</td></tr>
           {t.tipsCash > 0 && <tr><td>Propinas en efectivo</td><td className="num">{mxn(t.tipsCash)}</td></tr>}
@@ -791,7 +791,7 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
           <tr><td>Retiros y pagos desde la caja</td><td className="num">{mxn(-t.withdrawals)}</td></tr>
           <tr className="total"><td>Debe haber en caja</td><td className="num">{mxn(t.expectedCash)}</td></tr>
           <tr className="muted"><td>No es efectivo: transferencia · tarjeta · fiado</td><td className="num">{mxn(t.transferSales)} · {mxn(t.cardSales)} · {mxn(t.creditSales)}</td></tr>
-        </tbody></table>
+        </tbody></table></div>
       )}
       {(diff !== 0 || offline) && <label>{offline ? 'Nota' : 'Motivo de la diferencia'}<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={offline ? 'Corte sin internet' : 'Ej. di cambio de más'} /></label>}
       {err && <p className="error">{err}</p>}
@@ -843,8 +843,8 @@ function Contador({ shift, onClose }: { shift: Shift; onClose: () => void }) {
       <label>Número del contador<input inputMode="numeric" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} /></label>
       <p><button className="primary" disabled={!f.machineId || f.value === ''} onClick={save}>Guardar lectura</button></p>
       {msg && <p className="muted">{msg}</p>}
-      <table className="list"><thead><tr><th>Equipo</th><th className="num">Contador</th><th className="num">Cobradas</th><th className="num">Diferencia</th></tr></thead>
-        <tbody>{report.map((r) => <tr key={r.machineId}><td>{r.name}</td><td className="num">{r.counted ?? '—'}</td><td className="num">{r.sold}</td><td className="num" style={{ color: r.difference ? 'var(--danger)' : undefined }}>{r.difference ?? '—'}</td></tr>)}</tbody></table>
+      <div className="table-wrap"><table className="list"><thead><tr><th>Equipo</th><th className="num">Contador</th><th className="num">Cobradas</th><th className="num">Diferencia</th></tr></thead>
+        <tbody>{report.map((r) => <tr key={r.machineId}><td>{r.name}</td><td className="num">{r.counted ?? '—'}</td><td className="num">{r.sold}</td><td className="num" style={{ color: r.difference ? 'var(--danger)' : undefined }}>{r.difference ?? '—'}</td></tr>)}</tbody></table></div>
       <p><button onClick={onClose}>Cerrar</button></p>
     </Modal>
   )

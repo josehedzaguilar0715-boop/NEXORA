@@ -37,7 +37,7 @@ export function Encargos(_: { me: Me }) {
       </section>
       <section className="card">
         <h2>Encargos pendientes</h2>
-        <table className="list"><tbody>{list.map((o) => (
+        <div className="table-wrap"><table className="list"><tbody>{list.map((o) => (
           <tr key={o.id}>
             <td>#{o.folio} {o.customerName}<br /><small className="muted">{o.description}{o.dueDate ? ` · entrega ${o.dueDate}` : ''} · {o.status}</small></td>
             <td className="num">resta {mxn(o.balance)}</td>
@@ -47,7 +47,7 @@ export function Encargos(_: { me: Me }) {
               <button onClick={() => cancel(o)}>Cancelar</button>
             </td>
           </tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
       </section>
     </div>
   )

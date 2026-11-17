@@ -115,7 +115,7 @@ function Nuevo({ me, onClose, onDone }: { me: Me; onClose: () => void; onDone: (
         <h3 style={{ marginTop: 16 }}>2. Mercancía</h3>
         <div className="row"><input aria-label="Agregar producto al apartado" placeholder="Busca o escanea el producto…" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && matches[0]) addP(matches[0]) }} /><ScanButton onCode={(c) => { const p = catalog.find((x) => x.barcode === c); if (p) addP(p); else setFind(c) }} /></div>
         {matches.length > 0 && <div className="results">{matches.map((p) => <button key={p.id} onClick={() => addP(p)}>{p.name}<small>{mxn(p.price)} · disponibles {Math.max(0, (p.stock ?? 0) - ((p as any).reserved ?? 0))}</small></button>)}</div>}
-        <table className="list" style={{ marginTop: 8 }}><tbody>
+        <div className="table-wrap"><table className="list" style={{ marginTop: 8 }}><tbody>
           {items.map((i, k) => (
             <tr key={i.productId}>
               <td>{i.name}<br /><small className="muted">{mxn(i.price)} c/u · disponibles {i.free}</small></td>
@@ -125,7 +125,7 @@ function Nuevo({ me, onClose, onDone }: { me: Me; onClose: () => void; onDone: (
             </tr>
           ))}
           {items.length === 0 && <tr><td className="muted">Agrega lo que se va a apartar.</td></tr>}
-        </tbody></table>
+        </tbody></table></div>
         <div className="total">{mxn(total)}</div>
         <h3>3. Anticipo</h3>
         <div className="row">
@@ -166,9 +166,9 @@ function Detalle({ me, id, onClose, onChanged }: { me: Me; id: string; onClose: 
           {l.dueDate && <div><span className="muted">Recoger antes de</span><b className={l.overdue ? 'neg' : ''}>{fmtDate(l.dueDate)}</b></div>}
         </div>
         {!open && <p className="muted">{l.status === 'entregado' ? `Entregado el ${fmtDate(l.closedAt)}.` : `Cancelado el ${fmtDate(l.closedAt)}: ${l.cancelReason}`}</p>}
-        <table className="list"><tbody>{d.items.map((i: any, k: number) => <tr key={k}><td>{i.quantity} × {i.description}</td><td className="num">{mxn(i.total)}</td></tr>)}</tbody></table>
+        <div className="table-wrap"><table className="list"><tbody>{d.items.map((i: any, k: number) => <tr key={k}><td>{i.quantity} × {i.description}</td><td className="num">{mxn(i.total)}</td></tr>)}</tbody></table></div>
         <h3 style={{ marginTop: 12 }}>Pagos</h3>
-        <table className="list"><tbody>{d.payments.map((p: any, k: number) => <tr key={k}><td>{p.kind === 'anticipo' ? 'Anticipo' : p.kind === 'abono' ? 'Abono' : 'Devolución'} · {METHOD[p.method]}<br /><small className="muted">{new Date(p.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</small></td><td className={`num ${p.amount < 0 ? 'neg' : ''}`}>{mxn(p.amount)}</td></tr>)}</tbody></table>
+        <div className="table-wrap"><table className="list"><tbody>{d.payments.map((p: any, k: number) => <tr key={k}><td>{p.kind === 'anticipo' ? 'Anticipo' : p.kind === 'abono' ? 'Abono' : 'Devolución'} · {METHOD[p.method]}<br /><small className="muted">{new Date(p.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</small></td><td className={`num ${p.amount < 0 ? 'neg' : ''}`}>{mxn(p.amount)}</td></tr>)}</tbody></table></div>
         {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
         {open && mode === '' && (
           <div className="pay" style={{ marginTop: 12 }}>

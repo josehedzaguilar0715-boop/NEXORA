@@ -63,12 +63,12 @@ export function Inicio({ me }: { me: Me }) {
         </section>
         <section className="card">
           <h2>Movimientos recientes</h2>
-          <table className="list"><tbody>{moves.map((m, i) => (
+          <div className="table-wrap"><table className="list"><tbody>{moves.map((m, i) => (
             <tr key={i}>
               <td>{KIND[m.kind] ?? m.kind}<br /><small className="muted">{m.label} · {new Date(m.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}{m.status === 'cancelada' ? ' · cancelada' : ''}</small></td>
               <td className={`num ${m.kind === 'venta' || m.kind === 'deposito' ? (m.status === 'cancelada' ? 'muted' : 'pos') : 'neg'}`}>{m.kind === 'venta' || m.kind === 'deposito' ? '+' : '−'}{mxn(m.amount)}</td>
             </tr>
-          ))}</tbody></table>
+          ))}</tbody></table></div>
           {moves.length === 0 && <p className="muted">Todavía no hay movimientos.</p>}
         </section>
       </div>

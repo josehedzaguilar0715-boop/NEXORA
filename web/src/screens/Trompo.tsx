@@ -39,12 +39,12 @@ export function Trompo(_: { me: Me }) {
       </section>
       <section className="card">
         <h2>Hoy</h2>
-        <table className="list"><thead><tr><th>Carne</th><th className="num">Empezó</th><th className="num">Vendido</th><th className="num">Debe sobrar</th><th></th></tr></thead>
+        <div className="table-wrap"><table className="list"><thead><tr><th>Carne</th><th className="num">Empezó</th><th className="num">Vendido</th><th className="num">Debe sobrar</th><th></th></tr></thead>
           <tbody>{batches.map((b) => (
             <tr key={b.id}><td>{b.name}</td><td className="num">{b.startedKg} kg</td><td className="num">{b.soldKg} kg</td>
               <td className="num">{b.open ? `${b.expectedLeftoverKg} kg` : `${b.countedKg} kg (${b.differenceKg >= 0 ? '+' : ''}${b.differenceKg})`}</td>
               <td>{b.open && <button className="primary" onClick={() => close(b)}>Contar sobrante</button>}</td></tr>
-          ))}</tbody></table>
+          ))}</tbody></table></div>
       </section>
     </div>
   )

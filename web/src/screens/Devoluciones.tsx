@@ -29,9 +29,9 @@ export function Devoluciones({ me }: { me: Me }) {
       {sale && (
         <>
           <p className="muted">Folio {sale.folio} · {new Date(sale.createdAt).toLocaleString('es-MX')} · {sale.paymentMethod} · {mxn(sale.total)}</p>
-          <table className="list"><tbody>{sale.items.map((i: any) => (
+          <div className="table-wrap"><table className="list"><tbody>{sale.items.map((i: any) => (
             <tr key={i.id}><td>{i.description}<br /><small className="muted">vendió {i.quantity}</small></td><td style={{ width: 140 }}><input aria-label={`Devolver de ${i.description}`} inputMode="decimal" placeholder="0" value={qty[i.id] ?? ''} onChange={(e) => setQty({ ...qty, [i.id]: e.target.value })} />{perfume && <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 6 }} checked={!!sealed[i.id]} onChange={(e) => setSealed({ ...sealed, [i.id]: e.target.checked })} />Sellado</label>}</td></tr>
-          ))}</tbody></table>
+          ))}</tbody></table></div>
           {sale.paymentMethod !== 'fiado' ? (
             <label>Se devuelve en<select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })}><option value="efectivo">Efectivo (sale de la caja)</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta</option></select></label>
           ) : <p className="muted">Venta fiada: se abona a la cuenta del cliente.</p>}

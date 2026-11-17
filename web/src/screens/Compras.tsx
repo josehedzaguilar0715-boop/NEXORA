@@ -107,13 +107,13 @@ export function Compras(_: { me: Me }) {
         {msg.result && (
           <div className="card">
             <h2>Costo real por producto</h2>
-            <table className="list"><thead><tr><th>Producto</th><th className="num">Flete</th><th className="num">Costo c/u</th><th className="num">Sugerido</th></tr></thead>
-              <tbody>{msg.result.items.map((i: any) => <tr key={i.lotId}><td>{i.name}</td><td className="num">{mxn(i.freightShare)}</td><td className="num">{mxn(Math.round(i.unitCost))}</td><td className="num">{i.suggestedPrice != null ? mxn(i.suggestedPrice) : '—'}</td></tr>)}</tbody></table>
+            <div className="table-wrap"><table className="list"><thead><tr><th>Producto</th><th className="num">Flete</th><th className="num">Costo c/u</th><th className="num">Sugerido</th></tr></thead>
+              <tbody>{msg.result.items.map((i: any) => <tr key={i.lotId}><td>{i.name}</td><td className="num">{mxn(i.freightShare)}</td><td className="num">{mxn(Math.round(i.unitCost))}</td><td className="num">{i.suggestedPrice != null ? mxn(i.suggestedPrice) : '—'}</td></tr>)}</tbody></table></div>
           </div>
         )}
         <div className="card" style={{ marginTop: 16 }}>
           <h2>Cuentas por pagar · {mxn(payables.total)}</h2>
-          <table className="list"><tbody>{payables.payables.map((p) => <tr key={p.id}><td>{p.supplier ?? 'Sin proveedor'}<br /><small className="muted">{p.ticketRef ?? ''} {p.dueDate ? `vence ${p.dueDate}` : ''}</small></td><td className="num">{mxn(p.balance)}</td><td><button onClick={() => pay(p.id, p.balance)}>Abonar</button></td></tr>)}</tbody></table>
+          <div className="table-wrap"><table className="list"><tbody>{payables.payables.map((p) => <tr key={p.id}><td>{p.supplier ?? 'Sin proveedor'}<br /><small className="muted">{p.ticketRef ?? ''} {p.dueDate ? `vence ${p.dueDate}` : ''}</small></td><td className="num">{mxn(p.balance)}</td><td><button onClick={() => pay(p.id, p.balance)}>Abonar</button></td></tr>)}</tbody></table></div>
         </div>
       </section>
     </div>

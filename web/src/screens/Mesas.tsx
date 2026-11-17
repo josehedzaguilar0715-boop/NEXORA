@@ -12,6 +12,7 @@ export function Mesas({ me }: { me: Me }) {
   const [tables, setTables] = useState<any[]>([])
   const [tab, setTab] = useState<any>(null)
   const [msg, setMsg] = useState('')
+  const [panel, setPanel] = useState<'' | 'reservas' | 'rentas'>('')
   const load = async () => setTables((await api<any>('GET', '/tables')).tables)
   useEffect(() => { void load(); const t = setInterval(load, 15_000); return () => clearInterval(t) }, [])
   const openTable = async (t: any) => {
@@ -28,6 +29,13 @@ export function Mesas({ me }: { me: Me }) {
   const areas = [...new Set(tables.map((t) => t.area))]
   return (
     <div>
+      <div className="toolbar">
+        <button onClick={() => setPanel('reservas')}>Reservas de mesa</button>
+        {hasGiro(me, 'palapa') && <button onClick={() => setPanel('rentas')}>Rentas fuera</button>}
+        <span className="muted small" style={{ flex: 1, textAlign: 'right' }}>Toca una mesa para abrir su cuenta.</span>
+      </div>
+      {panel === 'reservas' && <Reservas me={me} tables={tables} onClose={() => { setPanel(''); void load() }} />}
+      {panel === 'rentas' && <RentasFuera onClose={() => setPanel('')} />}
       {msg && <p className="error">{msg}</p>}
       {areas.map((a) => (
         <section key={a} className="card" style={{ marginBottom: 16 }}>
@@ -55,7 +63,8 @@ export function Cuenta({ me, tab: initial, onClose }: { me: Me; tab: any; onClos
   const [person, setPerson] = useState<number | ''>('')
   const [pay, setPay] = useState<null | { person?: number }>(null)
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
-  useEffect(() => { api<any>('GET', '/products').then((r) => setMenu(r.products.filter((p: P) => p.sellable !== false))).catch(() => {}) }, [])
+  useEffect(() => { api<any>('GET', '/products').then((r) => setMenu(r.products.filter((p: P & { active?: boolean }) => p.sellable !== false && p.active !== false))).catch(() => {}) }, [])
+  const [renting, setRenting] = useState(false)
   const run = async (fn: () => Promise<any>, ok?: string) => {
     try { const r = await fn(); if (r?.tab) setTab(r.tab); else setTab((await api<any>('GET', `/tabs/${tab.id}`)).tab); setMsg(ok ? { ok } : {}) } catch (e) { setMsg({ err: (e as Error).message }) }
   }
@@ -104,9 +113,11 @@ export function Cuenta({ me, tab: initial, onClose }: { me: Me; tab: any; onClos
           {tab.kind === 'mesa' && <button className="big" onClick={() => run(() => api('POST', `/tabs/${tab.id}/request-bill`), 'Cuenta pedida.')}>Pedir cuenta</button>}
           {can(me, 'sell') && <button className="primary big" disabled={!tab.pending} onClick={() => setPay({})}>Cobrar todo</button>}
           {persons.map((n) => <button key={n} className="big" onClick={() => setPay({ person: n })}>Cobrar persona {n}</button>)}
+          {hasGiro(me, 'palapa') && <button className="big" onClick={() => setRenting(true)}>Rentar sillas, camastros…</button>}
           {tab.kind !== 'mesa' && hasGiro(me, 'palapa', 'restaurante', 'comedor', 'taqueria') && <button className="big" disabled={tab.pending > 0} onClick={() => run(() => api('POST', `/tabs/${tab.id}/send`), 'Enviado a cocina.')}>Mandar a cocina</button>}
         </div>
       </section>
+      {renting && <Rentar tab={tab} onClose={() => setRenting(false)} onDone={(t) => { setRenting(false); setTab(t); setMsg({ ok: 'Renta agregada a la cuenta.' }) }} />}
       {pay && <Cobrar tab={tab} person={pay.person} onClose={() => setPay(null)} onDone={async (t) => { setPay(null); setMsg({ ok: `Cobrado ${mxn(t)}` }); const r = await api<any>('GET', `/tabs/${tab.id}`); setTab(r.tab); if (r.tab.status === 'cerrada') onClose() }} />}
     </div>
   )
@@ -185,7 +196,7 @@ export function Pedidos({ me }: { me: Me }) {
       </section>
       <section className="card">
         <h2>Pedidos</h2>
-        <table className="list"><tbody>{tabs.map((t) => (
+        <div className="table-wrap"><table className="list"><tbody>{tabs.map((t) => (
           <tr key={t.id}>
             <td><b>#{t.orderNumber}</b> {t.customerName ?? ''}<br /><small className="muted">{STATE[t.orderStatus] ?? t.orderStatus} · {t.kind}{t.pending ? ` · por cobrar ${mxn(t.pending)}` : ''}</small></td>
             <td>
@@ -199,8 +210,109 @@ export function Pedidos({ me }: { me: Me }) {
               }}>Entregado</button>}
             </td>
           </tr>
-        ))}</tbody></table>
+        ))}</tbody></table></div>
       </section>
+    </div>
+  )
+}
+
+
+const RES_STATUS: Record<string, string> = { pendiente: 'Por confirmar', confirmada: 'Confirmada', llego: 'Llegó', no_llego: 'No llegó', cancelada: 'Cancelada' }
+
+/** Reservas de mesa por fecha, hora y personas. Las confirma el dueño o el encargado. */
+function Reservas({ me, tables, onClose }: { me: Me; tables: any[]; onClose: () => void }) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
+  const [date, setDate] = useState(today)
+  const [list, setList] = useState<any[]>([])
+  const nextHour = () => { const h = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: 'America/Mexico_City' }).format(new Date())); return `${String(Math.min(h + 1, 23)).padStart(2, '0')}:00` }
+  const [f, setF] = useState({ name: '', phone: '', people: '4', time: nextHour(), tableId: '' })
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  const load = async () => setList((await api<any>('GET', `/table-reservations?date=${date}`)).reservations)
+  useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [date])
+  const run = async (fn: () => Promise<unknown>, ok: string) => { try { await fn(); setMsg({ ok }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }
+  const manager = me.user.role === 'owner' || can(me, 'cancel_discount')
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="card wide" onClick={(e) => e.stopPropagation()}>
+        <div className="card-head"><h2>Reservas de mesa</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
+        <label>Día<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+        <div className="table-wrap"><table className="list"><tbody>
+          {list.map((r) => (
+            <tr key={r.id}>
+              <td><b>{new Date(r.starts_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' })} · {r.name}</b><br /><small className="muted">{r.people} personas{r.table_name ? ` · mesa ${r.table_name}` : ''}{r.phone ? ` · ${r.phone}` : ''} · {RES_STATUS[r.status] ?? r.status}</small></td>
+              <td className="num">
+                {r.status === 'pendiente' && manager && <button className="mini" onClick={() => run(() => api('POST', `/table-reservations/${r.id}/confirm`), 'Reserva confirmada.')}>Confirmar</button>}{' '}
+                {['pendiente', 'confirmada'].includes(r.status) && <button className="mini" onClick={() => run(() => api('POST', `/table-reservations/${r.id}/arrived`), 'Llegó.')}>Llegó</button>}{' '}
+                {['pendiente', 'confirmada'].includes(r.status) && <button className="mini" onClick={() => run(() => api('POST', `/table-reservations/${r.id}/no-show`), 'Marcada: no llegó.')}>No llegó</button>}{' '}
+                {['pendiente', 'confirmada'].includes(r.status) && <button className="mini" onClick={() => run(() => api('POST', `/table-reservations/${r.id}/cancel`), 'Reserva cancelada.')}>Cancelar</button>}
+              </td>
+            </tr>
+          ))}
+          {list.length === 0 && <tr><td className="muted">Sin reservas ese día.</td></tr>}
+        </tbody></table></div>
+        <h3 style={{ marginTop: 14 }}>Nueva reserva</h3>
+        <div className="row">
+          <label>Nombre<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+          <label>Teléfono<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
+        </div>
+        <div className="row">
+          <label>Hora<input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} /></label>
+          <label>Personas<input inputMode="numeric" value={f.people} onChange={(e) => setF({ ...f, people: e.target.value })} /></label>
+          <label>Mesa<select value={f.tableId} onChange={(e) => setF({ ...f, tableId: e.target.value })}><option value="">Cualquiera</option>{tables.map((t) => <option key={t.id} value={t.id}>Mesa {t.name} ({t.seats})</option>)}</select></label>
+        </div>
+        {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
+        <p><button className="primary" disabled={f.name.trim().length < 2 || !(Number(f.people) > 0)} onClick={() => run(async () => { await api('POST', '/table-reservations', { name: f.name, phone: f.phone || undefined, people: Number(f.people), startsAt: new Date(`${date}T${f.time}:00-06:00`).toISOString(), ...(f.tableId ? { tableId: f.tableId } : {}) }); setF({ ...f, name: '', phone: '' }) }, manager ? 'Reserva guardada. Confírmala cuando quieras.' : 'Reserva guardada; la confirma el encargado.')}>Guardar reserva</button></p>
+      </div>
+    </div>
+  )
+}
+
+/** Palapa: rentar activos (sillas, camastros, sombrillas) dentro de la cuenta. */
+function Rentar({ tab, onClose, onDone }: { tab: any; onClose: () => void; onDone: (t: any) => void }) {
+  const [assets, setAssets] = useState<any[]>([])
+  const [qty, setQty] = useState<Record<string, string>>({})
+  const [err, setErr] = useState('')
+  useEffect(() => { api<any>('GET', '/rental-assets').then((r) => setAssets(r.assets)).catch((e) => setErr(e.message)) }, [])
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="card" onClick={(e) => e.stopPropagation()}>
+        <h2>Rentar</h2>
+        <div className="table-wrap"><table className="list"><tbody>
+          {assets.map((a) => (
+            <tr key={a.id}>
+              <td><b>{a.name}</b><br /><small className="muted">{mxn(a.price)} c/u · disponibles {a.available}</small></td>
+              <td style={{ width: '6em' }}><input aria-label={`Cuántos ${a.name}`} inputMode="numeric" value={qty[a.id] ?? ''} onChange={(e) => setQty({ ...qty, [a.id]: e.target.value })} placeholder="0" /></td>
+              <td className="num"><button className="mini primary" disabled={!(Number(qty[a.id]) > 0)} onClick={async () => { try { onDone((await api<any>('POST', `/tabs/${tab.id}/rentals`, { assetId: a.id, quantity: Number(qty[a.id]) })).tab) } catch (e) { setErr((e as Error).message) } }}>Rentar</button></td>
+            </tr>
+          ))}
+          {assets.length === 0 && <tr><td className="muted">No hay activos para rentar. Dalos de alta en Configurar negocio → Rentas.</td></tr>}
+        </tbody></table></div>
+        {err && <p className="error">{err}</p>}
+        <p><button onClick={onClose}>Cerrar</button></p>
+      </div>
+    </div>
+  )
+}
+
+/** Lo que está rentado y falta que regresen. */
+function RentasFuera({ onClose }: { onClose: () => void }) {
+  const [list, setList] = useState<any[]>([])
+  const [msg, setMsg] = useState('')
+  const load = async () => setList((await api<any>('GET', '/rentals')).rentals)
+  useEffect(() => { void load().catch((e) => setMsg(e.message)) }, [])
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="card" onClick={(e) => e.stopPropagation()}>
+        <div className="card-head"><h2>Rentas fuera</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
+        <div className="table-wrap"><table className="list"><tbody>
+          {list.map((r) => (
+            <tr key={r.id}><td><b>{r.quantity} {r.name}</b><br /><small className="muted">{r.tableName ? `Mesa ${r.tableName}` : r.customerName ?? ''} · desde {new Date(r.outAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</small></td>
+              <td className="num"><button className="mini" onClick={async () => { try { await api('POST', `/rentals/${r.id}/return`); await load() } catch (e) { setMsg((e as Error).message) } }}>Regresó</button></td></tr>
+          ))}
+          {list.length === 0 && <tr><td className="muted">Todo lo rentado ya regresó.</td></tr>}
+        </tbody></table></div>
+        {msg && <p className="error">{msg}</p>}
+      </div>
     </div>
   )
 }
