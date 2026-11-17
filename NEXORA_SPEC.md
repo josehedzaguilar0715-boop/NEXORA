@@ -337,3 +337,15 @@ Reglas:
 - Revisión de precios cada 2 meses. Cualquier cambio se anota aquí con fecha y no afecta a los negocios activos sin aviso previo.
 
 Pendiente: definir el costo real por sucursal y por usuario (nube, mensajes de verificación, respaldos y soporte) para confirmar que estos precios los cubren.
+
+## 15. Decisiones (2026-11-17)
+
+- Códigos de verificación: por SMS.
+- Alojamiento de staging: Fly.io, región Dallas (dfw), la más cercana a México disponible.
+- Boletos y compras por link: quedan por pagar; se liquidan en efectivo o transferencia. Sin pago en línea.
+- Báscula: el peso se captura a mano.
+- Super panel: verificación en dos pasos con código por SMS y por correo.
+- Solicitudes de cambio: sin costo.
+- Link de reservas: se cobra como extra con instalación; lo habilita el super panel.
+- Días de prueba por defecto: 14. Días vencido antes de poder suspender: 30 (editables en el super panel).
+- Pendiente: método para verificar la identidad del dueño que pierde su teléfono.
