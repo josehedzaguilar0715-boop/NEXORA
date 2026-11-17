@@ -1289,6 +1289,67 @@ const MIGRATIONS: Migration[] = [
   CREATE TRIGGER sale_payments_no_delete BEFORE DELETE ON sale_payments BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
   INSERT INTO sale_payments (id, sale_id, method, amount) SELECT 'p-' || id, id, payment_method, total FROM sales;
   `,
+  {
+    fkOff: true,
+    sql: `
+  -- Apartados: la venta que se entrega ya estaba pagada con anticipos y abonos ("anticipo").
+  CREATE TABLE sale_payments_new (
+    id TEXT PRIMARY KEY,
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta','fiado','anticipo')),
+    amount INTEGER NOT NULL CHECK (amount >= 0)
+  );
+  INSERT INTO sale_payments_new SELECT * FROM sale_payments;
+  DROP TABLE sale_payments;
+  ALTER TABLE sale_payments_new RENAME TO sale_payments;
+  CREATE INDEX sale_payments_sale ON sale_payments(sale_id);
+  CREATE TRIGGER sale_payments_no_delete BEFORE DELETE ON sale_payments BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  `,
+  },
+  `
+  -- Apartados con anticipo: el cliente aparta mercancía con precio fijo, abona y se la lleva al liquidar.
+  CREATE TABLE layaways (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    folio INTEGER NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    total INTEGER NOT NULL CHECK (total > 0),
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'abierto' CHECK (status IN ('abierto','entregado','cancelado')),
+    sale_id TEXT REFERENCES sales(id),
+    cancel_reason TEXT,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    closed_at TEXT
+  );
+  CREATE UNIQUE INDEX layaways_folio ON layaways(business_id, folio);
+  CREATE TABLE layaway_items (
+    id TEXT PRIMARY KEY,
+    layaway_id TEXT NOT NULL REFERENCES layaways(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    presentation_id TEXT,
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    qty_milli INTEGER NOT NULL,
+    unit_price INTEGER NOT NULL,
+    total INTEGER NOT NULL
+  );
+  CREATE INDEX layaway_items_product ON layaway_items(product_id);
+  -- Anticipo, abonos y devoluciones (negativas). Nunca se borran.
+  CREATE TABLE layaway_payments (
+    id TEXT PRIMARY KEY,
+    layaway_id TEXT NOT NULL REFERENCES layaways(id),
+    kind TEXT NOT NULL CHECK (kind IN ('anticipo','abono','devolucion')),
+    amount INTEGER NOT NULL,
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta')),
+    shift_id TEXT REFERENCES shifts(id),
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE TRIGGER layaways_no_delete BEFORE DELETE ON layaways BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  CREATE TRIGGER layaway_payments_no_delete BEFORE DELETE ON layaway_payments BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  `,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

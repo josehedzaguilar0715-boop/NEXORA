@@ -356,3 +356,11 @@ button.link { min-height: 40px; padding: 8px 0; }
 .link-line { overflow-wrap: anywhere; margin-top: -4px; }
 a { overflow-wrap: anywhere; }
 @media (max-width: 900px) { .pos-screen { align-items: stretch; } .pos-screen > * , .pos-main > * { width: 100%; } }
+.tag { display: inline-block; margin-top: 2px; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; color: var(--violet); border: 1px solid rgba(139, 92, 246, 0.5); background: rgba(139, 92, 246, 0.12); }
+.choice { display: grid; gap: 10px; margin: 8px 0 12px; }
+.choice button { display: grid; gap: 4px; text-align: left; min-height: 96px; padding: 14px 16px; }
+.choice button b { font-size: 1.15rem; }
+.choice button small { color: var(--muted); font-weight: 500; }
+pre.report { font: 13px/1.35 ui-monospace, Menlo, Consolas, monospace; background: var(--bg); padding: 12px; border-radius: 10px; overflow-x: auto; white-space: pre; }
+.tag.bad { color: var(--danger); border-color: rgba(248, 113, 113, 0.5); background: rgba(248, 113, 113, 0.1); }
+.pill.ok { color: var(--ok); border-color: rgba(52, 211, 153, 0.5); background: rgba(52, 211, 153, 0.1); }

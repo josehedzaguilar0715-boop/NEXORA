@@ -63,7 +63,8 @@ type Flow = { category: string; method: string; amount: number }
 export function cashFlow(db: Db, businessId: string, from: string, to: string) {
   const { start, end } = range(from, to)
   const inflows = [
-    ...(db.prepare("SELECT 'ventas' category, p.method method, SUM(p.amount) amount FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND p.method <> 'fiado' AND s.created_at >= ? AND s.created_at < ? GROUP BY p.method").all(businessId, start, end) as Flow[]),
+    ...(db.prepare("SELECT 'ventas' category, p.method method, SUM(p.amount) amount FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND p.method NOT IN ('fiado','anticipo') AND s.created_at >= ? AND s.created_at < ? GROUP BY p.method").all(businessId, start, end) as Flow[]),
+    ...(db.prepare("SELECT 'apartados' category, lp.method method, SUM(lp.amount) amount FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND lp.amount > 0 AND lp.created_at >= ? AND lp.created_at < ? GROUP BY lp.method").all(businessId, start, end) as Flow[]),
     ...(db.prepare("SELECT 'cobranza' category, method, -SUM(delta) amount FROM credit_ledger WHERE business_id = ? AND kind = 'abono' AND created_at >= ? AND created_at < ? GROUP BY method").all(businessId, start, end) as Flow[]),
     ...(db.prepare("SELECT 'aportaciones' category, 'efectivo' method, SUM(m.amount) amount FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? AND m.origin = 'manual' AND m.type = 'deposito' AND m.created_at >= ? AND m.created_at < ?").all(businessId, start, end) as Flow[]),
   ].filter((r) => r.amount > 0)
@@ -71,6 +72,7 @@ export function cashFlow(db: Db, businessId: string, from: string, to: string) {
     ...(db.prepare('SELECT \'proveedores\' category, sp.method, SUM(sp.amount) amount FROM supplier_payments sp JOIN purchases p ON p.id = sp.purchase_id WHERE p.business_id = ? AND sp.created_at >= ? AND sp.created_at < ? GROUP BY sp.method').all(businessId, start, end) as Flow[]),
     ...(db.prepare("SELECT 'gastos' category, method, SUM(amount) amount FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? GROUP BY method").all(businessId, from, to) as Flow[]),
     ...(db.prepare("SELECT 'devoluciones' category, refund_method method, SUM(amount) amount FROM returns WHERE business_id = ? AND refund_method <> 'saldo' AND created_at >= ? AND created_at < ? GROUP BY refund_method").all(businessId, start, end) as Flow[]),
+    ...(db.prepare("SELECT 'devoluciones' category, lp.method method, -SUM(lp.amount) amount FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND lp.amount < 0 AND lp.created_at >= ? AND lp.created_at < ? GROUP BY lp.method").all(businessId, start, end) as Flow[]),
     ...(db.prepare("SELECT 'retiros' category, 'efectivo' method, SUM(m.amount) amount FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? AND m.origin = 'manual' AND m.type = 'retiro' AND m.created_at >= ? AND m.created_at < ?").all(businessId, start, end) as Flow[]),
   ].filter((r) => r.amount > 0)
   const sum = (rows: Flow[]) => rows.reduce((a, r) => a + r.amount, 0)
@@ -92,8 +94,10 @@ export function balanceSheet(db: Db, businessId: string) {
   const shifts = db.prepare("SELECT * FROM shifts WHERE business_id = ? AND status = 'abierto'").all(businessId) as ShiftRow[]
   const cashInRegisters = shifts.reduce((a, s) => a + shiftTotals(db, s).expectedCash - shiftTotals(db, s).tipsCash, 0)
   const assets = cashInRegisters + inventory + receivables
-  const liabilities = payables + customerCredit
-  return { cashInRegisters, openRegisters: shifts.length, inventory, receivables, assets, payables, customerCredit, liabilities, equity: assets - liabilities }
+  // Anticipos de apartados abiertos: dinero recibido por mercancía que aún no se entrega.
+  const layawayDeposits = (db.prepare("SELECT COALESCE(SUM(lp.amount),0) v FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND l.status = 'abierto'").get(businessId) as { v: number }).v
+  const liabilities = payables + customerCredit + layawayDeposits
+  return { cashInRegisters, openRegisters: shifts.length, inventory, receivables, assets, payables, customerCredit, layawayDeposits, liabilities, equity: assets - liabilities }
 }
 
 type Entry = { at: string; type: string; concept: string; method: string; inflow: number; outflow: number }
@@ -104,13 +108,14 @@ export function ledger(db: Db, businessId: string, from: string, to: string): En
   const b = businessId
   return db.prepare(`
     SELECT * FROM (
-      SELECT s.created_at at, 'Venta' type, 'Ticket #' || s.folio concept, p.method method, p.amount inflow, 0 outflow FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND p.method <> 'fiado' AND p.amount > 0 AND s.created_at >= ? AND s.created_at < ?
+      SELECT s.created_at at, 'Venta' type, 'Ticket #' || s.folio concept, p.method method, p.amount inflow, 0 outflow FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND p.method NOT IN ('fiado','anticipo') AND p.amount > 0 AND s.created_at >= ? AND s.created_at < ?
+      UNION ALL SELECT lp.created_at, CASE lp.kind WHEN 'devolucion' THEN 'Devolución de apartado' ELSE 'Apartado' END, CASE lp.kind WHEN 'anticipo' THEN 'Anticipo' WHEN 'abono' THEN 'Abono' ELSE 'Devolución' END || ' apartado #' || l.folio, lp.method, CASE WHEN lp.amount > 0 THEN lp.amount ELSE 0 END, CASE WHEN lp.amount < 0 THEN -lp.amount ELSE 0 END FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND lp.created_at >= ? AND lp.created_at < ?
       UNION ALL SELECT l.created_at, 'Cobro de fiado', COALESCE(c.name, 'Cliente'), l.method, -l.delta, 0 FROM credit_ledger l LEFT JOIN customers c ON c.id = l.customer_id WHERE l.business_id = ? AND l.kind = 'abono' AND l.created_at >= ? AND l.created_at < ?
       UNION ALL SELECT m.created_at, CASE m.type WHEN 'deposito' THEN 'Depósito a caja' ELSE 'Retiro de caja' END, m.reason, 'efectivo', CASE m.type WHEN 'deposito' THEN m.amount ELSE 0 END, CASE m.type WHEN 'retiro' THEN m.amount ELSE 0 END FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? AND m.origin = 'manual' AND m.created_at >= ? AND m.created_at < ?
       UNION ALL SELECT sp.created_at, 'Pago a proveedor', COALESCE(s.name, 'Proveedor') || COALESCE(' · folio ' || p.ticket_ref, ''), sp.method, 0, sp.amount FROM supplier_payments sp JOIN purchases p ON p.id = sp.purchase_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? AND sp.created_at >= ? AND sp.created_at < ?
       UNION ALL SELECT e.date || 'T12:00:00.000Z', 'Gasto', e.concept, e.method, 0, e.amount FROM expenses e WHERE e.business_id = ? AND e.date BETWEEN ? AND ?
       UNION ALL SELECT r.created_at, 'Devolución', r.reason, r.refund_method, 0, r.amount FROM returns r WHERE r.business_id = ? AND r.refund_method <> 'saldo' AND r.created_at >= ? AND r.created_at < ?
-    ) ORDER BY at, type LIMIT 20000`).all(b, start, end, b, start, end, b, start, end, b, start, end, b, from, to, b, start, end) as Entry[]
+    ) ORDER BY at, type LIMIT 20000`).all(b, start, end, b, start, end, b, start, end, b, start, end, b, start, end, b, from, to, b, start, end) as Entry[]
 }
 
 const CATEGORY_LABEL: Record<string, string> = { renta: 'Renta', servicios: 'Luz, agua, gas, internet y teléfono', nomina: 'Sueldos', insumos: 'Insumos y limpieza', transporte: 'Transporte y gasolina', mantenimiento: 'Mantenimiento', publicidad: 'Publicidad', impuestos: 'Impuestos y permisos', comisiones_bancarias: 'Comisiones bancarias', otros: 'Otros' }

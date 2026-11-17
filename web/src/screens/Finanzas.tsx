@@ -21,7 +21,7 @@ export const CATEGORIES: Record<string, string> = {
   mantenimiento: 'Mantenimiento', publicidad: 'Publicidad', impuestos: 'Impuestos y permisos', comisiones_bancarias: 'Comisiones bancarias', otros: 'Otros',
 }
 const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
-const FLOW: Record<string, string> = { ventas: 'Ventas cobradas', cobranza: 'Cobro de fiado', aportaciones: 'Depósitos a caja', proveedores: 'Pagos a proveedores', gastos: 'Gastos', devoluciones: 'Devoluciones a clientes', retiros: 'Retiros de caja' }
+const FLOW: Record<string, string> = { apartados: 'Anticipos y abonos de apartados', ventas: 'Ventas cobradas', cobranza: 'Cobro de fiado', aportaciones: 'Depósitos a caja', proveedores: 'Pagos a proveedores', gastos: 'Gastos', devoluciones: 'Devoluciones a clientes', retiros: 'Retiros de caja' }
 const pct = (n: number | null) => (n == null ? '—' : `${(n * 100).toFixed(1)} %`)
 const fmtDate = (d: string) => new Date(`${d}T12:00:00-06:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -242,6 +242,7 @@ function Balance({ onErr }: { onErr: (e: string) => void }) {
           <table className="list statement"><tbody>
             <tr><td>Cuentas por pagar<br /><small className="muted">compras a crédito sin liquidar</small></td><td className="num">{mxn(b.payables)}</td></tr>
             <tr><td>Saldo a favor de clientes<br /><small className="muted">devoluciones como saldo</small></td><td className="num">{mxn(b.customerCredit)}</td></tr>
+            {b.layawayDeposits > 0 && <tr><td>Anticipos de apartados<br /><small className="muted">dinero recibido por mercancía sin entregar</small></td><td className="num">{mxn(b.layawayDeposits)}</td></tr>}
             <tr className="total"><td>Total</td><td className="num">{mxn(b.liabilities)}</td></tr>
           </tbody></table>
         </section>

@@ -28,8 +28,9 @@ import { MiAsistencia, Usuarios } from './screens/Usuarios'
 import { Finanzas } from './screens/Finanzas'
 import { Importar } from './screens/Importar'
 import { Configurar } from './screens/Configurar'
+import { Apartados } from './screens/Apartados'
 import {
-  Armchair, Boxes, CalendarDays, ChartColumn, ChefHat, ClipboardCheck, Clock, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
+  Archive, Armchair, Boxes, CalendarDays, ChartColumn, ChefHat, ClipboardCheck, Clock, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
   LifeBuoy, LogOut, Menu, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
 } from 'lucide-react'
 
@@ -65,6 +66,7 @@ const SCREENS: Screen[] = [
   { key: 'cocina', label: 'Cocina', perm: 'sell', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria'], group: 'Operación', icon: ChefHat },
   { key: 'menu', label: 'Menú del día', perm: 'sell', C: MenuDia, giros: ['comedor', 'taqueria'], group: 'Operación', icon: UtensilsCrossed },
   { key: 'carne', label: 'Carne', perm: 'sell', C: Trompo, giros: ['taqueria'], group: 'Operación', icon: Flame },
+  { key: 'apartados', label: 'Apartados', perm: 'sell', C: Apartados, giros: ['abarrotes'], group: 'Operación', icon: Archive },
   { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria'], group: 'Operación', icon: FileText },
   { key: 'encargos', label: 'Encargos', perm: 'sell', C: Encargos, giros: ['papeleria'], group: 'Operación', icon: Package },
   { key: 'devoluciones', label: 'Devoluciones', perm: 'cancel_discount', C: Devoluciones, giros: ['ferreteria', 'perfumeria'], group: 'Operación', icon: Undo2 },

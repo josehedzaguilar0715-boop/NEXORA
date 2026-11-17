@@ -125,7 +125,16 @@ try {
 
   // Corte de caja.
   // Verificación a ciegas: primero se cuenta el dinero, sin ver cuánto dice el sistema.
+  // Corte X: cómo va la caja, sin cerrarla.
   await page.getByRole('button', { name: 'Corte de caja' }).click()
+  await page.getByRole('button', { name: /Corte X/ }).click()
+  await page.getByRole('heading', { name: /Corte X #1/ }).waitFor()
+  check((await page.locator('pre.report').innerText()).includes('DEBE HABER EN CAJA'), 'corte X: reporte parcial con lo que debe haber')
+  await page.screenshot({ path: `${shots}/5-corte-x.png` })
+  await page.getByRole('button', { name: 'Seguir vendiendo' }).click()
+  // Corte Z.
+  await page.getByRole('button', { name: 'Corte de caja' }).click()
+  await page.getByRole('button', { name: /Corte Z/ }).click()
   await page.getByRole('heading', { name: /1\. Cuenta el dinero/ }).waitFor()
   check(!(await page.getByText('Debe haber en caja').isVisible()), 'corte: se cuenta sin ver lo que espera el sistema')
   await page.getByLabel('¿Cuánto dinero hay en la caja?').fill('500')
@@ -140,8 +149,8 @@ try {
   check(await page.getByText('Debe haber en caja').isVisible(), 'corte: fondo $500 + $82 en efectivo cuadra con lo registrado')
   await page.screenshot({ path: `${shots}/5-corte.png` })
   await page.getByRole('button', { name: 'Cerrar caja' }).click()
-  await page.getByRole('heading', { name: 'Caja cerrada' }).waitFor()
-  check(true, 'cierra la caja')
+  await page.getByRole('heading', { name: /Caja cerrada · Corte Z #1/ }).waitFor()
+  check((await page.locator('pre.report').innerText()).includes('Turno cerrado.'), 'cierra la caja con su corte Z imprimible')
 
   // Pantallas del dueño.
   await page.getByRole('button', { name: 'Listo' }).click()

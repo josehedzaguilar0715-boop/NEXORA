@@ -66,6 +66,77 @@ function ensureCanManage(c: C, s: ShiftRow) {
   if (s.cashier_id !== u.id && !(u.role === 'owner' || hasPerm(u, 'open_close_cash'))) throw forbidden()
 }
 
+// ---------- Corte X (parcial) y corte Z (final) ----------
+
+const pesos = (c: number) => `${c < 0 ? '-' : ''}$${(Math.abs(c) / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+/**
+ * Reporte del turno. X: lectura parcial con la caja abierta (se puede sacar las veces que sea).
+ * Z: el corte final, con lo contado y la diferencia; lleva un número consecutivo por sucursal.
+ */
+export function shiftReport(db: import('./db.js').Db, s: ShiftRow, kind: 'X' | 'Z') {
+  const t = shiftTotals(db, s)
+  const biz = db.prepare('SELECT name FROM businesses WHERE id = ?').get(s.business_id) as { name: string }
+  const cashier = (db.prepare('SELECT name FROM users WHERE id = ?').get(s.cashier_id) as { name: string }).name
+  const sales = db.prepare("SELECT COUNT(*) n, COALESCE(SUM(total),0) total, COALESCE(SUM(discount + promo_discount),0) disc FROM sales WHERE shift_id = ? AND status = 'completada'").get(s.id) as { n: number; total: number; disc: number }
+  // Ventas entregadas que ya se habían pagado con anticipos de apartado (el dinero entró antes).
+  const prepaid = (db.prepare("SELECT COALESCE(SUM(p.amount),0) v FROM sale_payments p JOIN sales x ON x.id = p.sale_id WHERE x.shift_id = ? AND x.status = 'completada' AND p.method = 'anticipo'").get(s.id) as { v: number }).v
+  const number = kind === 'Z'
+    ? (db.prepare("SELECT COUNT(*) n FROM shifts WHERE branch_id = ? AND status = 'cerrado' AND closed_at <= ?").get(s.branch_id, s.closed_at ?? '9999') as { n: number }).n
+    : (db.prepare("SELECT COUNT(*) n FROM audit_log WHERE action = 'caja.corte_x' AND entity_id = ?").get(s.id) as { n: number }).n
+  const fmt = (d: string) => new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'short', timeStyle: 'short' }).format(new Date(d))
+  const W = 32
+  const row = (l: string, r: string) => l.slice(0, W - r.length - 1).padEnd(W - r.length) + r
+  const line = '='.repeat(W)
+  const text = [
+    biz.name,
+    kind === 'X' ? `CORTE X #${number} (parcial)` : `CORTE Z #${number} (final)`,
+    `Cajero: ${cashier}`,
+    `Abrió: ${fmt(s.opened_at)}`,
+    kind === 'Z' && s.closed_at ? `Cerró: ${fmt(s.closed_at)}` : `Hora: ${fmt(new Date().toISOString())}`,
+    line,
+    row(`Ventas (${sales.n})`, pesos(sales.total)),
+    ...(sales.disc ? [row('  Descuentos dados', pesos(sales.disc))] : []),
+    row('  Efectivo', pesos(t.cashSales)),
+    row('  Tarjeta', pesos(t.cardSales)),
+    row('  Transferencia', pesos(t.transferSales)),
+    ...(t.creditSales ? [row('  Fiado', pesos(t.creditSales))] : []),
+    ...(prepaid ? [row('  Pagado en apartados', pesos(prepaid))] : []),
+    ...(t.cancelled ? [row('Ventas canceladas', String(t.cancelled))] : []),
+    line,
+    row('Fondo inicial', pesos(t.openingFloat)),
+    row('Ventas en efectivo', pesos(t.cashSales)),
+    row('Entradas (abonos y otros)', pesos(t.deposits)),
+    row('Salidas (pagos y retiros)', pesos(t.withdrawals ? -t.withdrawals : 0)),
+    ...(t.tipsCash ? [row('Propinas en efectivo', pesos(t.tipsCash))] : []),
+    row('DEBE HABER EN CAJA', pesos(t.expectedCash)),
+    ...(kind === 'Z' && s.counted_cash != null ? [row('Contado', pesos(s.counted_cash)), row('Diferencia', pesos(s.difference ?? 0)), ...(s.difference_reason ? [`Motivo: ${s.difference_reason}`] : [])] : []),
+    line,
+    kind === 'X' ? 'La caja sigue abierta.' : 'Turno cerrado.',
+  ].join('\n')
+  return { kind, number, totals: t, tickets: sales.n, salesTotal: sales.total, text }
+}
+
+/** Corte X: cómo va la caja, sin cerrarla. Queda en la bitácora. */
+cash.post('/shifts/:id/x-report', requirePerm('open_close_cash'), async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const s = loadShift(c)
+  ensureCanManage(c, s)
+  if (s.status !== 'abierto') throw conflict('Ese turno ya tiene corte Z.', 'turno_cerrado')
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'caja.corte_x', entity: 'shift', entityId: s.id, newValue: { expected: shiftTotals(db, s).expectedCash } })
+  return c.json({ report: shiftReport(db, s, 'X') })
+})
+
+/** Volver a imprimir el corte Z de un turno cerrado. */
+cash.get('/shifts/:id/z-report', requirePerm('open_close_cash'), (c) => {
+  const { db } = c.get('deps')
+  const s = loadShift(c)
+  ensureCanManage(c, s)
+  if (s.status !== 'cerrado') throw conflict('Ese turno sigue abierto: saca un corte X.', 'turno_abierto')
+  return c.json({ report: shiftReport(db, s, 'Z') })
+})
+
 cash.post('/shifts/open', requirePerm('open_close_cash'), async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
@@ -173,7 +244,8 @@ cash.post('/shifts/:id/close', requirePerm('open_close_cash'), async (c) => {
     businessId: u.business_id, userId: u.id, action: 'caja.corte', entity: 'shift', entityId: s.id,
     newValue: { expected: totals.expectedCash, counted: d.countedCash, difference }, reason: d.reason ?? null,
   })
-  return c.json({ shift: db.prepare('SELECT * FROM shifts WHERE id = ?').get(s.id), totals, difference })
+  const closed = db.prepare('SELECT * FROM shifts WHERE id = ?').get(s.id) as ShiftRow
+  return c.json({ shift: closed, totals, difference, report: shiftReport(db, closed, 'Z') })
 })
 
 // Cierre del día: consolida los turnos de una sucursal.

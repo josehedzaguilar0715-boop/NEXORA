@@ -4,7 +4,7 @@ import { api, mxn, toCents } from '../api'
 import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
 
-type P = Product & { attrs?: Record<string, any>; sellable?: boolean; minStock: number; lastCost: number; suggestedPrice: number | null; categoryId: string | null; version: number; active?: boolean; trackStock?: boolean; trackExpiry?: boolean }
+type P = Product & { tiers?: { minQuantity: number; price: number }[]; attrs?: Record<string, any>; sellable?: boolean; minStock: number; lastCost: number; suggestedPrice: number | null; categoryId: string | null; version: number; active?: boolean; trackStock?: boolean; trackExpiry?: boolean }
 
 const UNIT: Record<string, string> = { pieza: 'pieza', kg: 'kg', litro: 'litro', metro: 'metro' }
 const FOOD = ['palapa', 'restaurante', 'taqueria', 'comedor']
@@ -62,8 +62,8 @@ export function Productos({ me }: { me: Me }) {
                 return (
                   <tr key={p.id} className="clickable" onClick={() => setEdit({ p })}>
                     <td><b>{p.name}</b><br /><small className="muted">{[catName(p.categoryId), p.barcode ?? 'sin código', UNIT[p.unit] ?? p.unit].filter(Boolean).join(' · ')}{p.sellable === false ? ' · uso interno' : ''}</small></td>
-                    <td className="num">{mxn(p.price)}</td>
-                    <td className="num">{p.trackStock === false ? <span className="muted">receta</span> : <span className={low ? 'pill bad' : 'pill'}>{p.stock ?? 0}</span>}{expIds.has(p.id) && <><br /><small className="neg">por caducar</small></>}</td>
+                    <td className="num">{mxn(p.price)}{p.tiers?.length ? <><br /><small className="muted">mayoreo {mxn(p.tiers[0]!.price)} desde {p.tiers[0]!.minQuantity}</small></> : null}</td>
+                    <td className="num">{p.trackStock === false ? <span className="muted">receta</span> : <span className={low ? 'pill bad' : 'pill'}>{p.stock ?? 0}</span>}{(p as P & { reserved?: number }).reserved ? <><br /><small className="muted">{(p as P & { reserved?: number }).reserved} apartados</small></> : null}{expIds.has(p.id) && <><br /><small className="neg">por caducar</small></>}</td>
                     <td className="num hide-sm">{p.lastCost ? mxn(Math.round(p.lastCost)) : '—'}</td>
                     <td className="num">{canStock && p.active !== false && p.trackStock !== false && <button className="mini" onClick={(e) => { e.stopPropagation(); setEdit({ p, tab: 'existencia' }) }}>+ Agregar</button>}</td>
                   </tr>
@@ -117,7 +117,9 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
     name: p?.name ?? '', barcode: p?.barcode ?? '', unit: p?.unit ?? 'pieza', price: p ? String(p.price / 100) : '', minStock: String(p?.minStock ?? 0), categoryId: p?.categoryId ?? '',
     authCode: '', brand: p?.attrs?.brand ?? '', fragrance: p?.attrs?.fragrance ?? '', sizeMl: p?.attrs?.sizeMl ? String(p.attrs.sizeMl) : '', presentation: p?.attrs?.presentation ?? 'regular',
     trackStock: p ? p.trackStock !== false : true, trackExpiry: !!p?.trackExpiry, stock: '', cost: '',
+    wholesale: p?.tiers?.length === 1 ? String(p.tiers[0]!.price / 100) : '', wholesaleMin: p?.tiers?.length === 1 ? String(p.tiers[0]!.minQuantity) : '',
   })
+  const multiTier = (p?.tiers?.length ?? 0) > 1
   const [err, setErr] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
@@ -128,12 +130,19 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
       if (!f.name.trim()) throw new Error('Escribe el nombre del producto.')
       if (f.price.trim() === '' || Number.isNaN(toCents(f.price))) throw new Error('Escribe el precio de venta.')
       const common = { name: f.name, barcode: f.barcode || null, price: toCents(f.price), minStock: Number(f.minStock) || 0, categoryId: f.categoryId || null, trackExpiry: f.trackExpiry, ...(attrs ? { attrs } : {}) }
+      const wantTier = f.wholesale.trim() !== '' || f.wholesaleMin.trim() !== ''
+      if (wantTier && (!(toCents(f.wholesale) > 0) || !(Number(f.wholesaleMin) > 1))) throw new Error('Para el mayoreo escribe el precio y desde cuántas piezas aplica (2 o más).')
+      if (wantTier && toCents(f.wholesale) >= toCents(f.price)) throw new Error('El precio de mayoreo debe ser menor que el de menudeo.')
+      const tiersBody = { tiers: wantTier ? [{ minQuantity: Number(f.wholesaleMin), price: toCents(f.wholesale) }] : [] }
+      const tiersChanged = !multiTier && JSON.stringify(tiersBody.tiers) !== JSON.stringify((p?.tiers ?? []).map((t) => ({ minQuantity: t.minQuantity, price: t.price })))
       if (!p) {
         const r = await api<{ product: P }>('POST', '/products', { ...common, unit: f.unit, ...(food ? { trackStock: f.trackStock } : {}), ...(attrs ? { sellable: !['tester', 'muestra', 'envase'].includes(f.presentation) } : {}) })
         // Existencia inicial opcional: entra como inventario inicial (sin gasto).
         if (f.trackStock && Number(f.stock) > 0) await api('POST', '/inventory/count', { productId: r.product.id, counted: Number(f.stock), reason: 'Inventario inicial', ...(f.cost.trim() ? { unitCost: toCents(f.cost) } : {}) })
+        if (wantTier) await api('PUT', `/products/${r.product.id}/price-tiers`, tiersBody)
       } else {
         await api('PATCH', `/products/${p.id}`, { ...common, ...(priceChanged ? { authCode: f.authCode } : {}), baseVersion: p.version, updatedAt: new Date().toISOString() })
+        if (tiersChanged) await api('PUT', `/products/${p.id}/price-tiers`, tiersBody)
       }
       onSaved()
     } catch (e) {
@@ -169,6 +178,12 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
       </div>
       {!p && <label>Categoría<select value={f.categoryId} onChange={set('categoryId')}><option value="">Sin categoría</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
       {p?.suggestedPrice != null && <p className="muted small">Precio sugerido por margen: {mxn(p.suggestedPrice)}</p>}
+      {multiTier ? <p className="muted small">Tiene {p!.tiers!.length} precios por volumen; se editan en «Precio por volumen».</p> : (
+        <div className="row">
+          <label>Precio de mayoreo (opcional)<input inputMode="decimal" value={f.wholesale} onChange={set('wholesale')} placeholder="$0.00" disabled={!canEdit} /></label>
+          <label>A partir de cuántas{f.unit !== 'pieza' ? ` (${UNIT[f.unit]})` : ''}<input inputMode="decimal" value={f.wholesaleMin} onChange={set('wholesaleMin')} placeholder="Ej. 12" disabled={!canEdit} /></label>
+        </div>
+      )}
       {priceChanged && <label>Código de autorización (cambio de precio)<input type="password" value={f.authCode} onChange={set('authCode')} /></label>}
       {!p && food && <label className="check"><input type="checkbox" checked={!f.trackStock} onChange={(e) => setF({ ...f, trackStock: !e.target.checked })} />Es un platillo o bebida preparada (no lleva existencia; descuenta su receta)</label>}
       {f.trackStock && (

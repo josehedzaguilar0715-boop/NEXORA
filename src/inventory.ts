@@ -132,11 +132,13 @@ export function suggestedPrice(db: Db, p: ProductRow, unitCost = p.last_cost): n
 
 function productView(db: Db, p: ProductRow, branchId: string | null) {
   const presentations = db.prepare('SELECT id, name, factor_milli AS factorMilli, price, barcode FROM presentations WHERE product_id = ? AND active = 1').all(p.id)
+  // Precio de mayoreo / escalas por volumen: la caja los usa para mostrar el mismo precio que cobra el servidor.
+  const tiers = (db.prepare('SELECT min_milli, price FROM price_tiers WHERE product_id = ? ORDER BY min_milli').all(p.id) as { min_milli: number; price: number }[]).map((t) => ({ minQuantity: fromMilli(t.min_milli), price: t.price }))
   return {
     id: p.id, name: p.name, categoryId: p.category_id, barcode: p.barcode, unit: p.unit, basePrice: p.price, marginBp: p.margin_bp,
     minStock: fromMilli(p.min_stock_milli), trackExpiry: !!p.track_expiry, sellable: !!p.sellable, attrs: JSON.parse(p.attrs), trackStock: !!(p as ProductRow & { track_stock: number }).track_stock, lastCost: p.last_cost, version: p.version, updatedAt: p.updated_at, active: !!p.active,
-    ...(branchId ? { price: currentPrice(db, branchId, p), stock: fromMilli(stockOf(db, branchId, p.id)) } : {}),
-    suggestedPrice: suggestedPrice(db, p), presentations,
+    ...(branchId ? { price: currentPrice(db, branchId, p), stock: fromMilli(stockOf(db, branchId, p.id)), reserved: fromMilli((db.prepare("SELECT COALESCE(SUM(i.qty_milli),0) v FROM layaway_items i JOIN layaways l ON l.id = i.layaway_id WHERE l.branch_id = ? AND l.status = 'abierto' AND i.product_id = ?").get(branchId, p.id) as { v: number }).v) } : {}),
+    suggestedPrice: suggestedPrice(db, p), presentations, tiers,
   }
 }
 

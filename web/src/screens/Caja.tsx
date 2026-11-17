@@ -6,14 +6,23 @@ import { can, FIADO_GIROS, type Me, hasGiro } from '../App'
 export interface Product {
   id: string; name: string; barcode: string | null; unit: 'pieza' | 'kg' | 'metro' | 'litro'; price: number; stock?: number
   presentations: { id: string; name: string; factorMilli: number; price: number; barcode: string | null }[]
+  /** Precio de mayoreo o escalas por volumen (desde cierta cantidad). */
+  tiers?: { minQuantity: number; price: number }[]
 }
 export interface Service { id: string; name: string; price: number; category: string | null; durationMin: number | null; machineId: string | null; active: boolean }
-interface Line { key: string; serviceId?: string; productId?: string; presentationId?: string; name: string; quantity: number; amount?: number; unitPrice: number; total: number; unit: string; free?: boolean }
+interface Line { key: string; serviceId?: string; productId?: string; presentationId?: string; name: string; quantity: number; amount?: number; unitPrice: number; total: number; unit: string; free?: boolean; tiers?: { minQuantity: number; price: number }[] }
 interface Shift { id: string; opening_float: number; opened_at: string }
 interface Customer { id: string; name: string }
 
 const unitLabel = (u: string) => ({ pieza: 'pza', kg: 'kg', metro: 'm', litro: 'L' })[u] ?? u
-const lineTotal = (l: Line) => (l.amount !== undefined ? l.amount : Math.round(l.quantity * l.unitPrice))
+/** Precio por unidad del renglón: el de mayoreo si la cantidad llega (lo mismo que cobra el servidor). */
+export const linePrice = (l: Line) => {
+  if (l.amount !== undefined || !l.tiers?.length) return l.unitPrice
+  const t = [...l.tiers].reverse().find((x) => l.quantity + 1e-9 >= x.minQuantity)
+  return t ? t.price : l.unitPrice
+}
+const isWholesale = (l: Line) => linePrice(l) !== l.unitPrice
+const lineTotal = (l: Line) => (l.amount !== undefined ? l.amount : Math.round(l.quantity * linePrice(l)))
 
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
@@ -102,7 +111,7 @@ export function Caja({ me }: { me: Me }) {
     const out: Hit[] = []
     for (const sv of services) if (sv.name.toLowerCase().includes(t)) out.push({ key: sv.id, label: sv.name, sub: `servicio · ${mxn(sv.price)}`, go: (n) => addService(sv, n) })
     for (const p of sellable) {
-      if (p.name.toLowerCase().includes(t) || p.barcode === parsed.term) out.push({ key: p.id, label: p.name, sub: `${mxn(p.price)} / ${unitLabel(p.unit)}${p.stock !== undefined ? ` · hay ${p.stock}` : ''}`, go: (n) => add(p, undefined, n) })
+      if (p.name.toLowerCase().includes(t) || p.barcode === parsed.term) out.push({ key: p.id, label: p.name, sub: `${mxn(p.price)} / ${unitLabel(p.unit)}${p.tiers?.length ? ` · mayoreo ${mxn(p.tiers[0]!.price)} desde ${p.tiers[0]!.minQuantity}` : ''}${p.stock !== undefined ? ` · hay ${p.stock}` : ''}`, go: (n) => add(p, undefined, n) })
       for (const pr of p.presentations) if (`${p.name} ${pr.name}`.toLowerCase().includes(t) || pr.barcode === parsed.term) out.push({ key: pr.id, label: `${p.name} ${pr.name}`, sub: mxn(pr.price), go: (n) => add(p, pr.id, n) })
     }
     return out.slice(0, 8)
@@ -124,7 +133,7 @@ export function Caja({ me }: { me: Me }) {
       const same = c.find((l) => l.productId === p.id && l.presentationId === presentationId && l.amount === undefined)
       if (same) { key = same.key; return c.map((l) => (l === same ? { ...l, quantity: l.quantity + qty } : l)) }
       key = crypto.randomUUID()
-      return [...c, { key, productId: p.id, presentationId, name: pr ? `${p.name} ${pr.name}` : p.name, quantity: qty, unitPrice: pr ? pr.price : p.price, total: 0, unit: pr ? 'pza' : unitLabel(p.unit) }]
+      return [...c, { key, productId: p.id, presentationId, name: pr ? `${p.name} ${pr.name}` : p.name, quantity: qty, unitPrice: pr ? pr.price : p.price, total: 0, unit: pr ? 'pza' : unitLabel(p.unit), ...(pr ? {} : { tiers: p.tiers }) }]
     })
     setTimeout(() => setSelLine(key), 0)
     setQ('')
@@ -285,11 +294,11 @@ export function Caja({ me }: { me: Me }) {
               {cart.map((l, i) => (
                 <tr key={l.key} className={selLine === l.key ? 'sel' : ''} onClick={() => setSelLine(l.key)}>
                   <td className="muted hide-sm">{i + 1}</td>
-                  <td>{l.name}{l.amount !== undefined && <><br /><small className="muted">por importe</small></>}</td>
+                  <td>{l.name}{l.amount !== undefined && <><br /><small className="muted">por importe</small></>}{isWholesale(l) && <><br /><span className="tag">mayoreo</span></>}</td>
                   <td className="num">{l.amount === undefined && l.unit === 'pza'
                     ? <div className="qty"><button onClick={(e) => { e.stopPropagation(); setQtyTo(l.key, l.quantity - 1) }} aria-label={`Menos ${l.name}`}>−</button><input className="qty-in" aria-label={`Cantidad de ${l.name}`} inputMode="numeric" value={l.quantity} onClick={(e) => e.stopPropagation()} onChange={(e) => { const n = Number(e.target.value); if (Number.isFinite(n) && n >= 0) setQtyTo(l.key, n || 0.0001) }} onBlur={(e) => { if (!(Number(e.target.value) > 0)) removeLine(l.key) }} onKeyDown={(e) => e.key === 'Enter' && focusSearch()} /><button onClick={(e) => { e.stopPropagation(); setQtyTo(l.key, l.quantity + 1) }} aria-label={`Más ${l.name}`}>+</button></div>
                     : `${l.amount !== undefined ? '' : `${l.quantity} ${l.unit}`}`}</td>
-                  <td className="num hide-sm">{l.amount === undefined ? mxn(l.unitPrice) : ''}</td>
+                  <td className="num hide-sm">{l.amount === undefined ? mxn(linePrice(l)) : ''}</td>
                   <td className="num"><b>{mxn(lineTotal(l))}</b></td>
                   <td className="num"><button className="mini" aria-label={`Quitar ${l.name}`} onClick={(e) => { e.stopPropagation(); removeLine(l.key) }}>✕</button></td>
                 </tr>
@@ -507,7 +516,7 @@ function Granel({ p, onAdd, onClose }: { p: Product; onAdd: (l: Line) => void; o
   const add = () => {
     if (!ok) return
     onAdd(by === 'cantidad'
-      ? { key: crypto.randomUUID(), productId: p.id, name: p.name, quantity: n, unitPrice: p.price, total: preview, unit: u }
+      ? { key: crypto.randomUUID(), productId: p.id, name: p.name, quantity: n, unitPrice: p.price, total: preview, unit: u, tiers: p.tiers }
       : { key: crypto.randomUUID(), productId: p.id, name: p.name, quantity: Math.round((toCents(v) * 1000) / p.price) / 1000, amount: toCents(v), unitPrice: p.price, total: preview, unit: u })
   }
   return (
@@ -659,7 +668,8 @@ function VentasTurno({ shift, me, onClose }: { shift: Shift; me: Me; onClose: ()
  * 2) el sistema compara contra lo registrado (cuadra, sobra o falta) y se puede volver a contar; 3) se cierra.
  */
 function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void; onClosed: () => void }) {
-  const [step, setStep] = useState<'contar' | 'verificar'>('contar')
+  const [step, setStep] = useState<'elegir' | 'x' | 'contar' | 'verificar'>('elegir')
+  const [xReport, setXReport] = useState<any>(null)
   const [typed, setTyped] = useState('')
   const [check, setCheck] = useState<any>(null)
   const [offline, setOffline] = useState(false)
@@ -697,15 +707,50 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
   if (result) {
     return (
       <Modal onClose={onClosed}>
-        <h2>Caja cerrada</h2>
+        <h2>Caja cerrada{result.report ? ` · Corte Z #${result.report.number}` : ''}</h2>
         {result.pending ? <p>Sin internet: el corte se enviará solo al reconectar.</p> : (
           <>
             <p className="row"><span>Efectivo esperado</span><b className="num">{mxn(result.totals.expectedCash)}</b></p>
             <p className="row"><span>Contado</span><b className="num">{mxn(result.shift.counted_cash)}</b></p>
             <p className="row"><span>Diferencia</span><b className="num" style={{ color: result.difference ? 'var(--danger)' : 'var(--ok)' }}>{mxn(result.difference)}</b></p>
+            {result.report && <><pre className="report">{result.report.text}</pre><div className="ticket">{result.report.text}</div></>}
           </>
         )}
-        <p><button className="primary big" style={{ width: '100%' }} onClick={onClosed}>Listo</button></p>
+        <p className="row">{result.report && <button className="big" onClick={() => window.print()}>Imprimir corte Z</button>}<button className="primary big" onClick={onClosed}>Listo</button></p>
+      </Modal>
+    )
+  }
+
+  if (step === 'elegir') {
+    return (
+      <Modal onClose={onClose}>
+        <h2>Corte de caja</h2>
+        <div className="choice">
+          <button className="big" onClick={async () => { setBusy(true); setErr(''); try { await flush(); setXReport((await api<any>('POST', `/shifts/${shift.id}/x-report`)).report); setStep('x') } catch (e) { setErr((e as Error).message) } setBusy(false) }} disabled={busy}>
+            <b>Corte X</b><small>Ver cómo va la caja. No la cierra; se puede sacar las veces que quieras.</small>
+          </button>
+          <button className="big" onClick={() => setStep('contar')}>
+            <b>Corte Z</b><small>Contar el dinero y cerrar el turno. Es el corte final del día o del turno.</small>
+          </button>
+        </div>
+        {err && <p className="error">{err}</p>}
+        <p><button onClick={onClose}>Regresar</button></p>
+      </Modal>
+    )
+  }
+
+  if (step === 'x' && xReport) {
+    return (
+      <Modal onClose={onClose}>
+        <h2>Corte X #{xReport.number} · la caja sigue abierta</h2>
+        <div className="kpis mini">
+          <div><span className="muted">Ventas</span><b>{mxn(xReport.salesTotal)}</b></div>
+          <div><span className="muted">Tickets</span><b>{xReport.tickets}</b></div>
+          <div><span className="muted">Debe haber en caja</span><b>{mxn(xReport.totals.expectedCash)}</b></div>
+        </div>
+        <pre className="report">{xReport.text}</pre>
+        <div className="ticket">{xReport.text}</div>
+        <p className="row"><button className="big" onClick={() => window.print()}>Imprimir corte X</button><button className="primary big" onClick={onClose}>Seguir vendiendo</button></p>
       </Modal>
     )
   }
@@ -713,7 +758,7 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
   if (step === 'contar') {
     return (
       <Modal onClose={onClose}>
-        <h2>Corte de caja · 1. Cuenta el dinero</h2>
+        <h2>Corte Z · 1. Cuenta el dinero</h2>
         <p className="muted">Cuenta todo el dinero que hay en la caja y escribe el total. Después el sistema te dice si coincide con lo registrado.</p>
         <label>¿Cuánto dinero hay en la caja?<input inputMode="decimal" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && typed.trim() && void verify()} placeholder="$0.00" /></label>
         <div className="total">{mxn(counted)}</div>
@@ -727,7 +772,7 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
   const t = check?.totals
   return (
     <Modal onClose={onClose}>
-      <h2>Corte de caja · 2. Verificación</h2>
+      <h2>Corte Z · 2. Verificación</h2>
       {offline ? <p className="error">Sin internet: no se puede comparar ahora. Puedes cerrar y el sistema lo comparará al reconectar; escribe una nota.</p> : (
         <div className={`verdict ${diff === 0 ? 'ok' : 'bad'}`}>
           <div className="big-ico" aria-hidden>{diff === 0 ? '✓' : '!'}</div>

@@ -117,7 +117,7 @@ export function tierPrice(db: Deps['db'], productId: string, qtyMilli: number): 
   return t?.price ?? null
 }
 
-function resolveLine(deps: Deps, u: UserRow, branchId: string, it: z.infer<typeof itemSchema>, trusted = false): ResolvedLine {
+export function resolveLine(deps: Deps, u: UserRow, branchId: string, it: z.infer<typeof itemSchema>, trusted = false): ResolvedLine {
   const { db } = deps
   const base = { input: it, ref: it.ref ?? null, category: it.category ?? null, presentationId: null, qtyMilli: null, priceChanged: false, cost: 0, itemId: newId(), serviceId: null }
   if (it.serviceId) {
@@ -171,7 +171,7 @@ export function saleView(deps: Deps, s: SaleRow) {
   const cashPart = payments.length ? payments.filter((p) => p.method === 'efectivo').reduce((a, p) => a + p.amount, 0) : s.total
   return {
     id: s.id, folio: s.folio, shiftId: s.shift_id, subtotal: s.subtotal, promoDiscount: s.promo_discount, discount: s.discount, total: s.total, customerId: s.customer_id,
-    paymentMethod: payments.length > 1 ? 'mixto' : s.payment_method, payments, cashReceived: s.cash_received, change: s.cash_received != null ? s.cash_received - cashPart : null,
+    paymentMethod: payments.length > 1 ? 'mixto' : payments[0]?.method ?? s.payment_method, payments, cashReceived: s.cash_received, change: s.cash_received != null ? s.cash_received - cashPart : null,
     status: s.status, cancelReason: s.cancel_reason, createdAt: s.created_at, items,
   }
 }
@@ -190,7 +190,7 @@ export function parseSale(data: unknown): SaleInput {
  * Registra una venta. `trustedPrices` solo lo usa el servidor (p. ej. al convertir una cotización ya
  * autorizada): acepta los precios dados sin pedir código.
  */
-export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trustedPrices?: boolean } = {}): { duplicate: boolean; sale: ReturnType<typeof saleView> } {
+export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trustedPrices?: boolean; /** Ya pagada con anticipos de un apartado: sin promociones ni cobro. */ prepaid?: boolean } = {}): { duplicate: boolean; sale: ReturnType<typeof saleView> } {
   const { db, now } = deps
   if (!hasPerm(u, 'sell')) throw forbidden()
   // Idempotencia: la misma venta nunca se cobra dos veces.
@@ -213,7 +213,7 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
   // La hora de la venta es la del equipo (puede venir de una caja sin internet), sin aceptar fechas futuras.
   const createdAt = d.createdAt && new Date(d.createdAt) <= t ? d.createdAt : iso(t)
   // Promociones vigentes: se aplican solas, sin código (las definió el dueño).
-  const promo = moduleOn(db, u.business_id, 'promociones') ? bestPromotions(activePromotions(db, u.business_id, createdAt), lines) : { total: 0, applied: [] }
+  const promo = !opts.prepaid && moduleOn(db, u.business_id, 'promociones') ? bestPromotions(activePromotions(db, u.business_id, createdAt), lines) : { total: 0, applied: [] }
   const discount = d.discount ?? 0
   if (discount > subtotal - promo.total) throw bad('El descuento no puede ser mayor al total.')
   const total = subtotal - promo.total - discount
@@ -223,7 +223,8 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
   const othersTotal = others.reduce((a, p) => a + p.amount, 0)
   if (othersTotal > total) throw bad(`Con tarjeta o transferencia van ${othersTotal / 100} y la venta es de ${total / 100}: revisa los montos.`, 'pago_no_cuadra')
   const cashPart = d.paymentMethod === 'efectivo' ? total - othersTotal : 0
-  const payments = d.paymentMethod === 'efectivo'
+  const payments = opts.prepaid ? [{ method: 'anticipo', amount: total }]
+    : d.paymentMethod === 'efectivo'
     ? [...(cashPart > 0 || !others.length ? [{ method: 'efectivo', amount: cashPart }] : []), ...others]
     : [{ method: d.paymentMethod, amount: total }]
   if (d.cashReceived !== undefined) {
@@ -366,7 +367,7 @@ sales.get('/sales/:id/ticket', (c) => {
 
 const mxn = (cents: number) => `$${(cents / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta', fiado: 'Fiado' }
+const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta', fiado: 'Fiado', anticipo: 'Pagado en apartado' }
 
 function ticketText(t: { business: string; phone: string | null; folio: string; date: string; items: { description: string; quantity: number; total: number }[]; subtotal: number; discount: number; total: number; paymentMethod: string; payments: { method: string; amount: number }[]; cashReceived: number | null; change: number | null; cashier: string; cancelled: boolean }) {
   const W = 32
