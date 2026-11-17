@@ -13,6 +13,9 @@ import { Cocina, Mesas, Pedidos } from './screens/Mesas'
 import { MenuDia } from './screens/MenuDia'
 import { Trompo } from './screens/Trompo'
 import { CierreDia, PrecioDia } from './screens/Verduleria'
+import { Ajustes, Buzon } from './screens/Ajustes'
+import { Escanear, Lealtad } from './screens/Lealtad'
+import { SuperPanel } from './screens/SuperPanel'
 import { Comisiones } from './screens/Comisiones'
 import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
@@ -25,8 +28,10 @@ export interface Me {
   permissions: 'todos' | string[]
   business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string }
   settings?: Record<string, any>
+  modules?: string[]
 }
-export const can = (me: Me, p: string) => me.permissions === 'todos' || me.permissions.includes(p)
+/** 'owner' = solo el dueño. Un permiso no marcado no aparece en pantalla. */
+export const can = (me: Me, p: string) => (p === 'owner' ? me.user.role === 'owner' : me.permissions === 'todos' || me.permissions.includes(p))
 
 type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[] }
 const SCREENS: Screen[] = [
@@ -51,6 +56,10 @@ const SCREENS: Screen[] = [
   { key: 'clientes', label: 'Clientes y fiado', perm: 'customers_credit', C: Clientes },
   { key: 'reportes', label: 'Reportes', perm: 'view_reports', C: Reportes },
   { key: 'usuarios', label: 'Personal', perm: 'create_employees', C: Usuarios },
+  { key: 'escanear', label: 'Escanear QR', perm: 'sell', C: Escanear },
+  { key: 'lealtad', label: 'Membresías y promos', perm: 'owner', C: Lealtad },
+  { key: 'buzon', label: 'Buzón', perm: 'owner', C: Buzon },
+  { key: 'ajustes', label: 'Ajustes', perm: 'owner', C: Ajustes },
 ]
 
 function useHash() {
@@ -86,6 +95,7 @@ function PendingBadge() {
 export function App() {
   // Páginas públicas (sin iniciar sesión): reservar y ver el estado de la cita.
   const path = location.pathname
+  if (path.startsWith('/admin')) return <SuperPanel />
   if (path.startsWith('/reservar/')) return <Reservar code={path.split('/')[2] ?? ''} />
   if (path.startsWith('/cita/')) return <EstadoCita token={path.split('/')[2] ?? ''} />
   if (path.startsWith('/boletos/')) return <TiendaBoletos code={path.split('/')[2] ?? ''} />
@@ -121,7 +131,9 @@ function Privada() {
 
   // Comedor: el mapa de mesas es opcional (apagado por defecto).
   const giroOk = (s: Screen) => !s.giros || s.giros.includes(me.business.giro) || (s.key === 'mesas' && me.business.giro === 'comedor' && !!me.settings?.tablesEnabled)
-  const allowed = SCREENS.filter((s) => can(me, s.perm) && giroOk(s))
+  const needsModule: Record<string, string[]> = { escanear: ['membresias', 'asistencia', 'fidelidad'] }
+  const moduleOk = (s: Screen) => !needsModule[s.key] || needsModule[s.key]!.some((m) => me.modules?.includes(m))
+  const allowed = SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s))
   const current = allowed.find((s) => s.key === hash) ?? allowed[0]
   const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'
   return (

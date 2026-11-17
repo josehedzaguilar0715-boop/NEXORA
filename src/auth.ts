@@ -181,6 +181,7 @@ authed.get('/auth/me', (c) => {
   const settingsRows = db.prepare('SELECT key, value FROM business_settings WHERE business_id = ?').all(user.business_id) as { key: string; value: string }[]
   return c.json({
     settings: Object.fromEntries(settingsRows.map((r) => [r.key, JSON.parse(r.value)])),
+    modules: JSON.parse((db.prepare('SELECT modules FROM businesses WHERE id = ?').get(user.business_id) as { modules: string }).modules),
     user: { id: user.id, name: user.name, username: user.username, role: user.role, branchId: user.branch_id, mustChangePassword: !!user.must_change_password },
     permissions,
     business: biz,

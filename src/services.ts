@@ -206,6 +206,7 @@ services.post('/orders', requirePerm('sell'), async (c) => {
   }
   if (d.deposit > d.total) throw bad('El anticipo no puede ser mayor que el total.')
   if (!d.customerId && !d.customerName) throw bad('Indica el nombre del cliente.')
+  if (d.customerId && !db.prepare('SELECT 1 FROM customers WHERE id = ? AND business_id = ?').get(d.customerId, u.business_id)) throw bad('Ese cliente no existe.')
   const id = d.id ?? newId()
   const result = db.transaction(() => {
     const folio = ((db.prepare('SELECT MAX(folio) m FROM orders WHERE business_id = ?').get(u.business_id) as { m: number | null }).m ?? 0) + 1

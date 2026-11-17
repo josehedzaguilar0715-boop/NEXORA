@@ -1,0 +1,171 @@
+import { useEffect, useState } from 'react'
+import { ApiError, mxn, toCents } from '../api'
+
+// El super panel tiene su propio acceso, separado del de los negocios.
+const TOKEN = 'nx_admin_token'
+async function adm<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+  const t = localStorage.getItem(TOKEN)
+  const res = await fetch(`/api${path}`, { method, headers: { 'content-type': 'application/json', ...(t ? { authorization: `Bearer ${t}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
+  const json = await res.json().catch(() => ({}))
+  if (res.status === 401 && path !== '/admin/login') localStorage.removeItem(TOKEN)
+  if (!res.ok) throw new ApiError(res.status, json?.error?.code ?? 'error', json?.error?.message ?? `Error ${res.status}`)
+  return json as T
+}
+
+const STATUS: Record<string, string> = { prueba: 'Prueba', activo: 'Activo', vencido: 'Vencido', suspendido: 'Suspendido' }
+const COLOR: Record<string, string> = { prueba: '#2563eb', activo: 'var(--ok)', vencido: 'var(--accent)', suspendido: 'var(--danger)' }
+const PLANS: Record<string, string> = { inicial: 'Inicial ($500, 3 usuarios)', crecimiento: 'Crecimiento ($700, 5)', profesional: 'Profesional ($900, 10)' }
+
+export function SuperPanel() {
+  const [logged, setLogged] = useState(!!localStorage.getItem(TOKEN))
+  const [tab, setTab] = useState<'negocios' | 'buzon' | 'alta' | 'ajustes'>('negocios')
+  if (!logged) return <AdminLogin onLogin={() => setLogged(true)} />
+  return (
+    <div className="app">
+      <header className="top">
+        <span className="name">NEXORA · Super panel</span>
+        <nav>{(['negocios', 'buzon', 'alta', 'ajustes'] as const).map((k) => <a key={k} href="#" className={tab === k ? 'on' : ''} onClick={(e) => { e.preventDefault(); setTab(k) }}>{{ negocios: 'Negocios', buzon: 'Buzón', alta: 'Alta asistida', ajustes: 'Ajustes' }[k]}</a>)}</nav>
+        <button onClick={() => { localStorage.removeItem(TOKEN); setLogged(false) }}>Salir</button>
+      </header>
+      <main>{tab === 'negocios' ? <Negocios /> : tab === 'buzon' ? <BuzonAdmin /> : tab === 'alta' ? <Alta onDone={() => setTab('negocios')} /> : <AjustesAdmin />}</main>
+    </div>
+  )
+}
+
+function AdminLogin({ onLogin }: { onLogin: () => void }) {
+  const [f, setF] = useState({ username: '', password: '' })
+  const [err, setErr] = useState('')
+  return (
+    <form className="card login" onSubmit={async (e) => { e.preventDefault(); try { const r = await adm('POST', '/admin/login', f); localStorage.setItem(TOKEN, r.token); onLogin() } catch (er) { setErr((er as Error).message) } }}>
+      <h1>Super panel</h1>
+      <label>Usuario<input value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} autoCapitalize="none" /></label>
+      <label>Contraseña<input type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></label>
+      {err && <p className="error">{err}</p>}
+      <p><button className="primary big" style={{ width: '100%' }}>Entrar</button></p>
+    </form>
+  )
+}
+
+function Negocios() {
+  const [list, setList] = useState<any[]>([])
+  const [filter, setFilter] = useState('')
+  const [sel, setSel] = useState<any>(null)
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  const load = async () => { const r = await adm('GET', `/admin/businesses${filter ? `?status=${filter}` : ''}`); setList(r.businesses); if (sel) setSel(r.businesses.find((b: any) => b.id === sel.id) ?? null) }
+  useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [filter])
+  const run = (fn: () => Promise<unknown>, ok: string) => async () => { try { await fn(); setMsg({ ok }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }
+  return (
+    <div className="grid2">
+      <section className="card">
+        <div className="tabs">{['', 'prueba', 'activo', 'vencido', 'suspendido'].map((s) => <button key={s} className={filter === s ? 'on' : ''} onClick={() => setFilter(s)}>{s ? STATUS[s] : 'Todos'}</button>)}</div>
+        <table className="list"><tbody>{list.map((b) => (
+          <tr key={b.id} onClick={() => setSel(b)} style={{ cursor: 'pointer' }}>
+            <td><b>{b.name}</b> <small className="muted">{b.code} · {b.giro}</small><br /><small className="muted">{b.owner?.name} · {b.owner?.phone}{b.unreadTickets ? ` · ✉ ${b.unreadTickets}` : ''}</small></td>
+            <td style={{ color: COLOR[b.status], fontWeight: 700 }}>{STATUS[b.status]}{b.overdueDays != null ? ` (${b.overdueDays} d)` : ''}</td>
+            <td className="num">{mxn(b.monthlyFee)}</td>
+          </tr>
+        ))}</tbody></table>
+      </section>
+      {sel && (
+        <section className="card">
+          <h2>{sel.name}</h2>
+          <p className="muted">{STATUS[sel.status]} · {sel.status === 'prueba' ? `prueba hasta ${sel.trialEndsAt?.slice(0, 10)}` : sel.paidUntil ? `pagado hasta ${sel.paidUntil.slice(0, 10)}` : ''}</p>
+          <p>Plan {sel.plan.plan} · {sel.plan.extraBranches} sucursales extra · {sel.plan.extraUserPacks} paquetes de usuarios · <b>{mxn(sel.monthlyFee)}/mes</b></p>
+          <p className="muted">Uso: {sel.usage.users}/{sel.limits.users} usuarios · {sel.usage.branches}/{sel.limits.branches} sucursales{sel.pendingPlan ? ` · cambio pendiente: ${sel.pendingPlan.plan}` : ''}</p>
+          {msg.err && <p className="error">{msg.err}</p>}
+          {msg.ok && <p className="okmsg">{msg.ok}</p>}
+          <div className="pay">
+            <button className="primary big" onClick={() => { const m = Number(prompt('¿Cuántos meses pagó?', '1')); if (m) void run(() => adm('POST', `/admin/businesses/${sel.id}/payments`, { months: m }), 'Pago registrado: el negocio queda activo.')() }}>Registrar pago</button>
+            {['prueba', 'vencido'].includes(sel.status) && !sel.paidUntil && <button className="big" onClick={() => { const d = Number(prompt('Días de prueba (desde el alta):', String(sel.trialDays ?? 14))); if (d >= 0) void run(() => adm('PATCH', `/admin/businesses/${sel.id}`, { trialDays: d }), 'Días de prueba cambiados.')() }}>Días de prueba</button>}
+            {sel.status === 'vencido' && <button className="danger big" onClick={() => { const r = prompt('Motivo de la suspensión:'); if (r) void run(() => adm('POST', `/admin/businesses/${sel.id}/suspend`, { reason: r }), 'Suspendido. Sus datos quedan intactos.')() }}>Suspender</button>}
+          </div>
+          <h3 style={{ marginTop: 14 }}>Plan</h3>
+          <Plan b={sel} onSave={(body) => run(() => adm('PATCH', `/admin/businesses/${sel.id}`, body), 'Plan guardado.')()} />
+          <h3 style={{ marginTop: 14 }}>Restablecer acceso del dueño</h3>
+          <p className="muted">Solo después de verificar su identidad. El motivo queda en bitácora.</p>
+          <button onClick={() => { const p = prompt('Contraseña temporal (mínimo 8):'); const r = p && prompt('¿Cómo verificaste su identidad?'); if (p && r) void run(() => adm('POST', `/admin/businesses/${sel.id}/users/${sel.owner.id}/reset-password`, { newPassword: p, reason: r }), 'Acceso restablecido; deberá cambiar la contraseña al entrar.')() }}>Restablecer</button>
+        </section>
+      )}
+    </div>
+  )
+}
+
+function Plan({ b, onSave }: { b: any; onSave: (body: any) => void }) {
+  const [f, setF] = useState({ plan: b.plan.plan, extraBranches: String(b.plan.extraBranches), extraUserPacks: String(b.plan.extraUserPacks), applyNow: false })
+  useEffect(() => setF({ plan: b.plan.plan, extraBranches: String(b.plan.extraBranches), extraUserPacks: String(b.plan.extraUserPacks), applyNow: false }), [b.id])
+  return (
+    <>
+      <label>Plan<select value={f.plan} onChange={(e) => setF({ ...f, plan: e.target.value })}>{Object.entries(PLANS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+      <div className="row"><label>Sucursales extra ($300)<input inputMode="numeric" value={f.extraBranches} onChange={(e) => setF({ ...f, extraBranches: e.target.value })} /></label><label>Paquetes de 5 usuarios ($200)<input inputMode="numeric" value={f.extraUserPacks} onChange={(e) => setF({ ...f, extraUserPacks: e.target.value })} /></label></div>
+      <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={f.applyNow} onChange={(e) => setF({ ...f, applyNow: e.target.checked })} />Aplicar ya (si no, en el siguiente pago)</label>
+      <p><button onClick={() => onSave({ plan: f.plan, extraBranches: Number(f.extraBranches) || 0, extraUserPacks: Number(f.extraUserPacks) || 0, applyNow: f.applyNow })}>Guardar plan</button></p>
+    </>
+  )
+}
+
+function Alta({ onDone }: { onDone: () => void }) {
+  const [f, setF] = useState({ businessName: '', ownerName: '', phone: '', tempPassword: '', trialDays: '', giro: 'abarrotes' })
+  const [err, setErr] = useState('')
+  const [done, setDone] = useState<any>(null)
+  if (done) return <div className="card login"><h2>Negocio creado</h2><p>Entrégale al dueño: teléfono <b>{f.phone}</b>, contraseña temporal <b>{f.tempPassword}</b>. Código del negocio para sus empleados: <b>{done.code}</b>.</p><button className="primary" onClick={onDone}>Listo</button></div>
+  return (
+    <div className="card login">
+      <h2>Alta asistida</h2>
+      <label>Nombre del negocio<input value={f.businessName} onChange={(e) => setF({ ...f, businessName: e.target.value })} /></label>
+      <label>Giro<select value={f.giro} onChange={(e) => setF({ ...f, giro: e.target.value })}>{['abarrotes', 'ferreteria', 'papeleria', 'barberia', 'unas', 'perfumeria', 'banos', 'turistico', 'palapa', 'restaurante', 'comedor', 'taqueria', 'verduleria'].map((g) => <option key={g} value={g}>{g}</option>)}</select></label>
+      <label>Nombre del dueño<input value={f.ownerName} onChange={(e) => setF({ ...f, ownerName: e.target.value })} /></label>
+      <label>Teléfono del dueño<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
+      <label>Contraseña temporal<input value={f.tempPassword} onChange={(e) => setF({ ...f, tempPassword: e.target.value })} /></label>
+      <label>Días de prueba (vacío = el valor por defecto)<input inputMode="numeric" value={f.trialDays} onChange={(e) => setF({ ...f, trialDays: e.target.value })} /></label>
+      {err && <p className="error">{err}</p>}
+      <p><button className="primary big" style={{ width: '100%' }} onClick={async () => { try { const r = await adm('POST', '/admin/businesses', { ...f, trialDays: f.trialDays ? Number(f.trialDays) : undefined }); setDone(r.business) } catch (e) { setErr((e as Error).message) } }}>Crear negocio</button></p>
+    </div>
+  )
+}
+
+function BuzonAdmin() {
+  const [list, setList] = useState<any[]>([])
+  const [sel, setSel] = useState<any>(null)
+  const [reply, setReply] = useState('')
+  const load = async () => setList((await adm('GET', '/admin/tickets')).tickets)
+  useEffect(() => { void load() }, [])
+  const open = async (t: any) => { setSel({ ...(await adm('GET', `/admin/tickets/${t.id}`)).ticket, type: t.type, business: t.business_name }); void load() }
+  const status = async (s: string) => { const r = await adm('PATCH', `/admin/tickets/${sel.id}`, { status: s }); setSel({ ...sel, ...r.ticket }); void load() }
+  return (
+    <div className="grid2">
+      <section className="card">
+        <h2>Buzón</h2>
+        <table className="list"><tbody>{list.map((t) => (
+          <tr key={t.id} onClick={() => open(t)} style={{ cursor: 'pointer', fontWeight: t.unread_by_support ? 700 : 400 }}><td>{t.business_name}<br /><small className="muted">{t.type === 'cambio' ? `Cambio · ${t.module}` : 'Soporte'} · {t.subject}</small></td><td>{t.status}</td></tr>
+        ))}</tbody></table>
+      </section>
+      {sel && (
+        <section className="card">
+          <h2>{sel.subject}</h2>
+          <p className="muted">{sel.business} · {sel.status}</p>
+          {sel.messages.map((m: any, i: number) => <div key={i} className="card" style={{ marginBottom: 8 }}><small className="muted">{m.author} · {new Date(m.createdAt).toLocaleString('es-MX')}</small><p style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{m.body}</p></div>)}
+          <label>Responder<textarea rows={3} value={reply} onChange={(e) => setReply(e.target.value)} /></label>
+          <p className="row"><button className="primary" disabled={!reply.trim()} onClick={async () => { const r = await adm('POST', `/admin/tickets/${sel.id}/messages`, { message: reply }); setSel({ ...sel, ...r.ticket }); setReply('') }}>Enviar</button>
+            {sel.type === 'cambio' ? ['en_revision', 'aceptada', 'rechazada'].map((s) => <button key={s} onClick={() => status(s)}>{s.replace('_', ' ')}</button>) : <button onClick={() => status('cerrado')}>Cerrar</button>}</p>
+        </section>
+      )}
+    </div>
+  )
+}
+
+function AjustesAdmin() {
+  const [s, setS] = useState<any>(null)
+  const [msg, setMsg] = useState('')
+  useEffect(() => { adm('GET', '/admin/settings').then((r) => setS(r.settings)).catch((e) => setMsg(e.message)) }, [])
+  if (!s) return <p className="muted">{msg || 'Cargando…'}</p>
+  return (
+    <div className="card login">
+      <h2>Valores por defecto</h2>
+      <label>Días de prueba para negocios nuevos<input inputMode="numeric" value={s.default_trial_days} onChange={(e) => setS({ ...s, default_trial_days: Number(e.target.value) || 0 })} /></label>
+      <label>Días vencido antes de poder suspender<input inputMode="numeric" value={s.suspend_after_days} onChange={(e) => setS({ ...s, suspend_after_days: Number(e.target.value) || 0 })} /></label>
+      <p><button className="primary" onClick={async () => { await adm('PUT', '/admin/settings', s); setMsg('Guardado.') }}>Guardar</button></p>
+      {msg && <p className="muted">{msg}</p>}
+      <p className="muted">Precios de planes: {mxn(50000)} / {mxn(70000)} / {mxn(90000)}; sucursal extra {mxn(30000)}; paquete de 5 usuarios {mxn(toCents('200'))}.</p>
+    </div>
+  )
+}

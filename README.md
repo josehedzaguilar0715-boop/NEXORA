@@ -178,3 +178,9 @@ Importes siempre en centavos enteros (MXN).
 - `POST /inventory/count-batch { items, reason }`: conteo rápido; compara contra lo esperado, ajusta y devuelve las diferencias con su costo.
 - `GET /customers/:id/statement?from&to`: estado de cuenta (por defecto, los últimos 7 días): saldo inicial, cargos, abonos y saldo final.
 - Pedidos por teléfono: cuenta `recoger` sin cocina; `POST /tabs/:id/deliver { paymentMethod }` cobra al entregar. Con `phoneOrdersPrepaid` (ajustes) se exige cobrar antes.
+
+## Pantallas de administración
+
+- **Super panel** en `/admin` (acceso propio): negocios por estado con su mensualidad, días vencido y mensajes sin leer; registrar pago; días de prueba; plan con sucursales y paquetes de usuarios (ahora o en el siguiente pago); suspender; restablecer el acceso del dueño con motivo; alta asistida; buzón con respuesta y estado de solicitudes; valores por defecto.
+- **Dueño**: Ajustes (datos del ticket, giro, módulos, opciones del giro, dispositivos), Buzón (dudas y solicitudes de cambio con su estado), Membresías y promos (planes, paquetes, pases, promociones, puntos o sellos y premios).
+- **Escanear QR** (si hay un módulo que lo use): entrada, usar membresía o consultar.

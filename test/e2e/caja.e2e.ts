@@ -7,13 +7,15 @@ import { createRequire } from 'node:module'
 import { mkdirSync } from 'node:fs'
 import { createApp } from '../../src/app.js'
 import { openDb } from '../../src/db.js'
+import { createAdmin } from '../../src/admin.js'
 
 const require = createRequire(import.meta.url)
 // Playwright viene preinstalado en el entorno (no es dependencia del proyecto).
 const { chromium } = require('playwright') as { chromium: any }
 
 const codes: Record<string, string> = {}
-const api = createApp({ db: openDb(':memory:'), now: () => new Date(), notifier: { sendCode: (p, c) => void (codes[p] = c) } })
+const apiDb = openDb(':memory:')
+const api = createApp({ db: apiDb, now: () => new Date(), notifier: { sendCode: (p, c) => void (codes[p] = c) } })
 const root = new Hono()
 root.route('/api', api)
 root.use('/*', serveStatic({ root: './web/dist' }))
@@ -226,6 +228,35 @@ try {
   await page.getByRole('button', { name: /Mesa 7/ }).click()
   await page.getByRole('button', { name: /Mesa 7/ }).getByText('Libre').waitFor()
   check(true, 'restaurante: cobro con propina, mesa a limpieza y el mesero la libera')
+
+  // Buzón del dueño y super panel: el dueño escribe, soporte responde y registra un pago.
+  await page.goto(`${base}/#/buzon`)
+  await page.getByLabel('Asunto').fill('No imprime el ticket')
+  await page.getByLabel('Mensaje').fill('La impresora no responde')
+  await page.getByRole('button', { name: 'Enviar' }).click()
+  await page.getByRole('cell', { name: /No imprime el ticket/ }).waitFor()
+  check(true, 'buzón: el dueño envía su duda')
+  createAdmin({ db: apiDb, now: () => new Date(), notifier: { sendCode: () => {} } }, { name: 'Soporte', username: 'soporte', password: 'superpanel1' })
+  const adm = await browser.newPage()
+  await adm.goto(`${base}/admin`)
+  await adm.getByLabel('Usuario').fill('soporte')
+  await adm.getByLabel('Contraseña').fill('superpanel1')
+  await adm.getByRole('button', { name: 'Entrar' }).click()
+  await adm.getByRole('cell', { name: /Abarrotes La Esquina/ }).click()
+  adm.on('dialog', (d: any) => void d.accept('1'))
+  await adm.getByRole('button', { name: 'Registrar pago' }).click()
+  await adm.getByText('Pago registrado: el negocio queda activo.').waitFor()
+  await adm.screenshot({ path: `${shots}/13-super-panel.png` })
+  await adm.getByRole('link', { name: 'Buzón' }).click()
+  await adm.getByRole('cell', { name: /No imprime el ticket/ }).click()
+  await adm.getByLabel('Responder').fill('Revisa el cable USB y vuelve a intentar.')
+  await adm.getByRole('button', { name: 'Enviar' }).click()
+  await adm.getByText('Revisa el cable USB').waitFor()
+  check(true, 'super panel: registra el pago (activo) y responde el buzón')
+  await page.reload()
+  await page.getByRole('cell', { name: /No imprime el ticket/ }).click()
+  await page.getByText('Revisa el cable USB y vuelve a intentar.').waitFor()
+  check(true, 'buzón: la respuesta llega al mismo buzón del cliente')
 } finally {
   await browser.close()
   server.close()
