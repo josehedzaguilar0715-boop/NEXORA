@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
-import { body, hasPerm, ownerOnly, parse, requirePerm, type Env } from './context.js'
+import { body, hasPerm, isManager, ownerOnly, parse, requirePerm, type Env } from './context.js'
 import type { Db } from './db.js'
 import { cancelHooks, saleHooks, saleValidators, type ResolvedLine } from './sales.js'
 import { bad, iso, localDate, newId } from './util.js'
@@ -130,7 +130,8 @@ commissions.get('/reports/commissions', requirePerm('view_commissions'), (c) => 
   const to = c.req.query('to') ?? today
   const start = new Date(`${from}T06:00:00.000Z`).toISOString()
   const end = new Date(new Date(`${to}T06:00:00.000Z`).getTime() + 86_400_000).toISOString()
-  const all = hasPerm(u, 'view_reports')
+  // Cada quien ve solo sus comisiones; el dueño y el encargado ven las de todos.
+  const all = isManager(u)
   const filter = all ? '' : 'AND x.staff_id = ?'
   const args = all ? [] : [u.id]
   const com = db.prepare(`SELECT x.staff_id AS staffId, us.name, COUNT(*) AS items, SUM(x.base) AS base, SUM(x.amount) AS commission FROM sale_commissions x JOIN users us ON us.id = x.staff_id WHERE x.business_id = ? AND x.status = 'vigente' AND x.created_at >= ? AND x.created_at < ? ${filter} GROUP BY x.staff_id`).all(u.business_id, start, end, ...args) as { staffId: string; name: string; base: number; commission: number }[]

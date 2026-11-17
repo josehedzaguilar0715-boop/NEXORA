@@ -1,0 +1,34 @@
+import { describe, expect, it } from 'vitest'
+import { negocioListo } from './helpers.js'
+
+describe('reportes para todos, solo lectura, y arqueo antes del corte', () => {
+  it('cualquier empleado ve reportes y finanzas, pero no modifica', async () => {
+    const { s, T, o } = await negocioListo()
+    const caj = await s.createStaff(T, o.business.code, 'cajera', 'cajero')
+    const piso = await s.createStaff(T, o.business.code, 'piso', 'empleado_piso', { permissions: ['attendance'] })
+    for (const u of [caj, piso]) {
+      expect((await s.call('GET', '/reports/summary', { token: u.token })).status).toBe(200)
+      expect((await s.call('GET', '/accounting/income-statement', { token: u.token })).status).toBe(200)
+      expect((await s.call('GET', '/accounting/balance', { token: u.token })).status).toBe(200)
+      // Ver no es modificar: no registra gastos ni cambia gastos fijos.
+      expect((await s.call('POST', '/expenses', { token: u.token, body: { concept: 'Luz', amount: 100, kind: 'fijo', method: 'efectivo' } })).status).toBe(403)
+      expect((await s.call('POST', '/fixed-expenses', { token: u.token, body: { concept: 'Renta', monthlyAmount: 100 } })).status).toBe(403)
+      expect((await s.call('GET', '/reports/suggested-withdrawal', { token: u.token })).status).toBe(403)
+    }
+  })
+
+  it('arqueo: cuenta por billete y moneda y compara contra lo registrado', async () => {
+    const { s, T, open, sell } = await negocioListo()
+    const shift = (await open(50000)).json.shift
+    await sell([{ description: 'Varios', quantity: 1, unitPrice: 8200 }])
+    const short = (await s.call('POST', `/shifts/${shift.id}/verify`, { token: T, body: { denominations: { 50000: 1 } } })).json
+    expect(short).toMatchObject({ counted: 50000, expectedCash: 58200, difference: -8200, matches: false })
+    const ok = (await s.call('POST', `/shifts/${shift.id}/verify`, { token: T, body: { denominations: { 50000: 1, 5000: 1, 2000: 1, 1000: 1, 200: 1 } } })).json
+    expect(ok).toMatchObject({ counted: 58200, difference: 0, matches: true })
+    expect((await s.call('POST', `/shifts/${shift.id}/verify`, { token: T, body: { denominations: { 300: 1 } } })).status).toBe(400)
+    const audit = (await s.call('GET', '/audit', { token: T })).json
+    expect(JSON.stringify(audit)).toContain('caja.arqueo')
+    // El arqueo no cierra la caja.
+    expect((await s.call('GET', '/shifts/current', { token: T })).json.shift.status).toBe('abierto')
+  })
+})

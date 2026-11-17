@@ -107,7 +107,7 @@ sync.get('/sync/conflicts', requirePerm('view_reports'), (c) => {
   return c.json({ conflicts: rows.map((r) => ({ ...r, winner: JSON.parse(r.winner), loser: JSON.parse(r.loser) })) })
 })
 
-sync.post('/sync/conflicts/:id/reviewed', requirePerm('view_reports'), (c) => {
+sync.post('/sync/conflicts/:id/reviewed', requirePerm('configure_catalog'), (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const r = db.prepare("UPDATE sync_conflicts SET status='revisado', reviewed_by=?, reviewed_at=? WHERE id=? AND business_id=? AND status='pendiente'").run(u.id, iso(now()), c.req.param('id'), u.business_id)

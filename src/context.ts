@@ -59,8 +59,19 @@ export type C = Context<Env>
 export const MAX_FAILED = 5
 export const LOCK_MINUTES = 15
 
+/** Permisos que tiene todo usuario y no se pueden quitar: ver reportes (solo lectura, sin modificar nada). */
+export const ALWAYS_GRANTED: Permission[] = ['view_reports']
+
+/**
+ * Dueño o encargado (quien puede autorizar cancelaciones y descuentos). Ya no se usa "ver reportes" para esto,
+ * porque ahora todos lo tienen.
+ */
+export function isManager(u: UserRow): boolean {
+  return u.role === 'owner' || (JSON.parse(u.permissions) as string[]).includes('cancel_discount')
+}
+
 export function hasPerm(u: UserRow, p: Permission): boolean {
-  return u.role === 'owner' || (JSON.parse(u.permissions) as string[]).includes(p)
+  return u.role === 'owner' || ALWAYS_GRANTED.includes(p) || (JSON.parse(u.permissions) as string[]).includes(p)
 }
 
 export function parse<T>(schema: ZodType<T>, data: unknown): T {

@@ -123,6 +123,38 @@ cash.get('/shifts/:id', (c) => {
   return c.json({ shift: s, totals: shiftTotals(db, s) })
 })
 
+/** Billetes y monedas de México, en centavos (para contar la caja por denominación). */
+export const DENOMINATIONS = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50] as const
+
+/**
+ * Arqueo: antes del corte (o cuando se quiera) se cuenta el efectivo y el sistema lo compara contra lo
+ * registrado. No cierra la caja; queda en la bitácora con el conteo por billete y moneda.
+ */
+cash.post('/shifts/:id/verify', requirePerm('open_close_cash'), async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const s = loadShift(c)
+  ensureCanManage(c, s)
+  if (s.status !== 'abierto') throw conflict('Ese turno ya está cerrado.', 'turno_cerrado')
+  const d = parse(z.object({
+    countedCash: money.optional(),
+    denominations: z.record(z.string(), z.number().int().min(0).max(100_000)).optional(),
+  }), await body(c))
+  let counted = d.countedCash
+  if (d.denominations) {
+    const bad_ = Object.keys(d.denominations).find((k) => !DENOMINATIONS.includes(Number(k) as (typeof DENOMINATIONS)[number]))
+    if (bad_) throw bad(`Denominación no válida: ${bad_}.`)
+    const sum = Object.entries(d.denominations).reduce((a, [k, n]) => a + Number(k) * n, 0)
+    if (counted != null && counted !== sum) throw bad('El total no coincide con los billetes y monedas.')
+    counted = sum
+  }
+  if (counted == null) throw bad('Cuenta el efectivo de la caja.')
+  const totals = shiftTotals(db, s)
+  const difference = counted - totals.expectedCash
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'caja.arqueo', entity: 'shift', entityId: s.id, newValue: { expected: totals.expectedCash, counted, difference, denominations: d.denominations ?? null } })
+  return c.json({ counted, expectedCash: totals.expectedCash, difference, matches: difference === 0, totals })
+})
+
 cash.post('/shifts/:id/close', requirePerm('open_close_cash'), async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user

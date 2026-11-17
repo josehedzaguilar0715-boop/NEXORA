@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { api, auth, mxn, toCents } from '../api'
-import type { Me } from '../App'
+import { can, type Me } from '../App'
 
 /** Finanzas y contabilidad: estado de resultados, flujo de efectivo, balance, gastos y libro de movimientos. */
 
@@ -39,7 +39,7 @@ async function download(kind: string, from: string, to: string) {
 type Tab = 'resumen' | 'resultados' | 'flujo' | 'balance' | 'gastos' | 'movimientos'
 const TABS: [Tab, string][] = [['resumen', 'Resumen'], ['resultados', 'Estado de resultados'], ['flujo', 'Flujo de efectivo'], ['balance', 'Balance'], ['gastos', 'Gastos'], ['movimientos', 'Movimientos']]
 
-export function Finanzas(_: { me: Me }) {
+export function Finanzas({ me }: { me: Me }) {
   const [tab, setTab] = useState<Tab>('resumen')
   const [preset, setPreset] = useState('mes')
   const [[from, to], setRange] = useState<[string, string]>(PRESETS[2]!.range())
@@ -66,7 +66,7 @@ export function Finanzas(_: { me: Me }) {
       {tab === 'resultados' && <Resultados from={from} to={to} onErr={setErr} />}
       {tab === 'flujo' && <Flujo from={from} to={to} onErr={setErr} />}
       {tab === 'balance' && <Balance onErr={setErr} />}
-      {tab === 'gastos' && <Gastos from={from} to={to} onErr={setErr} />}
+      {tab === 'gastos' && <Gastos from={from} to={to} onErr={setErr} canEdit={can(me, 'edit_inventory')} />}
       {tab === 'movimientos' && <Movimientos from={from} to={to} onErr={setErr} />}
       <p className="muted small" style={{ marginTop: 18 }}>Contabilidad administrativa para decidir mejor. Para declaraciones ante el SAT, comparte las exportaciones con tu contador.</p>
     </div>
@@ -254,7 +254,7 @@ function Balance({ onErr }: { onErr: (e: string) => void }) {
   )
 }
 
-function Gastos({ from, to, onErr }: { from: string; to: string; onErr: (e: string) => void }) {
+function Gastos({ from, to, onErr, canEdit }: { from: string; to: string; onErr: (e: string) => void; canEdit: boolean }) {
   const [list, reload] = useLoad<any>(`/expenses?from=${from}&to=${to}`, [from, to], onErr)
   const empty = { concept: '', amount: '', category: 'otros', kind: 'variable', method: 'efectivo', fromCash: false, date: today() }
   const [f, setF] = useState(empty)
@@ -267,8 +267,8 @@ function Gastos({ from, to, onErr }: { from: string; to: string; onErr: (e: stri
     } catch (e) { onErr((e as Error).message) }
   }
   return (
-    <div className="grid2" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.4fr)' }}>
-      <section className="card">
+    <div className="grid2" style={canEdit ? { gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.4fr)' } : { gridTemplateColumns: 'minmax(0, 1fr)' }}>
+      {canEdit && <section className="card">
         <h2>Registrar gasto</h2>
         <label>Concepto<input value={f.concept} onChange={(e) => setF({ ...f, concept: e.target.value })} placeholder="Ej. Recibo de luz de noviembre" /></label>
         <div className="row"><label>Importe<input inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} placeholder="$0.00" /></label><label>Fecha<input type="date" value={f.date} max={today()} onChange={(e) => setF({ ...f, date: e.target.value })} /></label></div>
@@ -280,7 +280,7 @@ function Gastos({ from, to, onErr }: { from: string; to: string; onErr: (e: stri
         {f.method === 'efectivo' && <label className="check"><input type="checkbox" checked={f.fromCash} onChange={(e) => setF({ ...f, fromCash: e.target.checked })} />Lo pago con dinero de la caja abierta</label>}
         {ok && <p className="okmsg">{ok}</p>}
         <p><button className="primary" disabled={!(toCents(f.amount) > 0 && f.concept.trim().length >= 2)} onClick={save}>Guardar gasto</button></p>
-      </section>
+      </section>}
       <section className="card">
         <div className="card-head"><h2>Gastos del periodo</h2><button onClick={() => download('gastos', from, to).catch((e) => onErr(e.message))}>⬇ Exportar</button></div>
         <table className="list"><thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th></tr></thead><tbody>

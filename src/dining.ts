@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { businessGiros } from './billing.js'
 import { audit } from './audit.js'
 import { authorize } from './authcode.js'
-import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Deps, type Env, type UserRow } from './context.js'
+import { body, hasPerm, isManager, ownerOnly, parse, requirePerm, type C, type Deps, type Env, type UserRow } from './context.js'
 import type { Db } from './db.js'
 import { currentPrice, getProduct } from './inventory.js'
 import { createSale, parseSale } from './sales.js'
@@ -409,7 +409,7 @@ dining.post('/table-reservations/:id/:action', requirePerm('sell'), async (c) =>
   const map: Record<string, { from: string[]; to: string }> = { confirm: { from: ['pendiente'], to: 'confirmada' }, arrived: { from: ['confirmada', 'pendiente'], to: 'llego' }, 'no-show': { from: ['confirmada', 'pendiente'], to: 'no_llego' }, cancel: { from: ['pendiente', 'confirmada'], to: 'cancelada' } }
   const act = map[c.req.param('action')]
   if (!act) throw notFound()
-  if (c.req.param('action') === 'confirm' && u.role !== 'owner' && !hasPerm(u, 'view_reports')) throw forbidden('Las reservas las confirma el dueño o el encargado.')
+  if (c.req.param('action') === 'confirm' && !isManager(u)) throw forbidden('Las reservas las confirma el dueño o el encargado.')
   const r = db.prepare('SELECT * FROM table_reservations WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; status: string } | undefined
   if (!r) throw notFound()
   if (!act.from.includes(r.status)) throw conflict(`La reserva está ${r.status}.`, 'estado_invalido')

@@ -437,27 +437,58 @@ function VentasTurno({ shift, me, onClose }: { shift: Shift; me: Me; onClose: ()
   )
 }
 
+/** Billetes y monedas de México (centavos). */
+const DENOMS: { v: number; label: string; coin?: boolean }[] = [
+  { v: 100000, label: '$1,000' }, { v: 50000, label: '$500' }, { v: 20000, label: '$200' }, { v: 10000, label: '$100' }, { v: 5000, label: '$50' }, { v: 2000, label: '$20' },
+  { v: 2000, label: '$20', coin: true }, { v: 1000, label: '$10', coin: true }, { v: 500, label: '$5', coin: true }, { v: 200, label: '$2', coin: true }, { v: 100, label: '$1', coin: true }, { v: 50, label: '50¢', coin: true },
+]
+
+/**
+ * Corte de caja con arqueo a ciegas: 1) se cuenta el efectivo por billete y moneda sin ver lo que dice el sistema;
+ * 2) el sistema compara contra lo registrado (cuadra, sobra o falta) y se puede volver a contar; 3) se cierra.
+ */
 function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void; onClosed: () => void }) {
-  const [totals, setTotals] = useState<any>(null)
-  const [counted, setCounted] = useState('')
+  const [step, setStep] = useState<'contar' | 'verificar'>('contar')
+  const [qty, setQty] = useState<Record<string, string>>({})
+  const [direct, setDirect] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [check, setCheck] = useState<any>(null)
+  const [offline, setOffline] = useState(false)
   const [reason, setReason] = useState('')
   const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<any>(null)
-  useEffect(() => {
-    flush().then(() => api('GET', `/shifts/${shift.id}`)).then((r: any) => setTotals(r.totals)).catch(() => setErr('Sin internet: el corte se calcula al reconectar. Puedes contar y cerrar de todos modos.'))
-  }, [])
-  const diff = totals && counted !== '' ? toCents(counted) - totals.expectedCash : 0
+  const key = (d: (typeof DENOMS)[number]) => `${d.coin ? 'm' : 'b'}${d.v}`
+  const fromDenoms = DENOMS.reduce((a, d) => a + d.v * (Number(qty[key(d)]) || 0), 0)
+  const counted = direct ? toCents(typed || '0') : fromDenoms
+  // Billetes y monedas del mismo valor ($20) se suman para el servidor.
+  const denominations = DENOMS.reduce((a: Record<string, number>, d) => { const n = Number(qty[key(d)]) || 0; if (n) a[d.v] = (a[d.v] ?? 0) + n; return a }, {})
+
+  const verify = async () => {
+    setErr(''); setBusy(true)
+    try {
+      await flush()
+      setCheck(await api('POST', `/shifts/${shift.id}/verify`, direct ? { countedCash: counted } : { denominations }))
+      setOffline(false)
+    } catch (e) {
+      if ((e as { code?: string }).code === 'sin_red') { setOffline(true); setCheck(null) } else { setBusy(false); return setErr((e as Error).message) }
+    }
+    setBusy(false); setStep('verificar')
+  }
   const close = async () => {
-    const body = { countedCash: toCents(counted), reason: reason || undefined, at: new Date().toISOString() }
+    setBusy(true)
+    const body = { countedCash: counted, reason: reason || undefined, at: new Date().toISOString() }
     const id = outbox.enqueue('POST', `/shifts/${shift.id}/close`, body, 'Corte de caja')
     await flush()
     const it = outbox.get(id)
+    setBusy(false)
     if (it?.status === 'rechazado') {
       outbox.dismiss(id)
       return setErr(it.error ?? 'No se pudo cerrar.')
     }
     setResult(it?.result ?? { pending: true })
   }
+
   if (result) {
     return (
       <Modal onClose={onClosed}>
@@ -473,24 +504,69 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
       </Modal>
     )
   }
+
+  if (step === 'contar') {
+    return (
+      <Modal onClose={onClose}>
+        <h2>Corte de caja · 1. Cuenta el efectivo</h2>
+        <p className="muted">Cuenta el dinero que hay en la caja. Después el sistema te dice si cuadra con lo registrado.</p>
+        <div className="tabs"><button className={!direct ? 'on' : ''} onClick={() => setDirect(false)}>Por billete y moneda</button><button className={direct ? 'on' : ''} onClick={() => setDirect(true)}>Solo el total</button></div>
+        {direct ? (
+          <label>Total contado<input inputMode="decimal" autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="$0.00" /></label>
+        ) : (
+          <div className="denoms">
+            {(['Billetes', 'Monedas'] as const).map((g) => (
+              <div key={g}>
+                <h3>{g}</h3>
+                {DENOMS.filter((d) => (g === 'Monedas') === !!d.coin).map((d) => (
+                  <label key={key(d)} className="denom">
+                    <span>{d.label}</span>
+                    <input inputMode="numeric" aria-label={`${g === 'Billetes' ? 'Billetes' : 'Monedas'} de ${d.label}`} value={qty[key(d)] ?? ''} onChange={(e) => setQty({ ...qty, [key(d)]: e.target.value.replace(/\D/g, '') })} placeholder="0" />
+                    <small className="num muted">{mxn(d.v * (Number(qty[key(d)]) || 0))}</small>
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="total">{mxn(counted)}</div>
+        {err && <p className="error">{err}</p>}
+        <p className="row"><button onClick={onClose}>Volver</button><button className="primary big" disabled={busy || (direct && typed.trim() === '')} onClick={verify}>{busy ? 'Verificando…' : 'Verificar con el sistema'}</button></p>
+      </Modal>
+    )
+  }
+
+  const diff = check ? check.difference : null
+  const t = check?.totals
   return (
     <Modal onClose={onClose}>
-      <h2>Corte de caja</h2>
-      {totals && (
-        <table className="list"><tbody>
-          <tr><td>Fondo inicial</td><td className="num">{mxn(totals.openingFloat)}</td></tr>
-          <tr><td>Ventas en efectivo</td><td className="num">{mxn(totals.cashSales)}</td></tr>
-          <tr><td>Retiros</td><td className="num">−{mxn(totals.withdrawals)}</td></tr>
-          <tr><td>Depósitos y abonos</td><td className="num">{mxn(totals.deposits)}</td></tr>
-          <tr><td><b>Debe haber en caja</b></td><td className="num"><b>{mxn(totals.expectedCash)}</b></td></tr>
-          <tr><td className="muted">Transferencia / tarjeta / fiado</td><td className="num muted">{mxn(totals.transferSales)} / {mxn(totals.cardSales)} / {mxn(totals.creditSales)}</td></tr>
+      <h2>Corte de caja · 2. Verificación</h2>
+      {offline ? <p className="error">Sin internet: no se puede comparar ahora. Puedes cerrar y el sistema lo comparará al reconectar; escribe una nota.</p> : (
+        <div className={`verdict ${diff === 0 ? 'ok' : 'bad'}`}>
+          <div className="big-ico" aria-hidden>{diff === 0 ? '✓' : '!'}</div>
+          <div>
+            <b>{diff === 0 ? 'La caja cuadra' : diff! > 0 ? `Sobran ${mxn(diff!)}` : `Faltan ${mxn(-diff!)}`}</b>
+            <div className="muted small">Contaste {mxn(check.counted)} · el sistema registra {mxn(check.expectedCash)}</div>
+          </div>
+        </div>
+      )}
+      {t && (
+        <table className="list statement"><tbody>
+          <tr><td>Fondo inicial</td><td className="num">{mxn(t.openingFloat)}</td></tr>
+          <tr><td>Ventas en efectivo</td><td className="num">{mxn(t.cashSales)}</td></tr>
+          {t.tipsCash > 0 && <tr><td>Propinas en efectivo</td><td className="num">{mxn(t.tipsCash)}</td></tr>}
+          <tr><td>Depósitos y abonos</td><td className="num">{mxn(t.deposits)}</td></tr>
+          <tr><td>Retiros y pagos desde la caja</td><td className="num">{mxn(-t.withdrawals)}</td></tr>
+          <tr className="total"><td>Debe haber en caja</td><td className="num">{mxn(t.expectedCash)}</td></tr>
+          <tr className="muted"><td>No es efectivo: transferencia · tarjeta · fiado</td><td className="num">{mxn(t.transferSales)} · {mxn(t.cardSales)} · {mxn(t.creditSales)}</td></tr>
         </tbody></table>
       )}
-      <label>¿Cuánto efectivo contaste?<input inputMode="decimal" autoFocus value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="$0.00" /></label>
-      {totals && counted !== '' && <h3 style={{ marginTop: 10, color: diff ? 'var(--danger)' : 'var(--ok)' }}>{diff === 0 ? 'Cuadra exacto' : diff > 0 ? `Sobra ${mxn(diff)}` : `Falta ${mxn(-diff)}`}</h3>}
-      {(diff !== 0 || !totals) && <><label>Motivo de la diferencia<input value={reason} onChange={(e) => setReason(e.target.value)} /></label></>}
+      {(diff !== 0 || offline) && <label>{offline ? 'Nota' : 'Motivo de la diferencia'}<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={offline ? 'Corte sin internet' : 'Ej. di cambio de más'} /></label>}
       {err && <p className="error">{err}</p>}
-      <p className="row"><button onClick={onClose}>Volver</button><button className="danger big" disabled={counted === '' || (diff !== 0 && !reason.trim())} onClick={close}>Cerrar caja</button></p>
+      <p className="row">
+        <button onClick={() => { setStep('contar'); setCheck(null); setReason('') }}>Volver a contar</button>
+        <button className={diff === 0 ? 'primary big' : 'danger big'} disabled={busy || ((diff !== 0 || offline) && !reason.trim())} onClick={close}>{busy ? 'Cerrando…' : diff === 0 ? 'Cerrar caja' : 'Cerrar con diferencia'}</button>
+      </p>
     </Modal>
   )
 }

@@ -37,7 +37,7 @@ export function Usuarios({ me }: { me: Me }) {
           <h2>{sel.name}</h2>
           <h3>Qué puede hacer</h3>
           {catalog.permissions.map((p) => (
-            <label key={p.key} style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={sel.permissions.includes(p.key)} onChange={() => toggle(p.key)} />{p.label}</label>
+            <label key={p.key} style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} disabled={p.key === 'view_reports'} checked={p.key === 'view_reports' || sel.permissions.includes(p.key)} onChange={() => toggle(p.key)} />{p.label}</label>
           ))}
           <p className="row">
             <button className="primary" onClick={run(() => api('PATCH', `/users/${sel.id}`, { permissions: sel.permissions }))}>Guardar permisos</button>

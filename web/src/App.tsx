@@ -42,7 +42,8 @@ export interface Me {
 /** 'owner' = solo el dueño. Un permiso no marcado no aparece en pantalla. */
 /** ¿El negocio tiene alguno de estos giros? (negocio mixto: principal + adicionales) */
 export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.business.giro]).some((x) => g.includes(x))
-export const can = (me: Me, p: string) => (p === 'owner' ? me.user.role === 'owner' : me.permissions === 'todos' || me.permissions.includes(p))
+/** Ver reportes lo tiene todo usuario (solo lectura), igual que en el servidor. */
+export const can = (me: Me, p: string) => (p === 'owner' ? me.user.role === 'owner' : p === 'view_reports' || me.permissions === 'todos' || me.permissions.includes(p))
 
 type Icon = import('lucide-react').LucideIcon
 type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[]; group: string; icon: Icon; ownTitle?: boolean }
@@ -158,7 +159,8 @@ function Privada() {
   const needsModule: Record<string, string[]> = { escanear: ['membresias', 'asistencia', 'fidelidad'] }
   const moduleOk = (s: Screen) => !needsModule[s.key] || needsModule[s.key]!.some((m) => me.modules?.includes(m))
   const allowed = SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s))
-  const current = allowed.find((s) => s.key === hash) ?? allowed[0]
+  // El personal que cobra entra directo a la caja; el dueño, al inicio.
+  const current = allowed.find((s) => s.key === hash) ?? (me.user.role === 'staff' ? allowed.find((s) => s.key === 'caja') : undefined) ?? allowed[0]
   const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'
   return (
     <div className="app">
