@@ -10,7 +10,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 4 (módulo común)**: clientes finales con QR, escaneo validado por el servidor, membresías por usos y periodo, promociones automáticas, fidelidad (puntos o sellos), asistencia de clientes y personal. Cada módulo se activa por negocio. ✅ con pruebas.
 - **Bloque 5 (abarrotes) — servidor**: catálogo con presentaciones y códigos de barras, granel por kilo o importe, lotes primero-entra-primero-sale con precio y costo real, compras con fletes repartidos, márgenes sugeridos, caducidad, mermas, conteos, traspasos, proveedores y cuentas por pagar, fiado con límite y abonos, gastos, reportes de utilidad y retiro sugerido, cajas asignadas. ✅ con pruebas.
 - **Bloque 5 (abarrotes) — pantallas**: app web instalable (`web/`) con caja (lector de código de barras, granel por kilo o importe, cobro con cambio, fiado, descuento con código, ventas del turno, retiros, corte), productos con alertas, compras con fletes, clientes y fiado, reportes con retiro sugerido y personal con permisos. Funciona sin internet con contador visible. ✅ con prueba de punta a punta en navegador.
-- Siguiente: Bloque 6 (ferretería).
+- **Bloque 6 (ferretería)**: varias unidades con equivalencias (caja, rollo; granel por metro y litro), escalas de precio por volumen que la caja aplica sola, cotizaciones que no apartan existencia, clientes constructores con límite (código del dueño), clave del proveedor por producto y devoluciones con o sin ticket (siempre con código). El negocio tiene un **giro** y las pantallas se adaptan. ✅ con pruebas y prueba en navegador.
+- Siguiente: Bloque 7 (papelería).
 
 ## Desarrollo local
 
@@ -80,3 +81,10 @@ Importes siempre en centavos enteros (MXN).
 - Link único para empleados: `/?negocio=CODIGO` llena el código del negocio.
 - Sin internet: la apertura, las ventas, los retiros y el corte se guardan en el equipo (cola local) y se envían solos al volver la señal. El botón verde/naranja de arriba es el contador de pendientes. Descuentos, cambios de precio y fiado necesitan señal porque el código se valida en el servidor.
 - Ticket: se imprime con la impresora térmica del sistema (58 mm). Abrir el cajón y leer la báscula directo desde el navegador quedan pendientes (se capturan a mano por ahora).
+
+## Ferretería (Bloque 6)
+
+- Unidades: la unidad base del producto (pieza, kg, metro, litro) más presentaciones con su equivalencia (Caja 100 = 100 piezas; Rollo = 100 m), capturada una vez por producto.
+- Escalas por volumen (`PUT /products/:id/price-tiers`): aplica la escala de mayor cantidad mínima alcanzada. Un precio distinto en caja sigue pidiendo código.
+- Cotizaciones (`/quotes`): fijan precio por su vigencia (15 días por defecto), no apartan existencia; `POST /quotes/:id/convert` crea la venta con esos precios y ahí descuenta. Un precio especial en la cotización pide código al cotizar.
+- Devoluciones (`/returns`): con ticket (por renglón, sin pasar de lo vendido, en proporción a lo cobrado) o sin ticket (producto y monto). Siempre con código. Lo que regresa en buen estado vuelve al inventario; lo dañado (`restock: false`) no. Una venta fiada se devuelve bajando la deuda.

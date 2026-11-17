@@ -100,6 +100,7 @@ function Editor({ me, p, onClose, onSaved }: { me: Me; p: P | null; onClose: () 
         {priceChanged && (<><label>Código de autorización (cambio de precio)<input type="password" value={f.authCode} onChange={set('authCode')} /></label></>)}
         {err && <p className="error">{err}</p>}
         <p className="row"><button onClick={onClose}>Cancelar</button><button className="primary" onClick={save}>Guardar</button></p>
+        {p && ['ferreteria', 'papeleria'].includes(me.business.giro) && <Escalas p={p} />}
         {p && can(me, 'edit_inventory') && (
           <div style={{ borderTop: '2px solid var(--line)', marginTop: 12 }}>
             <h3 style={{ marginTop: 12 }}>Registrar merma</h3>
@@ -111,6 +112,34 @@ function Editor({ me, p, onClose, onSaved }: { me: Me; p: P | null; onClose: () 
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Escalas de precio por volumen (la caja las aplica sola). */
+function Escalas({ p }: { p: P }) {
+  const [tiers, setTiers] = useState<{ minQuantity: string; price: string }[]>([])
+  const [msg, setMsg] = useState('')
+  useEffect(() => {
+    api<any>('GET', `/products/${p.id}/price-tiers`).then((r) => setTiers(r.tiers.map((t: any) => ({ minQuantity: String(t.minQuantity), price: String(t.price / 100) })))).catch(() => {})
+  }, [p.id])
+  const save = async () => {
+    try {
+      await api('PUT', `/products/${p.id}/price-tiers`, { tiers: tiers.filter((t) => Number(t.minQuantity) > 0).map((t) => ({ minQuantity: Number(t.minQuantity), price: toCents(t.price) })) })
+      setMsg('Escalas guardadas.')
+    } catch (e) { setMsg((e as Error).message) }
+  }
+  return (
+    <div style={{ borderTop: '2px solid var(--line)', marginTop: 12 }}>
+      <h3 style={{ marginTop: 12 }}>Precio por volumen</h3>
+      {tiers.map((t, i) => (
+        <div className="row" key={i}>
+          <input aria-label="Desde cantidad" inputMode="decimal" placeholder="Desde (cantidad)" value={t.minQuantity} onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, minQuantity: e.target.value } : x)))} />
+          <input aria-label="Precio por unidad" inputMode="decimal" placeholder="Precio c/u" value={t.price} onChange={(e) => setTiers(tiers.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))} />
+        </div>
+      ))}
+      <p className="row"><button onClick={() => setTiers([...tiers, { minQuantity: '', price: '' }])}>+ Escala</button><button className="primary" onClick={save}>Guardar escalas</button></p>
+      {msg && <p className="muted">{msg}</p>}
     </div>
   )
 }

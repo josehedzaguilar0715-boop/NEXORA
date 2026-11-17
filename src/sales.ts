@@ -73,7 +73,13 @@ export function customerBalance(db: Deps['db'], customerId: string): number {
   return (db.prepare('SELECT COALESCE(SUM(delta),0) b FROM credit_ledger WHERE customer_id = ?').get(customerId) as { b: number }).b
 }
 
-function resolveLine(deps: Deps, u: UserRow, branchId: string, it: z.infer<typeof itemSchema>): ResolvedLine {
+/** Escalas de precio por volumen: la de mayor cantidad mínima que se alcance. */
+export function tierPrice(db: Deps['db'], productId: string, qtyMilli: number): number | null {
+  const t = db.prepare('SELECT price FROM price_tiers WHERE product_id = ? AND min_milli <= ? ORDER BY min_milli DESC LIMIT 1').get(productId, qtyMilli) as { price: number } | undefined
+  return t?.price ?? null
+}
+
+function resolveLine(deps: Deps, u: UserRow, branchId: string, it: z.infer<typeof itemSchema>, trusted = false): ResolvedLine {
   const { db } = deps
   const base = { input: it, ref: it.ref ?? null, category: it.category ?? null, presentationId: null, qtyMilli: null, priceChanged: false, cost: 0, itemId: newId() }
   if (!it.productId) {
@@ -89,7 +95,7 @@ function resolveLine(deps: Deps, u: UserRow, branchId: string, it: z.infer<typeo
     const q = it.quantity ?? 1
     if (!Number.isInteger(q)) throw bad('Las presentaciones se venden completas.')
     const unitPrice = it.unitPrice ?? pr.price
-    return { ...base, category, description: `${p.name} ${pr.name}`, quantity: q, unitPrice, total: unitPrice * q, productId: p.id, presentationId: pr.id, qtyMilli: q * pr.factor_milli, priceChanged: unitPrice !== pr.price, ref: p.id }
+    return { ...base, category, description: `${p.name} ${pr.name}`, quantity: q, unitPrice, total: unitPrice * q, productId: p.id, presentationId: pr.id, qtyMilli: q * pr.factor_milli, priceChanged: !trusted && unitPrice !== pr.price, ref: p.id }
   }
   const price = currentPrice(db, branchId, p)
   if (it.amount !== undefined) {
@@ -102,14 +108,18 @@ function resolveLine(deps: Deps, u: UserRow, branchId: string, it: z.infer<typeo
   if (q === undefined) throw bad(`Indica la cantidad de ${p.name}.`)
   if (p.unit === 'pieza' && !Number.isInteger(q)) throw bad(`${p.name} se vende por pieza.`)
   const qtyMilli = toMilli(q)
-  if (it.unitPrice !== undefined && it.unitPrice !== price) {
-    return { ...base, category, description: p.name, quantity: q, unitPrice: it.unitPrice, total: Math.round(q * it.unitPrice), productId: p.id, qtyMilli, priceChanged: true, ref: p.id }
+  // La caja aplica sola la escala de precio por volumen.
+  const tier = tierPrice(db, p.id, qtyMilli)
+  const systemPrice = tier ?? price
+  if (it.unitPrice !== undefined && (trusted || it.unitPrice !== systemPrice)) {
+    return { ...base, category, description: p.name, quantity: q, unitPrice: it.unitPrice, total: Math.round(q * it.unitPrice), productId: p.id, qtyMilli, priceChanged: !trusted, ref: p.id }
   }
+  if (tier !== null) return { ...base, category, description: p.name, quantity: q, unitPrice: tier, total: Math.round(q * tier), productId: p.id, qtyMilli, ref: p.id }
   const total = priceFor(db, branchId, p, qtyMilli)
   return { ...base, category, description: p.name, quantity: q, unitPrice: Math.round(total / q), total, productId: p.id, qtyMilli, ref: p.id }
 }
 
-function saleView(deps: Deps, s: SaleRow) {
+export function saleView(deps: Deps, s: SaleRow) {
   const items = deps.db.prepare('SELECT description, quantity, unit_price AS unitPrice, total, product_id AS productId FROM sale_items WHERE sale_id = ? ORDER BY rowid').all(s.id) as { description: string; quantity: number; unitPrice: number; total: number }[]
   return {
     id: s.id, folio: s.folio, shiftId: s.shift_id, subtotal: s.subtotal, promoDiscount: s.promo_discount, discount: s.discount, total: s.total, customerId: s.customer_id,
@@ -119,16 +129,27 @@ function saleView(deps: Deps, s: SaleRow) {
 }
 
 sales.post('/sales', requirePerm('sell'), async (c) => {
-  const deps = c.get('deps')
-  const { db, now } = deps
-  const u = c.get('session').user
   const d = parse(saleSchema, await body(c))
+  const r = createSale(c.get('deps'), c.get('session').user, d)
+  return c.json(r, r.duplicate ? 200 : 201)
+})
 
+export function parseSale(data: unknown): SaleInput {
+  return parse(saleSchema, data)
+}
+
+/**
+ * Registra una venta. `trustedPrices` solo lo usa el servidor (p. ej. al convertir una cotización ya
+ * autorizada): acepta los precios dados sin pedir código.
+ */
+export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trustedPrices?: boolean } = {}): { duplicate: boolean; sale: ReturnType<typeof saleView> } {
+  const { db, now } = deps
+  if (!hasPerm(u, 'sell')) throw forbidden()
   // Idempotencia: la misma venta nunca se cobra dos veces.
   const prev = db.prepare('SELECT * FROM sales WHERE id = ?').get(d.id) as SaleRow | undefined
   if (prev) {
     if (prev.business_id !== u.business_id) throw conflict('Ese identificador ya está en uso.', 'id_repetido')
-    return c.json({ duplicate: true, sale: saleView(deps, prev) })
+    return { duplicate: true, sale: saleView(deps, prev) }
   }
 
   const shift = (d.shiftId
@@ -137,7 +158,7 @@ sales.post('/sales', requirePerm('sell'), async (c) => {
   if (!shift) throw conflict('Abre tu caja con el fondo inicial para poder vender.', 'caja_cerrada')
   if (shift.status !== 'abierto') throw conflict('Ese turno ya tiene corte; la venta no se puede agregar.', 'turno_cerrado')
 
-  const lines = d.items.map((it) => resolveLine(deps, u, shift.branch_id, it))
+  const lines = d.items.map((it) => resolveLine(deps, u, shift.branch_id, it, !!opts.trustedPrices))
   const subtotal = lines.reduce((a, l) => a + l.total, 0)
   if (d.customerId && !db.prepare('SELECT 1 FROM customers WHERE id = ? AND business_id = ?').get(d.customerId, u.business_id)) throw bad('Ese cliente no existe.')
   const t = now()
@@ -198,8 +219,8 @@ sales.post('/sales', requirePerm('sell'), async (c) => {
     for (const h of saleHooks) h({ deps, user: u, saleId: d.id, branchId: shift.branch_id, shiftId: shift.id, input: d, lines, total })
   })()
   const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(d.id) as SaleRow
-  return c.json({ duplicate: false, sale: saleView(deps, sale) }, 201)
-})
+  return { duplicate: false, sale: saleView(deps, sale) }
+}
 
 function loadSale(c: C): SaleRow {
   const s = c.get('deps').db.prepare('SELECT * FROM sales WHERE id = ? AND business_id = ?').get(c.req.param('id'), c.get('session').user.business_id) as SaleRow | undefined
@@ -223,6 +244,16 @@ sales.get('/sales', (c) => {
     .prepare(`SELECT * FROM sales WHERE business_id = ? ${shiftId ? 'AND shift_id = ?' : ''} ${all ? '' : 'AND cashier_id = ?'} ORDER BY folio DESC LIMIT 500`)
     .all(...[u.business_id, ...(shiftId ? [shiftId] : []), ...(all ? [] : [u.id])]) as SaleRow[]
   return c.json({ sales: rows.map((s) => saleView(deps, s)) })
+})
+
+/** Buscar el ticket original por folio (devoluciones). */
+sales.get('/sales/folio/:folio', (c) => {
+  const u = c.get('session').user
+  if (!hasPerm(u, 'cancel_discount') && !hasPerm(u, 'view_reports')) throw forbidden()
+  const s = c.get('deps').db.prepare('SELECT * FROM sales WHERE business_id = ? AND branch_id = ? AND folio = ?').get(u.business_id, c.req.query('branchId') ?? u.branch_id, Number(c.req.param('folio'))) as SaleRow | undefined
+  if (!s) throw notFound('No se encontró ese folio.')
+  const items = c.get('deps').db.prepare('SELECT id, description, quantity, total FROM sale_items WHERE sale_id = ? ORDER BY rowid').all(s.id)
+  return c.json({ sale: { ...saleView(c.get('deps'), s), items } })
 })
 
 sales.get('/sales/:id', (c) => {

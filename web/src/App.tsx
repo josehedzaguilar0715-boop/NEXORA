@@ -3,6 +3,8 @@ import { api, auth, cache, flush, outbox } from './api'
 import { Caja } from './screens/Caja'
 import { Clientes } from './screens/Clientes'
 import { Compras } from './screens/Compras'
+import { Cotizaciones } from './screens/Cotizaciones'
+import { Devoluciones } from './screens/Devoluciones'
 import { Login } from './screens/Login'
 import { Productos } from './screens/Productos'
 import { Reportes } from './screens/Reportes'
@@ -11,18 +13,21 @@ import { Usuarios } from './screens/Usuarios'
 export interface Me {
   user: { id: string; name: string; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
   permissions: 'todos' | string[]
-  business: { id: string; code: string; name: string; phone: string | null; status: string }
+  business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string }
 }
 export const can = (me: Me, p: string) => me.permissions === 'todos' || me.permissions.includes(p)
 
-const SCREENS = [
+type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[] }
+const SCREENS: Screen[] = [
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
+  { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria', 'papeleria'] },
+  { key: 'devoluciones', label: 'Devoluciones', perm: 'cancel_discount', C: Devoluciones, giros: ['ferreteria', 'perfumeria', 'papeleria'] },
   { key: 'productos', label: 'Productos', perm: 'view_inventory', C: Productos },
   { key: 'compras', label: 'Compras', perm: 'edit_inventory', C: Compras },
   { key: 'clientes', label: 'Clientes y fiado', perm: 'customers_credit', C: Clientes },
   { key: 'reportes', label: 'Reportes', perm: 'view_reports', C: Reportes },
   { key: 'usuarios', label: 'Personal', perm: 'create_employees', C: Usuarios },
-] as const
+]
 
 function useHash() {
   const [h, setH] = useState(location.hash.slice(2))
@@ -80,7 +85,7 @@ export function App() {
   }
   if (me.user.mustChangePassword) return <Login forceChange onLogin={(m) => { setMe(m); cache.set('me', m) }} />
 
-  const allowed = SCREENS.filter((s) => can(me, s.perm))
+  const allowed = SCREENS.filter((s) => can(me, s.perm) && (!s.giros || s.giros.includes(me.business.giro)))
   const current = allowed.find((s) => s.key === hash) ?? allowed[0]
   const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'
   return (

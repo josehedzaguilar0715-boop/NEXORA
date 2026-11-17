@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
-import { limits, type BusinessRow } from './billing.js'
+import { GIROS, limits, type BusinessRow } from './billing.js'
 import { body, hasPerm, type C, ownerOnly, parse, requirePerm, type Env, type UserRow } from './context.js'
 import { PERMISSIONS, PERMISSION_KEYS, TEMPLATES, type Permission } from './permissions.js'
 import { bad, checkPassword, conflict, forbidden, hashSecret, iso, newId, normalizeUsername, notFound, verifySecret } from './util.js'
@@ -161,18 +161,20 @@ users.patch('/business', ownerOnly, async (c) => {
       phone: z.string().trim().max(30).optional(),
       logoUrl: z.string().url().max(500).nullable().optional(),
       forcePasswordChange: z.boolean().optional(),
+      giro: z.enum(GIROS).optional(),
     }),
     await body(c),
   )
-  const old = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange FROM businesses WHERE id = ?').get(actor.business_id) as Record<string, unknown>
-  db.prepare('UPDATE businesses SET name = ?, phone = ?, logo_url = ?, force_password_change = ? WHERE id = ?').run(
+  const old = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange, giro FROM businesses WHERE id = ?').get(actor.business_id) as Record<string, unknown>
+  db.prepare('UPDATE businesses SET name = ?, phone = ?, logo_url = ?, force_password_change = ?, giro = ? WHERE id = ?').run(
     d.name ?? old.name,
     d.phone ?? old.phone,
     d.logoUrl === undefined ? old.logoUrl : d.logoUrl,
     d.forcePasswordChange === undefined ? old.forcePasswordChange : d.forcePasswordChange ? 1 : 0,
+    d.giro ?? old.giro,
     actor.business_id,
   )
-  const fresh = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange FROM businesses WHERE id = ?').get(actor.business_id)
+  const fresh = db.prepare('SELECT name, phone, logo_url AS logoUrl, force_password_change AS forcePasswordChange, giro FROM businesses WHERE id = ?').get(actor.business_id)
   audit(db, now, { businessId: actor.business_id, userId: actor.id, action: 'negocio.cambio', entity: 'business', entityId: actor.business_id, oldValue: old, newValue: fresh })
   return c.json({ business: fresh })
 })

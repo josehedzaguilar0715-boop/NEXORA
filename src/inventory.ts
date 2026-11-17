@@ -99,7 +99,7 @@ export function restore(ctx: MoveCtx, refId: string, type: 'cancelacion') {
   }
 }
 
-export function addLot(ctx: MoveCtx, a: { productId: string; qtyMilli: number; unitCost: number; price: number; expiresAt?: string | null; purchaseId?: string | null; sourceLotId?: string | null; receivedAt?: string; type: 'compra' | 'traspaso_entrada' | 'ajuste'; refId: string | null }) {
+export function addLot(ctx: MoveCtx, a: { productId: string; qtyMilli: number; unitCost: number; price: number; expiresAt?: string | null; purchaseId?: string | null; sourceLotId?: string | null; receivedAt?: string; type: 'compra' | 'traspaso_entrada' | 'ajuste' | 'devolucion' | 'fraccion_entrada'; refId: string | null }) {
   const { db, now } = ctx
   const id = newId()
   const at = a.receivedAt ?? iso(now())
@@ -450,6 +450,8 @@ const purchaseBody = z.object({
   freight: z.array(z.object({ concept: z.string().trim().min(2).max(80), amount: z.number().int().min(1) })).max(20).default([]),
   items: z.array(z.object({
     productId: z.string().optional(),
+    /** Clave del proveedor (ferretería): se busca el producto por ella. */
+    supplierCode: z.string().optional(),
     /** Producto nuevo capturado desde el ticket de compra. */
     newProduct: productBody.optional(),
     quantity: z.number().positive(),
@@ -482,8 +484,10 @@ inventory.post('/purchases', requirePerm('edit_inventory'), async (c) => {
   const ctx = { db, now, businessId: u.business_id, branchId, userId: u.id }
   const result = db.transaction(() => {
     const items = d.items.map((it) => {
-      if (!it.productId && !it.newProduct) throw bad('Cada renglón necesita un producto o los datos de uno nuevo.')
-      const pid = it.productId ?? createProduct(db, now, u.business_id, u.id, it.newProduct!)
+      const byCode = it.supplierCode && d.supplierId ? (db.prepare('SELECT product_id FROM product_suppliers WHERE supplier_id = ? AND supplier_code = ?').get(d.supplierId, it.supplierCode) as { product_id: string } | undefined)?.product_id : undefined
+      if (it.supplierCode && !byCode) throw bad(`La clave ${it.supplierCode} no está asignada a ningún producto de este proveedor.`)
+      if (!it.productId && !byCode && !it.newProduct) throw bad('Cada renglón necesita un producto o los datos de uno nuevo.')
+      const pid = it.productId ?? byCode ?? createProduct(db, now, u.business_id, u.id, it.newProduct!)
       const p = getProduct(db, u.business_id, pid)
       if (p.unit === 'pieza' && !Number.isInteger(it.quantity)) throw bad(`${p.name} se compra por pieza.`)
       return { ...it, p, qtyMilli: toMilli(it.quantity) }

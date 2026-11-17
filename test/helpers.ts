@@ -42,3 +42,19 @@ export function setup() {
   }
   return { longLived, adminToken, app, db, call, codes, advance, registerOwner, createStaff, uuid: randomUUID }
 }
+
+/** Negocio listo para vender: dueño con código 4321, sin cambio forzado de contraseña. */
+export async function negocioListo() {
+  const s = setup()
+  const o = await s.registerOwner()
+  const T = o.token
+  await s.call('PATCH', '/business', { token: T, body: { forcePasswordChange: false, phone: '5511112222' } })
+  const me = (await s.call('GET', '/auth/me', { token: T })).json.user
+  await s.call('PUT', `/users/${me.id}/auth-code`, { token: T, body: { code: '4321' } })
+  const product = async (body: object) => (await s.call('POST', '/products', { token: T, body })).json.product
+  const buy = (items: any[], extra: object = {}) => s.call('POST', '/purchases', { token: T, body: { payment: 'contado', items, ...extra } })
+  const open = (openingFloat = 10000) => s.call('POST', '/shifts/open', { token: T, body: { openingFloat } })
+  const sell = (items: any[], extra: object = {}) => s.call('POST', '/sales', { token: T, body: { id: s.uuid(), paymentMethod: 'efectivo', items, ...extra } })
+  const stock = async (id: string) => (await s.call('GET', `/products/${id}`, { token: T })).json.product.stock
+  return { s, o, T, me, product, buy, open, sell, stock }
+}

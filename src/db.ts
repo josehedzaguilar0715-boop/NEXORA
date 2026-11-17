@@ -641,6 +641,94 @@ const MIGRATIONS: Migration[] = [
   );
   `,
   },
+  `
+  -- Ferretería: escalas de precio por volumen, clave del proveedor, cotizaciones y devoluciones.
+  CREATE TABLE price_tiers (
+    product_id TEXT NOT NULL REFERENCES products(id),
+    min_milli INTEGER NOT NULL CHECK (min_milli > 0),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    PRIMARY KEY (product_id, min_milli)
+  );
+  CREATE TABLE product_suppliers (
+    product_id TEXT NOT NULL REFERENCES products(id),
+    supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+    supplier_code TEXT NOT NULL,
+    PRIMARY KEY (product_id, supplier_id),
+    UNIQUE (supplier_id, supplier_code)
+  );
+  CREATE TABLE quotes (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    folio INTEGER NOT NULL,
+    customer_id TEXT REFERENCES customers(id),
+    customer_name TEXT,
+    items TEXT NOT NULL,
+    total INTEGER NOT NULL,
+    valid_until TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'abierta' CHECK (status IN ('abierta','vendida','cancelada')),
+    sale_id TEXT REFERENCES sales(id),
+    price_authorized_by TEXT REFERENCES users(id),
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    UNIQUE (business_id, folio)
+  );
+  CREATE TABLE returns (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    sale_id TEXT REFERENCES sales(id),
+    shift_id TEXT REFERENCES shifts(id),
+    customer_id TEXT REFERENCES customers(id),
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    refund_method TEXT NOT NULL CHECK (refund_method IN ('efectivo','transferencia','tarjeta','saldo')),
+    reason TEXT NOT NULL,
+    authorized_by TEXT NOT NULL REFERENCES users(id),
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE return_items (
+    id TEXT PRIMARY KEY,
+    return_id TEXT NOT NULL REFERENCES returns(id),
+    sale_item_id TEXT,
+    product_id TEXT REFERENCES products(id),
+    description TEXT NOT NULL,
+    qty_milli INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    restocked INTEGER NOT NULL DEFAULT 1
+  );
+  `,
+  {
+    fkOff: true,
+    sql: `
+  -- Movimientos de inventario: se agregan devoluciones y fraccionado (decants).
+  CREATE TABLE stock_movements_new (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL,
+    product_id TEXT NOT NULL REFERENCES products(id),
+    lot_id TEXT REFERENCES lots(id),
+    type TEXT NOT NULL CHECK (type IN ('compra','venta','cancelacion','merma','traspaso_salida','traspaso_entrada','ajuste','consumo','devolucion','fraccion_salida','fraccion_entrada')),
+    qty_milli INTEGER NOT NULL,
+    cost INTEGER NOT NULL,
+    ref_id TEXT,
+    reason TEXT,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO stock_movements_new SELECT * FROM stock_movements;
+  DROP TABLE stock_movements;
+  ALTER TABLE stock_movements_new RENAME TO stock_movements;
+  CREATE INDEX stock_movements_product ON stock_movements(branch_id, product_id);
+  CREATE INDEX stock_movements_ref ON stock_movements(ref_id);
+  CREATE TRIGGER stock_movements_no_delete BEFORE DELETE ON stock_movements BEGIN SELECT RAISE(ABORT, 'Los movimientos no se pueden borrar'); END;
+  CREATE TRIGGER stock_movements_no_update BEFORE UPDATE ON stock_movements BEGIN SELECT RAISE(ABORT, 'Los movimientos no se pueden modificar'); END;
+  `,
+  },
+  `
+  -- Cada giro tiene su sistema sobre la misma base.
+  ALTER TABLE businesses ADD COLUMN giro TEXT NOT NULL DEFAULT 'abarrotes';
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {

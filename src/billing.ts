@@ -70,6 +70,8 @@ export function enforceLimits(db: Db, now: Clock, businessId: string, actorNote:
   }
 }
 
+export const GIROS = ['abarrotes', 'ferreteria', 'papeleria', 'barberia', 'unas', 'perfumeria', 'banos', 'turistico', 'palapa', 'restaurante', 'comedor', 'taqueria', 'verduleria'] as const
+
 export const BLOCKED_CODE = 'cuenta_vencida'
 /** Lo que un negocio vencido o suspendido aún puede usar: entrar, ver su estado y escribir al buzón. */
 const ALLOWED_WHEN_BLOCKED = [/^\/auth\//, /^\/support\//]
