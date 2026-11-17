@@ -9,6 +9,7 @@ import { Encargos } from './screens/Encargos'
 import { Agenda } from './screens/Agenda'
 import { Entradas } from './screens/Entradas'
 import { Acceso, MisBoletos, Taquilla, TiendaBoletos } from './screens/Taquilla'
+import { Cocina, Mesas, Pedidos } from './screens/Mesas'
 import { Comisiones } from './screens/Comisiones'
 import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
@@ -29,6 +30,9 @@ const SCREENS: Screen[] = [
   { key: 'entradas', label: 'Entradas', perm: 'sell', C: Entradas, giros: ['banos'] },
   { key: 'taquilla', label: 'Taquilla', perm: 'sell', C: Taquilla, giros: ['turistico'] },
   { key: 'acceso', label: 'Acceso', perm: 'sell', C: Acceso, giros: ['turistico'] },
+  { key: 'mesas', label: 'Mesas', perm: 'sell', C: Mesas, giros: ['palapa', 'restaurante', 'taqueria'] },
+  { key: 'pedidos', label: 'Para llevar', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'comedor'] },
+  { key: 'cocina', label: 'Cocina', perm: 'sell', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria'] },
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
   { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria'] },
   { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria', 'papeleria'] },

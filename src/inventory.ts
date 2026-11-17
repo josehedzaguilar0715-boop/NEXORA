@@ -134,7 +134,7 @@ function productView(db: Db, p: ProductRow, branchId: string | null) {
   const presentations = db.prepare('SELECT id, name, factor_milli AS factorMilli, price, barcode FROM presentations WHERE product_id = ? AND active = 1').all(p.id)
   return {
     id: p.id, name: p.name, categoryId: p.category_id, barcode: p.barcode, unit: p.unit, basePrice: p.price, marginBp: p.margin_bp,
-    minStock: fromMilli(p.min_stock_milli), trackExpiry: !!p.track_expiry, sellable: !!p.sellable, attrs: JSON.parse(p.attrs), lastCost: p.last_cost, version: p.version, updatedAt: p.updated_at, active: !!p.active,
+    minStock: fromMilli(p.min_stock_milli), trackExpiry: !!p.track_expiry, sellable: !!p.sellable, attrs: JSON.parse(p.attrs), trackStock: !!(p as ProductRow & { track_stock: number }).track_stock, lastCost: p.last_cost, version: p.version, updatedAt: p.updated_at, active: !!p.active,
     ...(branchId ? { price: currentPrice(db, branchId, p), stock: fromMilli(stockOf(db, branchId, p.id)) } : {}),
     suggestedPrice: suggestedPrice(db, p), presentations,
   }
@@ -188,8 +188,10 @@ const productBody = z.object({
   trackExpiry: z.boolean().optional(),
   /** false: inventario de uso (tinta, tóner, insumos, testers); no aparece en la caja. */
   sellable: z.boolean().optional(),
-  /** Atributos del giro: marca, fragancia, ml, presentación (regular, tester, set)… */
+  /** Atributos del giro: marca, fragancia, ml, presentación, estación de cocina, variantes… */
   attrs: z.record(z.string(), z.unknown()).optional(),
+  /** false: platillo o bebida preparada; no lleva existencia propia, descuenta su receta. */
+  trackStock: z.boolean().optional(),
   presentations: z.array(z.object({ name: z.string().trim().min(1).max(60), factor: z.number().positive(), price: z.number().int().min(0), barcode: z.string().trim().min(3).max(50).optional() })).max(20).optional(),
 })
 
@@ -207,8 +209,8 @@ export function createProduct(db: Db, now: Clock, businessId: string, userId: st
   for (const pr of d.presentations ?? []) checkBarcode(db, businessId, pr.barcode)
   const id = newId()
   const t = iso(now())
-  db.prepare('INSERT INTO products (id, business_id, name, category_id, barcode, unit, price, margin_bp, min_stock_milli, track_expiry, sellable, attrs, updated_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
-    id, businessId, d.name, d.categoryId ?? null, d.barcode ?? null, d.unit, d.price, d.marginBp ?? null, toMilli(d.minStock ?? 0), d.trackExpiry ? 1 : 0, d.sellable === false ? 0 : 1, JSON.stringify(d.attrs ?? {}), t, t,
+  db.prepare('INSERT INTO products (id, business_id, name, category_id, barcode, unit, price, margin_bp, min_stock_milli, track_expiry, sellable, attrs, track_stock, updated_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+    id, businessId, d.name, d.categoryId ?? null, d.barcode ?? null, d.unit, d.price, d.marginBp ?? null, toMilli(d.minStock ?? 0), d.trackExpiry ? 1 : 0, d.sellable === false ? 0 : 1, JSON.stringify(d.attrs ?? {}), d.trackStock === false ? 0 : 1, t, t,
   )
   for (const pr of d.presentations ?? []) db.prepare('INSERT INTO presentations (id, product_id, name, factor_milli, price, barcode) VALUES (?,?,?,?,?,?)').run(newId(), id, pr.name, toMilli(pr.factor), pr.price, pr.barcode ?? null)
   audit(db, now, { businessId, userId, action: 'producto.alta', entity: 'product', entityId: id, newValue: d })

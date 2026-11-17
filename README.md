@@ -17,7 +17,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 10 (perfumería)**: variantes por marca, fragancia, ml y presentación (cada una con código de barras y costo); decants que abren frascos, descuentan ml y crean los chicos con costo proporcional (más envase); testers y muestras como inventario de uso; devoluciones solo de sellados, con ticket y código; sets con un precio y empaque como consumible; comisiones por asesora, marca o categoría. ✅ con pruebas.
 - **Bloque 11 (baños públicos)**: tarifas editables combinadas en una entrada con ticket y hora; pases por día, semana o mes con QR que también registra asistencia; conteo de accesos por hora, día y servicio; insumos de uso descontados por acceso según la referencia del dueño; control de limpieza por turno; gastos fijos para la reserva; cobro por tiempo activable por servicio. ✅ con pruebas.
 - **Bloque 12 (lugar turístico)**: boletos por tipo con precio editable, por fecha y horario con aforo (nunca se vende de más); aforo en tiempo real; venta anticipada por link con QR por boleto (queda por pagar y cuenta para el aforo); acceso con QR que rechaza repetidos, vencidos, cancelados y sin pagar; taquilla con corte por tipo de boleto; visitas guiadas con cupo y guía; tienda y estacionamiento aparte; cierre temporal con código que prepara avisos y cancela los afectados; reembolsos solo con código del dueño; grupos vía promociones; reportes por día, horario, tipo y canal. ✅ con pruebas.
-- Siguiente: Bloque 13 (palapa).
+- **Bloque 13 (palapa)**: mesas con cuenta abierta; comandas a cocina y barra con mesa y hora; cobro en mesa completo o dividido por persona o por producto; propinas por mesero aparte; reservas de mesa confirmadas por dueño o encargado; consumo mínimo por mesa; renta de sillas, camastros y sombrillas con su propio control; recetas e insumos; precio por kilo del día con código; merma de perecederos; bebidas y hielo con costo; tolera reenvíos sin señal. ✅ con pruebas.
+- Siguiente: Bloque 14 (restaurante).
 
 ## Desarrollo local
 
@@ -142,3 +143,12 @@ Importes siempre en centavos enteros (MXN).
 - Venta anticipada: `/boletos/<código del negocio>` (módulo `reservas`). Los boletos quedan "por pagar" (sin pasarela de pago en línea: se cobran en taquilla con el folio). No entran sin pagar.
 - Cierres (`POST /tourism/closures`) y cancelaciones (`POST /tickets/cancel`) exigen el código del dueño; reembolsar es decisión explícita, nunca automática.
 - Pendiente: cobro en línea (requiere elegir una pasarela de pago).
+
+## Comida: núcleo común (Bloque 13, `src/dining.ts`)
+
+- **Platillos**: productos con `trackStock: false` y receta; al venderse descuentan solo sus insumos. `attrs.station` decide a qué estación va (cocina, cocina_caliente, cocina_fria, barra, postres…) y `attrs.modifiers` sus variantes con precio extra.
+- **Cuentas** (`/tabs`): mesa, para llevar o para recoger. Los precios quedan fijos al pedir. `send` arma una comanda por estación; `GET /kitchen?station=` es la pantalla de cada estación; `POST /comandas/:id/ready` la marca lista (tiempos de cocina en `/reports/kitchen-times`).
+- **Cobro** (`/tabs/:id/checkout`): una o varias partes (todo, por persona o por renglones). Cada parte es una venta normal, con propina para el mesero. Al cerrar, la mesa pasa a limpieza y el mesero la libera.
+- **Cancelar o regalar** un renglón siempre pide el código del dueño y queda en bitácora.
+- **Consumo mínimo** por mesa: al cerrar se cobra la diferencia. (Por horario: pendiente.)
+- **Renta de activos** (`/rental-assets`, `/tabs/:id/rentals`): disponibilidad propia; regresan al cerrar la cuenta.

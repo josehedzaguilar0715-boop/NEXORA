@@ -10,6 +10,8 @@ const SETTINGS = z.object({
   travelFee: z.number().int().min(0).nullable(),
   /** Baños: minutos en que un pase no puede volver a entrar (misma visita). */
   passReentryMin: z.number().int().min(0).max(24 * 60),
+  /** Restaurante: reservar hora para pedidos para recoger (apagado: solo número de pedido). */
+  pickupScheduling: z.boolean(),
 }).partial()
 export type Settings = z.infer<typeof SETTINGS>
 

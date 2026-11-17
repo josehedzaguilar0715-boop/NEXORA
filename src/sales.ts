@@ -5,7 +5,7 @@ import { authorize } from './authcode.js'
 import { earnForSale, moduleOn, reverseSalePoints } from './common.js'
 import { activePromotions, bestPromotions } from './promotions.js'
 import { body, hasPerm, parse, requirePerm, type C, type Deps, type Env, type UserRow } from './context.js'
-import { consume, currentPrice, getProduct, priceFor, restore, toMilli } from './inventory.js'
+import { consume, currentPrice, getProduct, priceFor, restore, toMilli, type MoveCtx } from './inventory.js'
 import { bad, conflict, forbidden, iso, newId, notFound } from './util.js'
 
 export const sales = new Hono<Env>()
@@ -82,6 +82,31 @@ export function carryMilli(db: Deps['db'], branchId: string, productId: string, 
   const milli = Math.floor(total / 1000)
   db.prepare('INSERT INTO consumption_carry (branch_id, product_id, micro) VALUES (?,?,?) ON CONFLICT(branch_id, product_id) DO UPDATE SET micro = excluded.micro').run(branchId, productId, total - milli * 1000)
   return milli
+}
+
+/**
+ * Descuenta lo vendido: un combo descuenta sus componentes; un producto con existencia, sus lotes;
+ * un platillo (sin existencia propia) solo su receta. Devuelve el costo.
+ */
+export function consumeProduct(ctx: MoveCtx, productId: string, qtyMilli: number, refId: string, depth = 0): number {
+  const { db } = ctx
+  const p = db.prepare('SELECT track_stock FROM products WHERE id = ?').get(productId) as { track_stock: number }
+  const parts = db.prepare('SELECT product_id, qty_milli FROM combo_items WHERE combo_id = ?').all(productId) as { product_id: string; qty_milli: number }[]
+  let cost = 0
+  if (parts.length && depth < 3) for (const pt of parts) cost += consumeProduct(ctx, pt.product_id, Math.round((pt.qty_milli * qtyMilli) / 1000), refId, depth + 1)
+  else if (p.track_stock) cost += consume(ctx, productId, qtyMilli, 'venta', refId).cost
+  return cost + consumeRecipe(ctx, productId, qtyMilli / 1000, refId)
+}
+
+/** Insumos de una receta por `units` vendidas (millonésimas con acumulación exacta). */
+export function consumeRecipe(ctx: MoveCtx, ownerId: string, units: number, refId: string): number {
+  const recipe = ctx.db.prepare('SELECT product_id, qty_micro FROM recipes WHERE owner_id = ?').all(ownerId) as { product_id: string; qty_micro: number }[]
+  let cost = 0
+  for (const r of recipe) {
+    const milli = carryMilli(ctx.db, ctx.branchId, r.product_id, Math.round(r.qty_micro * units))
+    if (milli > 0) cost += consume(ctx, r.product_id, milli, 'consumo', refId).cost
+  }
+  return cost
 }
 
 /** Escalas de precio por volumen: la de mayor cantidad mínima que se alcance. */
@@ -224,22 +249,9 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
     const ctx = { db, now, businessId: u.business_id, branchId: shift.branch_id, userId: u.id }
     const ins = db.prepare('INSERT INTO sale_items (id, sale_id, description, quantity, unit_price, total, ref, category, product_id, presentation_id, qty_milli, cost) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
     for (const l of lines) {
-      if (l.productId && l.qtyMilli) {
-        // Combo: descuenta sus componentes; producto normal: su propia existencia.
-        const parts = db.prepare('SELECT product_id, qty_milli FROM combo_items WHERE combo_id = ?').all(l.productId) as { product_id: string; qty_milli: number }[]
-        l.cost = parts.length
-          ? parts.reduce((a, pt) => a + consume(ctx, pt.product_id, Math.round((pt.qty_milli * l.qtyMilli!) / 1000), 'venta', d.id).cost, 0)
-          : consume(ctx, l.productId, l.qtyMilli, 'venta', d.id).cost
-      }
-      // Receta: lo que gasta el servicio o platillo (tinta, papel, insumos), como inventario de uso.
-      const owner = l.serviceId ?? l.productId
-      if (owner) {
-        const recipe = db.prepare('SELECT product_id, qty_micro FROM recipes WHERE owner_id = ?').all(owner) as { product_id: string; qty_micro: number }[]
-        for (const r of recipe) {
-          const milli = carryMilli(db, shift.branch_id, r.product_id, Math.round(r.qty_micro * l.quantity))
-          if (milli > 0) l.cost += consume(ctx, r.product_id, milli, 'consumo', d.id).cost
-        }
-      }
+      if (l.productId && l.qtyMilli) l.cost = consumeProduct(ctx, l.productId, l.qtyMilli, d.id)
+      // Receta del servicio: lo que gasta (tinta, papel, insumos), como inventario de uso.
+      if (l.serviceId) l.cost += consumeRecipe(ctx, l.serviceId, l.quantity, d.id)
       ins.run(l.itemId, d.id, l.description, l.quantity, l.unitPrice, l.total, l.ref, l.category, l.productId, l.presentationId, l.qtyMilli, l.cost)
       if (l.serviceId) db.prepare('UPDATE sale_items SET service_id = ? WHERE id = ?').run(l.serviceId, l.itemId)
       if (l.priceChanged) audit(db, now, { businessId: u.business_id, userId: u.id, action: 'venta.cambio_precio', entity: 'sale', entityId: d.id, newValue: { description: l.description, unitPrice: l.unitPrice }, authorizedBy: priceAuth })

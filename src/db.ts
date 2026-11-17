@@ -1049,6 +1049,110 @@ const MIGRATIONS: Migration[] = [
     created_by TEXT NOT NULL
   );
   `,
+  `
+  -- Platillos y bebidas preparadas: no llevan existencia propia, descuentan su receta.
+  ALTER TABLE products ADD COLUMN track_stock INTEGER NOT NULL DEFAULT 1;
+
+  -- Palapa / restaurante / comedor / taquería: mesas, cuentas abiertas, comandas por estación.
+  CREATE TABLE dining_tables (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    name TEXT NOT NULL,
+    area TEXT NOT NULL DEFAULT 'salon',
+    seats INTEGER NOT NULL DEFAULT 4,
+    status TEXT NOT NULL DEFAULT 'libre' CHECK (status IN ('libre','ocupada','reservada','por_cobrar','limpieza')),
+    min_consumption INTEGER,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE tabs (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    kind TEXT NOT NULL CHECK (kind IN ('mesa','llevar','recoger')),
+    table_id TEXT REFERENCES dining_tables(id),
+    waiter_id TEXT REFERENCES users(id),
+    people INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL CHECK (status IN ('abierta','por_cobrar','cerrada','cancelada')),
+    order_number INTEGER,
+    order_status TEXT CHECK (order_status IN ('recibido','en_cocina','listo','entregado')),
+    customer_name TEXT,
+    phone TEXT,
+    pickup_at TEXT,
+    opened_by TEXT NOT NULL,
+    opened_at TEXT NOT NULL,
+    closed_at TEXT
+  );
+  CREATE INDEX tabs_open ON tabs(business_id, status);
+  CREATE TABLE comandas (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    tab_id TEXT NOT NULL REFERENCES tabs(id),
+    station TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'en_preparacion' CHECK (status IN ('en_preparacion','lista','entregada')),
+    created_at TEXT NOT NULL,
+    ready_at TEXT
+  );
+  CREATE INDEX comandas_station ON comandas(business_id, station, status);
+  CREATE TABLE tab_items (
+    id TEXT PRIMARY KEY,
+    tab_id TEXT NOT NULL REFERENCES tabs(id),
+    product_id TEXT REFERENCES products(id),
+    service_id TEXT REFERENCES services(id),
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL CHECK (quantity > 0),
+    unit_price INTEGER NOT NULL,
+    modifiers TEXT NOT NULL DEFAULT '[]',
+    notes TEXT,
+    station TEXT,
+    person INTEGER,
+    status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente','enviado','listo','entregado','cancelado','pagado')),
+    comanda_id TEXT REFERENCES comandas(id),
+    courtesy INTEGER NOT NULL DEFAULT 0,
+    authorized_by TEXT REFERENCES users(id),
+    cancel_reason TEXT,
+    sale_id TEXT REFERENCES sales(id),
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX tab_items_tab ON tab_items(tab_id);
+  CREATE TABLE table_reservations (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    table_id TEXT REFERENCES dining_tables(id),
+    starts_at TEXT NOT NULL,
+    people INTEGER NOT NULL CHECK (people > 0),
+    name TEXT NOT NULL,
+    phone TEXT,
+    notes TEXT,
+    status TEXT NOT NULL CHECK (status IN ('pendiente','confirmada','llego','no_llego','cancelada')),
+    confirmed_by TEXT REFERENCES users(id),
+    created_by TEXT,
+    created_at TEXT NOT NULL
+  );
+  -- Renta de activos (sillas, camastros, sombrillas) con su propio control.
+  CREATE TABLE rental_assets (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity >= 0),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE asset_rentals (
+    id TEXT PRIMARY KEY,
+    asset_id TEXT NOT NULL REFERENCES rental_assets(id),
+    tab_id TEXT NOT NULL REFERENCES tabs(id),
+    tab_item_id TEXT NOT NULL REFERENCES tab_items(id),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    out_at TEXT NOT NULL,
+    returned_at TEXT
+  );
+  CREATE TRIGGER tab_items_no_delete BEFORE DELETE ON tab_items BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  CREATE TRIGGER tabs_no_delete BEFORE DELETE ON tabs BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {
