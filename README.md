@@ -15,7 +15,8 @@ Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA
 - **Bloque 8 (barbería)**: agenda por barbero con horarios, días de descanso y bloqueos; citas en mostrador y clientes sin cita en la misma agenda; combos con precio repartido; comisiones por barbero y servicio/producto/categoría sin valores predeterminados (sobre precio final, cada venta guarda su %); propinas aparte; productos en la misma cuenta; reserva pública por link con "el primero disponible", solo horas libres, pendiente hasta confirmar y estado visible. Sin recordatorios automáticos (botón para preparar WhatsApp). ✅ con pruebas y prueba en navegador.
 - **Bloque 9 (estudio de uñas)**: agenda por técnica con tiempo de secado que bloquea; consumibles por técnica; comisiones por técnica (categoría) y propinas aparte; paquetes de sesiones (N usos en su vigencia); notas libres que solo escribe el dueño; a domicilio (todos o algunos servicios, dirección privada, traslado que bloquea la agenda, cargo opcional apagado y fuera de comisión); recordatorio de retoque opcional y apagado, que solo prepara el mensaje. ✅ con pruebas.
 - **Bloque 10 (perfumería)**: variantes por marca, fragancia, ml y presentación (cada una con código de barras y costo); decants que abren frascos, descuentan ml y crean los chicos con costo proporcional (más envase); testers y muestras como inventario de uso; devoluciones solo de sellados, con ticket y código; sets con un precio y empaque como consumible; comisiones por asesora, marca o categoría. ✅ con pruebas.
-- Siguiente: Bloque 11 (baños públicos).
+- **Bloque 11 (baños públicos)**: tarifas editables combinadas en una entrada con ticket y hora; pases por día, semana o mes con QR que también registra asistencia; conteo de accesos por hora, día y servicio; insumos de uso descontados por acceso según la referencia del dueño; control de limpieza por turno; gastos fijos para la reserva; cobro por tiempo activable por servicio. ✅ con pruebas.
+- Siguiente: Bloque 12 (lugar turístico).
 
 ## Desarrollo local
 
@@ -125,3 +126,10 @@ Importes siempre en centavos enteros (MXN).
 - Testers y muestras: productos de uso interno (`sellable: false`); su gasto se registra con `POST /testers/use`. No se venden ni se devuelven.
 - Devoluciones: en perfumería exigen ticket y que el renglón venga marcado `sealed: true`.
 - Comisiones: nueva regla `brand` (por marca), además de producto, categoría y persona.
+
+## Baños públicos (Bloque 11)
+
+- Tarifas = servicios. `POST /baths/entry` cobra varias en una entrada y registra el acceso. Un servicio con `attrs.timeRate { blockMin, blockPrice }` no se cobra al entrar: se cobra a la salida (`/baths/accesses/:id/exit`) por bloques empezados.
+- Pases: plan de membresía `kind: 'pase'` con periodo día/semana/mes. `POST /baths/pass-entry` valida el QR, cuenta el acceso y registra asistencia (una por día). No vuelve a entrar dentro de `passReentryMin` minutos (30 por defecto, en `/settings`).
+- Insumos por acceso: `PUT /baths/access-supplies` (ej. 0.025 rollo por acceso = uno cada 40), descontados con acumulación exacta.
+- Limpieza: tareas del dueño, y cada quien marca la que hizo con hora y turno. No se muestra fuera del negocio.

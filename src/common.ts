@@ -159,7 +159,7 @@ function membershipView(db: Db, m: MembershipRow, at: Date) {
 const planBody = z.object({
   name: z.string().trim().min(2).max(100), usesPerPeriod: z.number().int().min(1).max(1000), period: z.enum(['dia', 'semana', 'mes']),
   /** paquete: usesPerPeriod sesiones en total, válidas validityDays días. */
-  kind: z.enum(['periodo', 'paquete']).optional(), validityDays: z.number().int().min(1).max(3650).optional(),
+  kind: z.enum(['periodo', 'paquete', 'pase']).optional(), validityDays: z.number().int().min(1).max(3650).optional(),
   price: z.number().int().min(0), appliesTo: z.array(z.string()).max(200).optional(), active: z.boolean().optional(),
 })
 

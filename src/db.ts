@@ -945,6 +945,44 @@ const MIGRATIONS: Migration[] = [
   DROP TABLE commission_rules;
   ALTER TABLE commission_rules_new RENAME TO commission_rules;
   `,
+  `
+  -- Baños públicos (y lugares con entrada): cada acceso queda registrado, con cobro o con pase.
+  CREATE TABLE accesses (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    kind TEXT NOT NULL CHECK (kind IN ('cobro','pase')),
+    sale_id TEXT REFERENCES sales(id),
+    customer_id TEXT REFERENCES customers(id),
+    membership_id TEXT,
+    services TEXT NOT NULL,
+    at TEXT NOT NULL,
+    timed_service_id TEXT REFERENCES services(id),
+    exited_at TEXT,
+    exit_sale_id TEXT REFERENCES sales(id),
+    created_by TEXT NOT NULL
+  );
+  CREATE INDEX accesses_business ON accesses(business_id, at);
+  CREATE TRIGGER accesses_no_delete BEFORE DELETE ON accesses BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  -- Control de limpieza por turno (interno).
+  CREATE TABLE cleaning_tasks (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE cleaning_log (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    task_id TEXT NOT NULL REFERENCES cleaning_tasks(id),
+    user_id TEXT NOT NULL REFERENCES users(id),
+    shift_id TEXT REFERENCES shifts(id),
+    at TEXT NOT NULL,
+    note TEXT
+  );
+  CREATE TRIGGER cleaning_log_no_delete BEFORE DELETE ON cleaning_log BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  `,
 ]
 
 export function openDb(path = ':memory:'): Db {

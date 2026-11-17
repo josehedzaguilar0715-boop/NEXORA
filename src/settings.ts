@@ -8,6 +8,8 @@ import type { Db } from './db.js'
 const SETTINGS = z.object({
   /** Cargo por traslado a domicilio (centavos). null = apagado. Va fuera de la comisión. */
   travelFee: z.number().int().min(0).nullable(),
+  /** Baños: minutos en que un pase no puede volver a entrar (misma visita). */
+  passReentryMin: z.number().int().min(0).max(24 * 60),
 }).partial()
 export type Settings = z.infer<typeof SETTINGS>
 

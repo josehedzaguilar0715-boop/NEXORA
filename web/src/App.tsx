@@ -7,6 +7,7 @@ import { Cotizaciones } from './screens/Cotizaciones'
 import { Devoluciones } from './screens/Devoluciones'
 import { Encargos } from './screens/Encargos'
 import { Agenda } from './screens/Agenda'
+import { Entradas } from './screens/Entradas'
 import { Comisiones } from './screens/Comisiones'
 import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
@@ -24,6 +25,7 @@ export const can = (me: Me, p: string) => me.permissions === 'todos' || me.permi
 type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[] }
 const SCREENS: Screen[] = [
   { key: 'agenda', label: 'Agenda', perm: 'sell', C: Agenda, giros: ['barberia', 'unas'] },
+  { key: 'entradas', label: 'Entradas', perm: 'sell', C: Entradas, giros: ['banos'] },
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja },
   { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria'] },
   { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria', 'papeleria'] },
