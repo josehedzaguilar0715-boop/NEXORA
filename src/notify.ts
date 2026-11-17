@@ -11,6 +11,8 @@ export function createNotifier(env: Record<string, string | undefined> = process
   const sms = env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM
   const mail = env.RESEND_API_KEY && env.MAIL_FROM
   return {
+    smsEnabled: !!sms,
+    mailEnabled: !!mail,
     async sendCode(phone, code) {
       const body = `NEXORA: tu código es ${code}. Vence en 10 minutos. No lo compartas.`
       if (!sms) {

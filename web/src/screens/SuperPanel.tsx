@@ -99,17 +99,30 @@ function Negocios() {
           <h3 style={{ marginTop: 14 }}>Plan</h3>
           <Plan b={sel} onSave={(body) => run(() => adm('PATCH', `/admin/businesses/${sel.id}`, body), 'Plan guardado.')()} />
           <h3 style={{ marginTop: 14 }}>Restablecer acceso del dueño</h3>
-          <p className="muted">Se verifica su identidad con su número registrado: le llega un código por SMS y te lo dicta.</p>
+          <p className="muted">Antes confirma que es el dueño: llámale a su número registrado ({sel.owner.phone}). Le das una contraseña temporal, entra con su teléfono y la cambia.</p>
           <button onClick={async () => {
             try {
-              const v = await adm('POST', `/admin/businesses/${sel.id}/verify-owner`)
-              const code = prompt(`Código enviado (${v.sentTo}). ¿Qué código te dictó el dueño?`)
-              const p = code && prompt('Contraseña temporal (mínimo 8):')
-              if (!code || !p) return
-              await adm('POST', `/admin/businesses/${sel.id}/users/${sel.owner.id}/reset-password`, { newPassword: p, reason: 'Identidad verificada con código a su número', identityChallengeId: v.challengeId, identityCode: code })
-              setMsg({ ok: 'Acceso restablecido; deberá cambiar la contraseña al entrar.' })
+              const url = `/admin/businesses/${sel.id}/users/${sel.owner.id}/reset-password`
+              const temp = 'Nx-' + Math.random().toString(36).slice(2, 8) + Math.floor(Math.random() * 90 + 10)
+              let identity: { identityChallengeId?: string; identityCode?: string } = {}
+              let reason = 'Identidad confirmada por llamada a su número registrado'
+              try {
+                // Con SMS configurado, además le llega un código que te dicta.
+                const v = await adm('POST', `/admin/businesses/${sel.id}/verify-owner`)
+                const code = prompt(`Código enviado (${v.sentTo}). ¿Qué código te dictó el dueño?`)
+                if (!code) return
+                identity = { identityChallengeId: v.challengeId, identityCode: code }
+                reason = 'Identidad verificada con código a su número'
+              } catch (e) {
+                if ((e as { code?: string }).code !== 'sin_sms') throw e
+                if (!confirm(`¿Ya confirmaste por llamada al ${sel.owner.phone} que es el dueño de ${sel.name}?`)) return
+              }
+              const p = prompt('Contraseña temporal (mínimo 8). Díctasela al dueño:', temp)
+              if (!p) return
+              await adm('POST', url, { newPassword: p, reason, ...identity })
+              setMsg({ ok: `Listo. Contraseña temporal: ${p} — al entrar le pedirá cambiarla.` })
             } catch (e) { setMsg({ err: (e as Error).message }) }
-          }}>Verificar y restablecer</button>
+          }}>Dar contraseña temporal</button>
         </section>
       )}
     </div>

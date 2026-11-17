@@ -282,7 +282,7 @@ describe('super panel: cambiar contraseña', () => {
 })
 
 describe('avisos sin proveedor', () => {
-  it('no anuncia "te enviamos" si el código solo quedó en el registro', async () => {
+  it('sin SMS ni correo configurados, entra solo con usuario y contraseña', async () => {
     const { createAdmin } = await import('../src/admin.js')
     const { createApp } = await import('../src/app.js')
     const { openDb } = await import('../src/db-node.js')
@@ -294,8 +294,8 @@ describe('avisos sin proveedor', () => {
       createAdmin(deps, { name: 'S', username: 'soporte', password: 'superpanel1', phone: '5500000001', email: 'a@b.c' })
       const r = await createApp(deps).request('/admin/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'soporte', password: 'superpanel1' }) })
       const j = (await r.json()) as any
-      expect(j.challengeId).toBeTruthy()
-      expect(j.sentTo).toEqual([])
+      expect(j.token).toBeTruthy()
+      expect(j.challengeId).toBeUndefined()
     } finally {
       console.log = log
     }

@@ -3,7 +3,7 @@ import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, refreshStatus, setting, type BusinessRow, type Plan } from './billing.js'
-import { body, LOCK_MINUTES, MAX_FAILED, parse, type Deps, type UserRow } from './context.js'
+import { body, LOCK_MINUTES, MAX_FAILED, parse, smsOn, type Deps, type UserRow } from './context.js'
 import { consumeChallenge, createChallenge, forgetDevices } from './auth.js'
 import { ticketView } from './support.js'
 import { exportAll, runBackup } from './backup.js'
@@ -44,18 +44,21 @@ admin.post('/admin/login', async (c) => {
   }
   db.prepare('UPDATE admins SET failed_attempts = 0, locked_until = NULL WHERE id = ?').run(a.id)
   // Verificación en dos pasos: el mismo código llega por SMS y por correo; sirve cualquiera.
-  if (a.phone || a.email) {
-    const deps = c.get('deps')
+  const deps = c.get('deps')
+  const viaSms = !!a.phone && smsOn(deps)
+  const viaMail = !!a.email && !!deps.notifier.sendEmail && deps.notifier.mailEnabled !== false
+  // Sin SMS ni correo configurados se entra con usuario y contraseña (como los clientes).
+  if (viaSms || viaMail) {
     const code = numericCode(6)
     const id = newId()
     db.prepare('INSERT INTO admin_challenges (id, admin_id, code_hash, expires_at, created_at) VALUES (?,?,?,?,?)').run(id, a.id, hashSecret(code), iso(new Date(now().getTime() + 10 * 60_000)), iso(now()))
     const sent: string[] = []
     // Solo se anuncia lo que de verdad salió (sin proveedor, el código queda en el registro del servidor).
-    if (a.phone && (await deps.notifier.sendCode(a.phone, code)) !== false) sent.push(`SMS al ${a.phone.slice(-4).padStart(10, '•')}`)
-    if (a.email && deps.notifier.sendEmail && (await deps.notifier.sendEmail(a.email, 'NEXORA · código del super panel', `Tu código de acceso al super panel es ${code}. Vence en 10 minutos. Si no fuiste tú, cambia tu contraseña.`)) !== false) sent.push(`correo ${a.email.replace(/^(.{2}).*(@.*)$/, '$1•••$2')}`)
+    if (viaSms && (await deps.notifier.sendCode(a.phone!, code)) !== false) sent.push(`SMS al ${a.phone!.slice(-4).padStart(10, '•')}`)
+    if (viaMail && (await deps.notifier.sendEmail!(a.email!, 'NEXORA · código del super panel', `Tu código de acceso al super panel es ${code}. Vence en 10 minutos. Si no fuiste tú, cambia tu contraseña.`)) !== false) sent.push(`correo ${a.email!.replace(/^(.{2}).*(@.*)$/, '$1•••$2')}`)
     return c.json({ challengeId: id, sentTo: sent })
   }
-  return c.json({ token: issueAdminSession(c.get('deps'), a.id) })
+  return c.json({ token: issueAdminSession(deps, a.id) })
 })
 
 function issueAdminSession(deps: Deps, adminId: string) {
@@ -255,7 +258,8 @@ admin.post('/admin/businesses/:id/users/:userId/reset-password', async (c) => {
   const u = db.prepare('SELECT id, role FROM users WHERE id = ? AND business_id = ?').get(c.req.param('userId'), b.id) as { id: string; role: string } | undefined
   if (!u) throw notFound('No se encontró ese usuario.')
   // Identidad del dueño: debe dictar el código que llegó a su número registrado (aunque haya cambiado de aparato).
-  if (u.role === 'owner') {
+  // Sin SMS, soporte confirma por llamada al número registrado y da una contraseña temporal.
+  if (u.role === 'owner' && smsOn(c.get('deps'))) {
     if (!d.identityChallengeId || !d.identityCode) throw bad('Primero envía el código al teléfono del dueño y pídele que te lo dicte.', 'identidad_requerida')
     const { user } = consumeChallenge(c.get('deps'), d.identityChallengeId, d.identityCode, 'identidad')
     if (user.id !== u.id) throw bad('Ese código no es de este dueño.', 'identidad_requerida')
@@ -273,6 +277,7 @@ admin.post('/admin/businesses/:id/verify-owner', async (c) => {
   const { db, now } = deps
   const b = loadBusiness(c)
   const owner = db.prepare("SELECT * FROM users WHERE business_id = ? AND role = 'owner'").get(b.id) as UserRow
+  if (!smsOn(deps)) throw bad('No hay SMS configurado: confirma su identidad llamando a su número registrado.', 'sin_sms')
   const challengeId = await createChallenge(deps, owner, 'identidad', {})
   audit(db, now, { businessId: b.id, userId: c.get('admin').id, action: 'admin.verificar_identidad', entity: 'user', entityId: owner.id })
   return c.json({ challengeId, sentTo: `SMS al ${owner.phone!.slice(-4).padStart(10, '•')}` })

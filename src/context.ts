@@ -5,12 +5,19 @@ import type { Permission } from './permissions.js'
 import { bad, forbidden, unauthorized, iso, sha256, type Clock } from './util.js'
 
 export interface Notifier {
+  /** false = no hay proveedor de SMS: se entra solo con usuario y contraseña, y soporte da contraseñas temporales. */
+  smsEnabled?: boolean
+  /** false = no hay proveedor de correo. */
+  mailEnabled?: boolean
   /** Envía un código por WhatsApp/SMS. En desarrollo solo se registra. */
   /** Devuelve false si no hay proveedor y el código solo quedó en el registro del servidor. */
   sendCode(phone: string, code: string): void | boolean | Promise<void | boolean>
   /** Correo (opcional): se usa para la verificación del super panel. */
   sendEmail?(to: string, subject: string, text: string, attachments?: { filename: string; content: string }[]): void | boolean | Promise<void | boolean>
 }
+
+/** ¿Se usan códigos por SMS? Sin proveedor, no (todo se maneja con usuario, contraseña y soporte). */
+export const smsOn = (deps: { notifier: Notifier }) => deps.notifier.smsEnabled !== false
 
 export interface Deps {
   db: Db

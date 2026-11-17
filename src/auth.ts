@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { GIROS, setting } from './billing.js'
-import { body, parse, LOCK_MINUTES, MAX_FAILED, type Deps, type Env, type UserRow } from './context.js'
+import { body, parse, LOCK_MINUTES, MAX_FAILED, smsOn, type Deps, type Env, type UserRow } from './context.js'
 import {
   bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone,
   normalizeUsername, notFound, numericCode, sha256, unauthorized, verifySecret,
@@ -141,6 +141,13 @@ publicAuth.post('/auth/register', async (c) => {
     })()
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow
   }
+  // Sin SMS: la cuenta queda lista y entra de una vez con su teléfono y contraseña.
+  if (!smsOn(deps)) {
+    db.prepare('UPDATE users SET phone_verified = 1 WHERE id = ?').run(user.id)
+    const { token } = createSession(deps, user, d)
+    const biz = db.prepare('SELECT id, code, name FROM businesses WHERE id = ?').get(user.business_id)
+    return c.json({ token, business: biz }, 201)
+  }
   const challengeId = await createChallenge(deps, user, 'registro', d)
   return c.json({ challengeId, delivered: wasDelivered(challengeId) }, 201)
 })
@@ -167,6 +174,10 @@ publicAuth.post('/auth/owner/login', async (c) => {
   }
   const user = deps.db.prepare("SELECT * FROM users WHERE role = 'owner' AND phone = ? AND phone_verified = 1").get(phone) as UserRow | undefined
   checkLogin(deps, user, d.password)
+  if (!smsOn(deps)) {
+    const { token } = createSession(deps, user!, d)
+    return c.json({ token, mustChangePassword: !!user!.must_change_password })
+  }
   // Equipo de confianza: ya verificó con SMS hace menos de 30 días; no se gasta otro mensaje.
   if (d.deviceTrust) {
     const t = deps.db.prepare('SELECT id FROM trusted_devices WHERE token_hash = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?').get(sha256(d.deviceTrust), user!.id, iso(deps.now())) as { id: string } | undefined
@@ -191,6 +202,7 @@ publicAuth.post('/auth/owner/verify', async (c) => {
 // Dueño que olvidó su contraseña: la recupera con un código que llega a su teléfono.
 publicAuth.post('/auth/owner/recover', async (c) => {
   const deps = c.get('deps')
+  if (!smsOn(deps)) throw bad('Llama o escribe a soporte: te damos una contraseña temporal para entrar y luego la cambias.', 'recuperar_con_soporte')
   const d = parse(z.object({ phone: z.string() }), await body(c))
   let phone = ''
   try { phone = normalizePhone(d.phone) } catch { /* misma respuesta: no revela si el número existe */ }
