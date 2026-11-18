@@ -167,7 +167,10 @@ agenda.get('/agenda', requirePerm('sell'), (c) => {
   const staffId = c.req.query('staffId')
   const rows = db.prepare(`SELECT * FROM appointments WHERE business_id = ? AND starts_at >= ? AND starts_at < ? ${staffId ? 'AND staff_id = ?' : ''} ORDER BY starts_at`).all(...[u.business_id, from, to, ...(staffId ? [staffId] : [])]) as ApptRow[]
   const blocks = db.prepare(`SELECT b.id, b.user_id AS staffId, b.starts_at AS startsAt, b.ends_at AS endsAt, b.reason FROM agenda_blocks b WHERE b.business_id = ? AND b.starts_at < ? AND b.ends_at > ? ${staffId ? 'AND b.user_id = ?' : ''}`).all(...[u.business_id, to, from, ...(staffId ? [staffId] : [])])
-  return c.json({ date, appointments: rows.map((a) => apptView(db, a)), blocks })
+  // Horario de cada persona ese día de la semana (para ver sus horas libres).
+  const weekday = new Date(`${date}T12:00:00-06:00`).getUTCDay()
+  const hours = db.prepare('SELECT s.user_id AS staffId, s.start, s.end FROM staff_schedules s JOIN users u ON u.id = s.user_id WHERE u.business_id = ? AND u.active = 1 AND u.in_agenda = 1 AND s.weekday = ? ORDER BY s.start').all(u.business_id, weekday)
+  return c.json({ date, appointments: rows.map((a) => apptView(db, a)), blocks, hours })
 })
 
 agenda.get('/agenda/availability', requirePerm('sell'), (c) => {

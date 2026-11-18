@@ -231,7 +231,7 @@ try {
   check(true, 'barbería: el cliente reserva por link y ve "por confirmar"')
   await page.goto(`${base}/#/agenda`)
   await page.reload()
-  await page.getByLabel('Día').fill(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(Date.now() + 86_400_000)))
+  await page.getByLabel('Día', { exact: true }).fill(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(Date.now() + 86_400_000)))
   await page.getByRole('button', { name: 'Confirmar' }).click()
   await page.getByRole('button', { name: 'Cobrar' }).click()
   await page.getByLabel(/Propina para/).fill('20')

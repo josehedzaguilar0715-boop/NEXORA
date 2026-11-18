@@ -8,13 +8,61 @@ const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico
 const hm = (iso: string) => new Date(iso).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit', hour12: true })
 const STATUS: Record<string, string> = { pendiente: 'Por confirmar', confirmada: 'Confirmada', en_atencion: 'Atendiendo', atendida: 'Cobrada', cancelada: 'Cancelada', no_asistio: 'No vino' }
 
+/** Minutos del día (hora de México) de una fecha ISO. */
+const mins = (iso: string) => { const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso)).split(':').map(Number); return h! * 60 + m! }
+const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); return h! * 60 + m! }
+const toHm = (n: number) => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`
+const fmtDur = (n: number) => (n >= 60 ? `${Math.floor(n / 60)} h${n % 60 ? ` ${n % 60} min` : ''}` : `${n} min`)
+const shift = (date: string, d: number) => new Date(Date.parse(`${date}T12:00:00-06:00`) + d * 86_400_000).toISOString().slice(0, 10)
+const dayLabel = (date: string) => { const s = new Date(`${date}T12:00:00-06:00`).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'America/Mexico_City' }); return (date === today() ? 'Hoy, ' : '') + s.charAt(0).toUpperCase() + s.slice(1) }
+
+/** Horas libres dentro del horario: lo que no está ocupado por citas ni bloqueos (hoy, solo desde ahora). Huecos de 15 min o más. */
+function freeGaps(date: string, hours: { start: string; end: string }[], busy: [string, string][]) {
+  const nowMin = date === today() ? Math.ceil(mins(new Date().toISOString()) / 15) * 15 : date < today() ? 24 * 60 : 0
+  const taken = busy.map(([a, b]) => [mins(a), Math.max(mins(a), mins(b) || 24 * 60)] as [number, number]).sort((x, y) => x[0] - y[0])
+  const out: { from: number; to: number }[] = []
+  for (const h of hours) {
+    let cur = Math.max(toMin(h.start), nowMin)
+    const end = toMin(h.end)
+    for (const [a, b] of taken) {
+      if (b <= cur || a >= end) continue
+      if (a - cur >= 15) out.push({ from: cur, to: a })
+      cur = Math.max(cur, b)
+    }
+    if (end - cur >= 15) out.push({ from: cur, to: end })
+  }
+  return out
+}
+
+/** Una cita: hora y estado arriba, cliente y servicios, y los botones acomodados en cuadrícula (no se enciman en el celular). */
+function Cita({ a, me, wa, act, onCobrar }: { a: any; me: Me; wa: string | null; act: (id: string, path: string, body?: unknown) => () => Promise<void>; onCobrar: () => void }) {
+  const off = ['cancelada', 'no_asistio'].includes(a.status)
+  return (
+    <div className={`appt appt-${a.status}`} style={{ opacity: off ? 0.55 : 1 }}>
+      <div className="appt-top"><b>{hm(a.startsAt)} – {hm(a.endsAt)}</b><span className="pill">{STATUS[a.status]}</span></div>
+      <div className="appt-name">{a.customerName}</div>
+      <div className="muted small">{a.services.map((s: any) => s.name).join(' + ')}{a.source === 'link' ? ' · reservó por link' : ''}{a.atHome ? ' · a domicilio' : ''}</div>
+      {!off && a.status !== 'atendida' && (
+        <div className="appt-actions">
+          {a.status === 'pendiente' && <button className="primary" onClick={act(a.id, 'confirm')}>Confirmar</button>}
+          {['confirmada', 'en_atencion'].includes(a.status) && can(me, 'sell') && <button className="primary" onClick={onCobrar}>Cobrar</button>}
+          {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'start')}>Atender</button>}
+          {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'no-show')}>No vino</button>}
+          {['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && <button onClick={() => { const r = prompt('Motivo de la cancelación:'); if (r) void act(a.id, 'cancel', { reason: r })() }}>Cancelar</button>}
+          {wa && <a className="button" href={wa} target="_blank" rel="noreferrer">WhatsApp</a>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** Agenda por persona (barbería, uñas): citas, clientes sin cita y cobro. */
 export function Agenda({ me }: { me: Me }) {
   const [date, setDate] = useState(today())
-  const [data, setData] = useState<{ appointments: any[]; blocks: any[] }>({ appointments: [], blocks: [] })
+  const [data, setData] = useState<{ appointments: any[]; blocks: any[]; hours?: { staffId: string; start: string; end: string }[] }>({ appointments: [], blocks: [] })
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([])
   const [services, setServices] = useState<Service[]>([])
-  const [form, setForm] = useState<null | { walkIn: boolean }>(null)
+  const [form, setForm] = useState<null | { walkIn: boolean; staffId?: string; time?: string }>(null)
   const [checkout, setCheckout] = useState<any>(null)
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = async () => {
@@ -33,7 +81,12 @@ export function Agenda({ me }: { me: Me }) {
   return (
     <div>
       <div className="toolbar agenda-bar">
-        <label className="date-pick">Día<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+        <div className="day-nav">
+          <button aria-label="Día anterior" onClick={() => setDate(shift(date, -1))}>‹</button>
+          <label className="day-label">{dayLabel(date)}<input type="date" aria-label="Día" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} /></label>
+          <button aria-label="Día siguiente" onClick={() => setDate(shift(date, 1))}>›</button>
+          {date !== today() && <button onClick={() => setDate(today())}>Hoy</button>}
+        </div>
         <button className="primary" onClick={() => setForm({ walkIn: false })}>+ Nueva cita</button>
         <button onClick={() => setForm({ walkIn: true })}>Cliente sin cita</button>
       </div>
@@ -41,43 +94,56 @@ export function Agenda({ me }: { me: Me }) {
       {msg.err && <p className="error">{msg.err}</p>}
       {msg.ok && <p className="okmsg">{msg.ok}</p>}
       <div className="agenda-cols">
-        {staff.map((st) => (
-          <section className="card" key={st.id}>
-            <h2>{st.name}</h2>
-            {data.blocks.filter((b) => b.staffId === st.id).map((b) => <p key={b.id} className="muted">⛔ {hm(b.startsAt)}–{hm(b.endsAt)} {b.reason}</p>)}
-            {data.appointments.filter((a) => a.staffId === st.id).map((a) => (
-              <div key={a.id} className="card" style={{ marginBottom: 8, opacity: ['cancelada', 'no_asistio'].includes(a.status) ? 0.5 : 1 }}>
-                <b>{hm(a.startsAt)}–{hm(a.endsAt)}</b> · {a.customerName}
-                <div className="muted">{a.services.map((s: any) => s.name).join(' + ')} · {STATUS[a.status]}{a.source === 'link' ? ' · por link' : ''}{a.atHome ? ' · a domicilio' : ''}</div>
-                <div className="row" style={{ marginTop: 6 }}>
-                  {a.status === 'pendiente' && <button className="primary" onClick={act(a.id, 'confirm')}>Confirmar</button>}
-                  {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'start')}>Atender</button>}
-                  {['confirmada', 'en_atencion'].includes(a.status) && can(me, 'sell') && <button className="primary" onClick={() => setCheckout(a)}>Cobrar</button>}
-                  {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'no-show')}>No vino</button>}
-                  {['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && <button onClick={() => { const r = prompt('Motivo de la cancelación:'); if (r) void act(a.id, 'cancel', { reason: r })() }}>Cancelar</button>}
-                  {wa(a) && a.status !== 'atendida' && <a className="muted" href={wa(a)!} target="_blank" rel="noreferrer">Preparar WhatsApp</a>}
-                </div>
+        {staff.map((st) => {
+          const hours = (data.hours ?? []).filter((h) => h.staffId === st.id)
+          const appts = data.appointments.filter((a) => a.staffId === st.id)
+          const blocks = data.blocks.filter((b) => b.staffId === st.id)
+          const live = appts.filter((a) => !['cancelada', 'no_asistio'].includes(a.status))
+          const gaps = freeGaps(date, hours, [...live.map((a) => [a.startsAt, a.endsAt] as [string, string]), ...blocks.map((b) => [b.startsAt, b.endsAt] as [string, string])])
+          const freeMin = gaps.reduce((acc, g) => acc + (g.to - g.from), 0)
+          type Row = { at: number; kind: 'cita'; a: any } | { at: number; kind: 'libre'; from: number; to: number } | { at: number; kind: 'bloqueo'; b: any }
+          const rows: Row[] = [...appts.map((a) => ({ at: mins(a.startsAt), kind: 'cita' as const, a })), ...gaps.map((g) => ({ at: g.from, kind: 'libre' as const, from: g.from, to: g.to })), ...blocks.map((b) => ({ at: mins(b.startsAt), kind: 'bloqueo' as const, b }))].sort((x, y) => x.at - y.at)
+          return (
+            <section className="card agenda-staff" key={st.id}>
+              <div className="agenda-head">
+                <h2>{st.name}</h2>
+                <span className="muted small">{hours.length ? `${hours.map((h) => `${h12(h.start)} – ${h12(h.end)}`).join(' y ')}` : 'Descansa este día'}</span>
+                <span className="small">{live.length} {live.length === 1 ? 'cita' : 'citas'}{hours.length ? ` · ${fmtDur(freeMin)} libres` : ''}</span>
               </div>
-            ))}
-          </section>
-        ))}
+              {rows.map((r, i) => r.kind === 'libre' ? (
+                <button key={`l${i}`} className="slot-free" onClick={() => setForm({ walkIn: false, staffId: st.id, time: toHm(r.from) })}>
+                  <span><b>Libre</b> {h12(toHm(r.from))} – {h12(toHm(r.to))}</span><span className="slot-add">+ Agendar</span>
+                </button>
+              ) : r.kind === 'bloqueo' ? (
+                <div key={r.b.id} className="slot-block">⛔ {hm(r.b.startsAt)} – {hm(r.b.endsAt)} · {r.b.reason}</div>
+              ) : (
+                <Cita key={r.a.id} a={r.a} me={me} wa={wa(r.a)} act={act} onCobrar={() => setCheckout(r.a)} />
+              ))}
+              {!rows.length && <p className="muted">{hours.length ? 'Sin citas.' : 'No trabaja este día.'}</p>}
+            </section>
+          )
+        })}
       </div>
       {me.modules?.includes('recordatorios') && <Retoques />}
       {staff.length === 0 && <p className="card">Nadie está en la agenda todavía. En <a href="#/usuarios">Personal</a> abre a cada persona → «Horario de agenda» y marca «Atiende citas». Los servicios se dan de alta en <a href="#/configurar">Configurar negocio</a>.</p>}
-      {form && <NuevaCita walkIn={form.walkIn} date={date} staff={staff} services={services} onClose={() => setForm(null)} onSaved={() => { setForm(null); setMsg({ ok: 'Cita guardada.' }); void load() }} />}
+      {form && <NuevaCita walkIn={form.walkIn} preset={form.staffId ? { staffId: form.staffId, time: form.time } : undefined} date={date} staff={staff} services={services} onClose={() => setForm(null)} onSaved={() => { setForm(null); setMsg({ ok: 'Cita guardada.' }); void load() }} />}
       {checkout && <Cobro appt={checkout} onClose={() => setCheckout(null)} onDone={(t, l) => { setCheckout(null); setMsg({ ok: `Cobrado: ${mxn(t)}.${l ? ` ${loyaltyText(l)}.` : ''}` }); void load() }} />}
     </div>
   )
 }
 
-function NuevaCita({ walkIn, date, staff, services, onClose, onSaved }: { walkIn: boolean; date: string; staff: { id: string; name: string }[]; services: Service[]; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ staffId: staff[0]?.id ?? '', serviceIds: [] as string[], time: '', name: '', phone: '', atHome: false, address: '', travelMin: '30' })
+function NuevaCita({ walkIn, preset, date, staff, services, onClose, onSaved }: { walkIn: boolean; preset?: { staffId: string; time?: string }; date: string; staff: { id: string; name: string }[]; services: Service[]; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({ staffId: preset?.staffId ?? staff[0]?.id ?? '', serviceIds: [] as string[], time: '', name: '', phone: '', atHome: false, address: '', travelMin: '30' })
   const [slots, setSlots] = useState<string[]>([])
   const [err, setErr] = useState('')
   const total = useMemo(() => services.filter((s) => f.serviceIds.includes(s.id)).reduce((a, s) => a + s.price, 0), [f.serviceIds, services])
   useEffect(() => {
     if (walkIn || !f.serviceIds.length || !f.staffId) return setSlots([])
-    api<any>('GET', `/agenda/availability?date=${date}&serviceIds=${f.serviceIds.join(',')}&staffId=${f.staffId}&travelMin=${f.atHome ? Number(f.travelMin) || 0 : 0}`).then((r) => setSlots(r.slots)).catch(() => setSlots([]))
+    api<any>('GET', `/agenda/availability?date=${date}&serviceIds=${f.serviceIds.join(',')}&staffId=${f.staffId}&travelMin=${f.atHome ? Number(f.travelMin) || 0 : 0}`).then((r) => {
+      setSlots(r.slots)
+      // Si se abrió desde una hora libre, queda elegida esa hora (si cabe el servicio).
+      if (preset?.time && r.slots.includes(preset.time)) setF((x) => (x.time ? x : { ...x, time: preset.time! }))
+    }).catch(() => setSlots([]))
   }, [f.serviceIds, f.staffId, date, walkIn, f.atHome, f.travelMin])
   const save = async () => {
     try {
