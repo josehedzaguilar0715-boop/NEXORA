@@ -33,7 +33,17 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
 }
 
 interface Held { id: string; at: string; cart: Line[]; discount: { amount: number; code: string } | null; customer: Customer | null; staffId: string }
-type Modal_ = null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product; qty?: number } | { kind: 'libre' } | { kind: 'cobro' } | { kind: 'fiado' } | { kind: 'ticket'; text: string; change?: number | null; provisional: boolean } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' } | { kind: 'espera' } | { kind: 'cliente' } | { kind: 'cancelar' }
+export interface Loyalty { unit: string; earned: number; balance: number; ready: string[]; next: { name: string; cost: number } | null }
+/** «Ganó 1 sello · lleva 7 · le faltan 3 para Corte gratis». */
+export function loyaltyText(l: Loyalty): string {
+  const u = (n: number) => `${n} ${l.unit === 'sellos' ? (n === 1 ? 'sello' : 'sellos') : n === 1 ? 'punto' : 'puntos'}`
+  const parts = [l.earned > 0 ? `Ganó ${u(l.earned)}` : `Hoy ya no suma ${l.unit} (llegó al tope del día)`, `lleva ${u(l.balance)}`]
+  if (l.ready.length) parts.push(`¡ya puede canjear: ${l.ready.join(', ')}!`)
+  else if (l.next) parts.push(`le faltan ${l.next.cost - l.balance} para ${l.next.name}`)
+  return parts.join(' · ')
+}
+
+type Modal_ = null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product; qty?: number } | { kind: 'libre' } | { kind: 'cobro' } | { kind: 'fiado' } | { kind: 'ticket'; text: string; change?: number | null; provisional: boolean; loyalty?: Loyalty | null } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' } | { kind: 'espera' } | { kind: 'cliente' } | { kind: 'cancelar' }
 
 /** Atajos de teclado de la caja (se muestran en cada botón). */
 const KEYS = { buscar: 'F2', cliente: 'F3', descuento: 'F4', espera: 'F6', mov: 'F7', libre: 'F8', ventas: 'F9', cobrar: 'F10' } as const
@@ -81,7 +91,7 @@ export function Caja({ me }: { me: Me }) {
       const svLive = sv.services.filter((x) => x.active && x.category !== 'boleto')
       setServices(svLive)
       cache.set('services', svLive)
-      if (can(me, 'customers_credit')) {
+      if (can(me, 'customers_credit') || can(me, 'sell')) {
         const c = await api<{ customers: Customer[] }>('GET', '/customers')
         setCustomers(c.customers)
         cache.set('customers', c.customers)
@@ -192,9 +202,11 @@ export function Caja({ me }: { me: Me }) {
     const needsCode = !!discount || !!extra.authCode
     await flush()
     let sale: any = null
+    let loyalty: Loyalty | null = null
     if (outbox.pending() === 0) {
       try {
-        sale = (await api('POST', '/sales', body, { 'idempotency-key': id })).sale
+        const r = await api<any>('POST', '/sales', body, { 'idempotency-key': id })
+        sale = r.sale; loyalty = r.loyalty ?? null
       } catch (e) {
         const err = e as ApiError
         if (err.code === 'codigo_requerido' && method === 'fiado') {
@@ -217,7 +229,7 @@ export function Caja({ me }: { me: Me }) {
         `TOTAL ${mxn(total)}`, `Pago: ${method}`, `Atendió: ${me.user.name}`].filter(Boolean).join('\n')
     }
     const cashPart = total - (extra.otherPayments ?? []).reduce((a, p) => a + p.amount, 0)
-    setModal({ kind: 'ticket', text, change: extra.cashReceived !== undefined ? (sale?.change ?? extra.cashReceived - cashPart) : null, provisional: !sale })
+    setModal({ kind: 'ticket', text, change: extra.cashReceived !== undefined ? (sale?.change ?? extra.cashReceived - cashPart) : null, provisional: !sale, loyalty })
     reset()
   }
 
@@ -378,6 +390,7 @@ export function Caja({ me }: { me: Me }) {
           <h2>Venta cobrada</h2>
           {modal.change != null && <div className="total">Cambio: {mxn(modal.change)}</div>}
           {modal.provisional && <p className="muted">Sin internet: la venta se guardó en este equipo y se enviará sola.</p>}
+          {modal.loyalty && <p className="okmsg">{loyaltyText(modal.loyalty)}</p>}
           <pre style={{ fontSize: 14, background: 'var(--bg)', padding: 10, borderRadius: 8, overflowX: 'auto' }}>{modal.text}</pre>
           <div className="ticket">{modal.text}</div>
           <div className="row">

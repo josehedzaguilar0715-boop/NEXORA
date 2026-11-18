@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { authorize } from './authcode.js'
-import { earnForSale, moduleOn, reverseSalePoints } from './common.js'
+import { earnForSale, loyaltyStatus, moduleOn, reverseSalePoints } from './common.js'
 import { activePromotions, bestPromotions } from './promotions.js'
 import { body, hasPerm, parse, requirePerm, type C, type Deps, type Env, type UserRow } from './context.js'
 import { consume, currentPrice, getProduct, priceFor, restore, toMilli, type MoveCtx } from './inventory.js'
@@ -244,6 +244,7 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
     priceAuth = authorize(deps, u, d.authCode, 'change_prices', 'cambio de precio en venta').id
   }
   let creditAuth: string | null = null
+  let earned = 0
   if (d.paymentMethod === 'fiado') {
     if (!d.customerId) throw bad('Para fiar elige al cliente.')
     if (!hasPerm(u, 'customers_credit')) throw forbidden('No tienes permiso para fiar.')
@@ -272,7 +273,7 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
     }
     for (const p of payments) db.prepare('INSERT INTO sale_payments (id, sale_id, method, amount) VALUES (?,?,?,?)').run(newId(), d.id, p.method, p.amount)
     for (const p of promo.applied) db.prepare('INSERT INTO sale_promotions (sale_id, promotion_id, amount) VALUES (?,?,?)').run(d.id, p.id, p.amount)
-    if (d.customerId) earnForSale(db, now, u.business_id, u.id, d.customerId, d.id, total)
+    if (d.customerId) earned = earnForSale(db, now, u.business_id, u.id, d.customerId, d.id, total)
     if (d.paymentMethod === 'fiado') {
       db.prepare("INSERT INTO credit_ledger (id, business_id, customer_id, delta, kind, sale_id, shift_id, created_by, created_at) VALUES (?,?,?,?,'cargo',?,?,?,?)").run(newId(), u.business_id, d.customerId!, total, d.id, shift.id, u.id, createdAt)
       if (creditAuth) audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fiado.sobre_limite', entity: 'customer', entityId: d.customerId!, newValue: { total }, authorizedBy: creditAuth })
@@ -281,7 +282,7 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
     for (const h of saleHooks) h({ deps, user: u, saleId: d.id, branchId: shift.branch_id, shiftId: shift.id, input: d, lines, total })
   })()
   const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(d.id) as SaleRow
-  return { duplicate: false, sale: saleView(deps, sale) }
+  return { duplicate: false, sale: saleView(deps, sale), ...(d.customerId ? { loyalty: loyaltyStatus(db, u.business_id, d.customerId, earned) } : {}) }
 }
 
 function loadSale(c: C): SaleRow {

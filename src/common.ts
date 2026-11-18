@@ -49,11 +49,16 @@ common.put('/modules', ownerOnly, async (c) => {
 
 // ---------- Clientes finales ----------
 
-common.get('/customers', requirePerm('customers_credit'), (c) => {
+/** Quien solo vende (p. ej. el barbero) puede elegir al cliente en la caja para sus sellos, pero sin ver teléfono ni notas. */
+common.get('/customers', requirePerm('sell', 'customers_credit'), (c) => {
+  const u = c.get('session').user
   const q = `%${c.req.query('q') ?? ''}%`
+  if (!hasPerm(u, 'customers_credit')) {
+    return c.json({ customers: c.get('deps').db.prepare('SELECT id, name, loyalty_enrolled AS loyaltyEnrolled, active FROM customers WHERE business_id = ? AND active = 1 AND name LIKE ? ORDER BY name LIMIT 200').all(u.business_id, q) })
+  }
   const rows = c.get('deps').db
     .prepare('SELECT id, name, phone, notes, code, loyalty_enrolled AS loyaltyEnrolled, active FROM customers WHERE business_id = ? AND (name LIKE ? OR phone LIKE ?) ORDER BY name LIMIT 200')
-    .all(c.get('session').user.business_id, q, q)
+    .all(u.business_id, q, q)
   return c.json({ customers: rows })
 })
 
@@ -129,6 +134,22 @@ publicCommon.get('/public/qr/:code', async (c) => {
   if (!cu) throw notFound()
   const svg = await QRCode.toString(cu.code, { type: 'svg', margin: 2, width: 320 })
   return c.body(svg, 200, { 'content-type': 'image/svg+xml', 'cache-control': 'private, max-age=3600' })
+})
+
+/** Tarjeta de sellos/puntos que el cliente ve en su teléfono con su código (sin iniciar sesión). Solo lectura. */
+publicCommon.get('/public/loyalty/:code', (c) => {
+  const { db } = c.get('deps')
+  const cu = db.prepare('SELECT c.id, c.name, c.business_id, c.loyalty_enrolled, b.name AS business, b.logo_url FROM customers c JOIN businesses b ON b.id = c.business_id WHERE c.code = ? AND c.active = 1').get(c.req.param('code').toUpperCase()) as { id: string; name: string; business_id: string; loyalty_enrolled: number; business: string; logo_url: string | null } | undefined
+  if (!cu) throw notFound('No encontramos esa tarjeta.')
+  const p = moduleOn(db, cu.business_id, 'fidelidad') ? program(db, cu.business_id) : undefined
+  if (!p || !eligible(p, cu)) throw notFound('Este negocio no tiene tarjeta de sellos para ti.')
+  const history = db.prepare("SELECT l.delta, l.reason, l.created_at AS at, r.name AS reward FROM loyalty_ledger l LEFT JOIN loyalty_rewards r ON r.id = l.reward_id WHERE l.customer_id = ? ORDER BY l.created_at DESC, l.rowid DESC LIMIT 20").all(cu.id)
+  return c.json({
+    business: cu.business, logoUrl: cu.logo_url, name: cu.name.split(' ')[0], unit: p.unit, earnBy: p.earn_by, earnPoints: p.earn_points, dailyCap: p.daily_cap,
+    balance: balanceOf(db, cu.id),
+    rewards: db.prepare('SELECT name, cost FROM loyalty_rewards WHERE business_id = ? AND active = 1 ORDER BY cost').all(cu.business_id),
+    history,
+  })
 })
 
 // ---------- Membresías ----------
@@ -308,7 +329,17 @@ common.post('/promotions/evaluate', requireModule('promociones'), async (c) => {
 
 // ---------- Fidelidad ----------
 
-interface Program { unit: string; earn_by: 'monto' | 'visita'; earn_amount: number | null; earn_points: number; scope: 'todos' | 'por_persona' }
+interface Program { unit: string; earn_by: 'monto' | 'visita' | 'venta'; earn_amount: number | null; earn_points: number; scope: 'todos' | 'por_persona'; daily_cap: number | null }
+
+const balanceOf = (db: Db, customerId: string) => (db.prepare('SELECT COALESCE(SUM(delta),0) p FROM loyalty_ledger WHERE customer_id = ?').get(customerId) as { p: number }).p
+
+/** Respeta el tope de sellos/puntos por día (por cliente). Devuelve cuántos sí se pueden dar hoy. */
+function underCap(db: Db, now: Clock, p: Program, customerId: string, wanted: number): number {
+  if (!p.daily_cap) return wanted
+  const start = new Date(`${localDate(now())}T06:00:00.000Z`).toISOString()
+  const today = (db.prepare("SELECT COALESCE(SUM(delta),0) n FROM loyalty_ledger WHERE customer_id = ? AND reason IN ('venta','visita') AND created_at >= ?").get(customerId, start) as { n: number }).n
+  return Math.max(0, Math.min(wanted, p.daily_cap - Math.max(0, today)))
+}
 const program = (db: Db, businessId: string) => db.prepare('SELECT * FROM loyalty_program WHERE business_id = ?').get(businessId) as Program | undefined
 const eligible = (p: Program, cu: { loyalty_enrolled: number }) => p.scope === 'todos' || !!cu.loyalty_enrolled
 
@@ -316,8 +347,9 @@ function earnForVisit(db: Db, now: Clock, businessId: string, userId: string, cu
   if (!moduleOn(db, businessId, 'fidelidad')) return 0
   const p = program(db, businessId)
   if (!p || p.earn_by !== 'visita' || !eligible(p, cu)) return 0
-  db.prepare('INSERT INTO loyalty_ledger (id, business_id, customer_id, delta, reason, created_by, created_at) VALUES (?,?,?,?,?,?,?)').run(newId(), businessId, cu.id, p.earn_points, 'visita', userId, iso(now()))
-  return p.earn_points
+  const pts = underCap(db, now, p, cu.id, p.earn_points)
+  if (pts > 0) db.prepare('INSERT INTO loyalty_ledger (id, business_id, customer_id, delta, reason, created_by, created_at) VALUES (?,?,?,?,?,?,?)').run(newId(), businessId, cu.id, pts, 'visita', userId, iso(now()))
+  return pts
 }
 
 /** Puntos por monto al cobrar una venta con cliente. Se llama dentro de la transacción de la venta. */
@@ -325,10 +357,20 @@ export function earnForSale(db: Db, now: Clock, businessId: string, userId: stri
   if (!moduleOn(db, businessId, 'fidelidad')) return 0
   const p = program(db, businessId)
   const cu = db.prepare('SELECT id, loyalty_enrolled FROM customers WHERE id = ?').get(customerId) as { id: string; loyalty_enrolled: number }
-  if (!p || p.earn_by !== 'monto' || !p.earn_amount || !eligible(p, cu)) return 0
-  const pts = Math.floor(total / p.earn_amount) * p.earn_points
+  if (!p || p.earn_by === 'visita' || !eligible(p, cu)) return 0
+  if (p.earn_by === 'monto' && !p.earn_amount) return 0
+  const pts = underCap(db, now, p, customerId, p.earn_by === 'venta' ? (total > 0 ? p.earn_points : 0) : Math.floor(total / p.earn_amount!) * p.earn_points)
   if (pts > 0) db.prepare('INSERT INTO loyalty_ledger (id, business_id, customer_id, delta, reason, sale_id, created_by, created_at) VALUES (?,?,?,?,?,?,?,?)').run(newId(), businessId, customerId, pts, 'venta', saleId, userId, iso(now()))
   return pts
+}
+
+/** Lo que la caja le dice al cajero después de cobrar con cliente: cuántos sellos ganó, cuántos lleva y el premio más cercano. */
+export function loyaltyStatus(db: Db, businessId: string, customerId: string, earned: number) {
+  const p = moduleOn(db, businessId, 'fidelidad') ? program(db, businessId) : undefined
+  if (!p) return null
+  const balance = balanceOf(db, customerId)
+  const next = db.prepare('SELECT name, cost FROM loyalty_rewards WHERE business_id = ? AND active = 1 ORDER BY cost').all(businessId) as { name: string; cost: number }[]
+  return { unit: p.unit, earned, balance, ready: next.filter((r) => r.cost <= balance).map((r) => r.name), next: next.find((r) => r.cost > balance) ?? null }
 }
 
 /** Al cancelar una venta se revierten los puntos que dio (con un movimiento contrario, no borrando). */
@@ -340,22 +382,22 @@ export function reverseSalePoints(db: Db, now: Clock, businessId: string, userId
 common.get('/loyalty', requireModule('fidelidad'), (c) => {
   const { db } = c.get('deps')
   const b = c.get('session').user.business_id
-  return c.json({ program: program(db, b) ?? null, rewards: db.prepare('SELECT * FROM loyalty_rewards WHERE business_id = ? ORDER BY cost').all(b) })
+  return c.json({ program: program(db, b) ?? null, rewards: db.prepare('SELECT * FROM loyalty_rewards WHERE business_id = ? ORDER BY active DESC, cost').all(b) })
 })
 
 common.put('/loyalty', requireModule('fidelidad'), ownerOnly, async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const d = parse(
-    z.object({ unit: z.enum(['puntos', 'sellos']), earnBy: z.enum(['monto', 'visita']), earnAmount: z.number().int().min(1).optional(), earnPoints: z.number().int().min(1), scope: z.enum(['todos', 'por_persona']) }),
+    z.object({ unit: z.enum(['puntos', 'sellos']), earnBy: z.enum(['monto', 'visita', 'venta']), earnAmount: z.number().int().min(1).optional(), earnPoints: z.number().int().min(1).max(100), scope: z.enum(['todos', 'por_persona']), dailyCap: z.number().int().min(1).max(100).nullable().optional() }),
     await body(c),
   )
   if (d.earnBy === 'monto' && !d.earnAmount) throw bad('Indica cada cuánto dinero se gana (earnAmount).')
   const old = program(db, u.business_id)
   db.prepare(
-    `INSERT INTO loyalty_program (business_id, unit, earn_by, earn_amount, earn_points, scope, updated_at) VALUES (?,?,?,?,?,?,?)
-     ON CONFLICT(business_id) DO UPDATE SET unit=excluded.unit, earn_by=excluded.earn_by, earn_amount=excluded.earn_amount, earn_points=excluded.earn_points, scope=excluded.scope, updated_at=excluded.updated_at`,
-  ).run(u.business_id, d.unit, d.earnBy, d.earnAmount ?? null, d.earnPoints, d.scope, iso(now()))
+    `INSERT INTO loyalty_program (business_id, unit, earn_by, earn_amount, earn_points, scope, daily_cap, updated_at) VALUES (?,?,?,?,?,?,?,?)
+     ON CONFLICT(business_id) DO UPDATE SET unit=excluded.unit, earn_by=excluded.earn_by, earn_amount=excluded.earn_amount, earn_points=excluded.earn_points, scope=excluded.scope, daily_cap=excluded.daily_cap, updated_at=excluded.updated_at`,
+  ).run(u.business_id, d.unit, d.earnBy, d.earnBy === 'monto' ? d.earnAmount ?? null : null, d.earnPoints, d.scope, d.dailyCap ?? null, iso(now()))
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fidelidad.programa', oldValue: old, newValue: d })
   return c.json({ ok: true })
 })
@@ -368,6 +410,17 @@ common.post('/loyalty/rewards', requireModule('fidelidad'), ownerOnly, async (c)
   db.prepare('INSERT INTO loyalty_rewards (id, business_id, name, cost, created_at) VALUES (?,?,?,?,?)').run(id, u.business_id, d.name, d.cost, iso(now()))
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fidelidad.premio_alta', entity: 'loyalty_reward', entityId: id, newValue: d })
   return c.json({ id }, 201)
+})
+
+common.patch('/loyalty/rewards/:id', requireModule('fidelidad'), ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const r = db.prepare('SELECT * FROM loyalty_rewards WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; name: string; cost: number; active: number } | undefined
+  if (!r) throw notFound('No se encontró ese premio.')
+  const d = parse(z.object({ name: z.string().trim().min(2).max(100).optional(), cost: z.number().int().min(1).optional(), active: z.boolean().optional() }), await body(c))
+  db.prepare('UPDATE loyalty_rewards SET name = ?, cost = ?, active = ? WHERE id = ?').run(d.name ?? r.name, d.cost ?? r.cost, d.active === undefined ? r.active : d.active ? 1 : 0, r.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fidelidad.premio_cambio', entity: 'loyalty_reward', entityId: r.id, oldValue: { name: r.name, cost: r.cost, active: !!r.active }, newValue: d })
+  return c.json({ ok: true })
 })
 
 common.post('/customers/:id/redeem', requireModule('fidelidad'), requirePerm('sell'), async (c) => {

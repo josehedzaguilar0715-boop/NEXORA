@@ -37,17 +37,14 @@ export function Lealtad(_: { me: Me }) {
   const [mods, setMods] = useState<string[]>([])
   const [plans, setPlans] = useState<any[]>([])
   const [promos, setPromos] = useState<any[]>([])
-  const [loyal, setLoyal] = useState<any>(null)
   const [p, setP] = useState({ name: '', kind: 'periodo', usesPerPeriod: '4', period: 'mes', validityDays: '90', price: '' })
   const [pr, setPr] = useState({ name: '', kind: 'porcentaje', value: '', from: '', to: '', minQuantity: '', combinable: false })
-  const [lp, setLp] = useState({ unit: 'puntos', earnBy: 'monto', earnAmount: '10', earnPoints: '1', scope: 'todos', reward: '', cost: '' })
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = async () => {
     const m = (await api<any>('GET', '/modules')).active as string[]
     setMods(m)
     if (m.includes('membresias')) setPlans((await api<any>('GET', '/membership-plans')).plans)
     if (m.includes('promociones')) setPromos((await api<any>('GET', '/promotions')).promotions)
-    if (m.includes('fidelidad')) setLoyal(await api('GET', '/loyalty'))
   }
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
   const run = (fn: () => Promise<unknown>, ok = 'Guardado.') => async () => { try { await fn(); setMsg({ ok }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }
@@ -81,20 +78,68 @@ export function Lealtad(_: { me: Me }) {
           <p><button className="primary" disabled={!pr.name || !pr.value || !pr.from || !pr.to} onClick={run(() => api('POST', '/promotions', { name: pr.name, kind: pr.kind, value: pr.kind === 'porcentaje' ? Math.round(Number(pr.value) * 100) : toCents(pr.value), startsAt: new Date(`${pr.from}T00:00:00-06:00`).toISOString(), endsAt: new Date(`${pr.to}T23:59:59-06:00`).toISOString(), appliesTo: { all: true }, minQuantity: Number(pr.minQuantity) || 0, combinable: pr.combinable }))}>Agregar</button></p>
         </section>
       )}
-      {mods.includes('fidelidad') && (
-        <section className="card">
-          <h2>Puntos o sellos</h2>
-          <div className="row"><label>Se acumulan<select value={lp.unit} onChange={(e) => setLp({ ...lp, unit: e.target.value })}><option value="puntos">Puntos</option><option value="sellos">Sellos</option></select></label>
-            <label>Por<select value={lp.earnBy} onChange={(e) => setLp({ ...lp, earnBy: e.target.value })}><option value="monto">Monto de compra</option><option value="visita">Visita</option></select></label></div>
-          <div className="row">{lp.earnBy === 'monto' && <label>Cada $<input inputMode="decimal" value={lp.earnAmount} onChange={(e) => setLp({ ...lp, earnAmount: e.target.value })} /></label>}<label>Da<input inputMode="numeric" value={lp.earnPoints} onChange={(e) => setLp({ ...lp, earnPoints: e.target.value })} /></label>
-            <label>Para<select value={lp.scope} onChange={(e) => setLp({ ...lp, scope: e.target.value })}><option value="todos">Todos los clientes</option><option value="por_persona">Solo inscritos</option></select></label></div>
-          <p><button className="primary" onClick={run(() => api('PUT', '/loyalty', { unit: lp.unit, earnBy: lp.earnBy, earnAmount: lp.earnBy === 'monto' ? toCents(lp.earnAmount) : undefined, earnPoints: Number(lp.earnPoints) || 1, scope: lp.scope }))}>Guardar programa</button></p>
-          <h3>Premios</h3>
-          <div className="table-wrap"><table className="list"><tbody>{loyal?.rewards.map((r: any) => <tr key={r.id}><td>{r.name}</td><td className="num">{r.cost}</td></tr>)}</tbody></table></div>
-          <div className="row"><input aria-label="Premio" placeholder="Premio" value={lp.reward} onChange={(e) => setLp({ ...lp, reward: e.target.value })} /><input aria-label="Cuesta" placeholder="Cuesta" inputMode="numeric" value={lp.cost} onChange={(e) => setLp({ ...lp, cost: e.target.value })} /><button onClick={run(() => api('POST', '/loyalty/rewards', { name: lp.reward, cost: Number(lp.cost) }))}>Agregar</button></div>
-        </section>
-      )}
+      {mods.includes('fidelidad') && <Fidelidad />}
       {(msg.err || msg.ok) && <p className={msg.err ? 'error' : 'okmsg'}>{msg.err ?? msg.ok}</p>}
     </div>
+  )
+}
+
+const EARN: Record<string, string> = { venta: 'Cada cobro', visita: 'Cada visita (QR)', monto: 'Por monto' }
+
+/** Tarjeta de sellos o puntos: cómo se ganan, tope por día y premios. El cliente la ve en su teléfono. */
+function Fidelidad() {
+  const [lp, setLp] = useState({ unit: 'sellos', earnBy: 'venta', earnAmount: '100', earnPoints: '1', scope: 'todos', dailyCap: '' })
+  const [rewards, setRewards] = useState<any[]>([])
+  const [nr, setNr] = useState({ id: '', name: '', cost: '' })
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  const load = async () => {
+    const r = await api<any>('GET', '/loyalty')
+    setRewards(r.rewards)
+    const p = r.program
+    if (p) setLp({ unit: p.unit, earnBy: p.earn_by, earnAmount: p.earn_amount ? String(p.earn_amount / 100) : '100', earnPoints: String(p.earn_points), scope: p.scope, dailyCap: p.daily_cap ? String(p.daily_cap) : '' })
+  }
+  useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
+  const run = (fn: () => Promise<unknown>, ok: string) => async () => { try { await fn(); setMsg({ ok }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }
+  const word = lp.unit === 'sellos' ? 'sellos' : 'puntos'
+  const Word = lp.unit === 'sellos' ? 'Sellos' : 'Puntos'
+  return (
+    <section className="card">
+      <h2>Tarjeta de {word}</h2>
+      <p className="muted small">Se suman solos al cobrar con el cliente seleccionado. El cliente ve su tarjeta en su teléfono (Clientes → su ficha → «Su QR»).</p>
+      <div className="row">
+        <label>Se juntan<select value={lp.unit} onChange={(e) => setLp({ ...lp, unit: e.target.value })}><option value="sellos">Sellos</option><option value="puntos">Puntos</option></select></label>
+        <label>Se ganan<select value={lp.earnBy} onChange={(e) => setLp({ ...lp, earnBy: e.target.value })}>{Object.entries(EARN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+      </div>
+      <div className="row">
+        {lp.earnBy === 'monto' && <label>Cada $<input inputMode="decimal" value={lp.earnAmount} onChange={(e) => setLp({ ...lp, earnAmount: e.target.value })} /></label>}
+        <label>{lp.earnBy === 'venta' ? `${Word} por cobro` : lp.earnBy === 'visita' ? `${Word} por visita` : `${Word} que da`}<input inputMode="numeric" value={lp.earnPoints} onChange={(e) => setLp({ ...lp, earnPoints: e.target.value })} /></label>
+        <label>Máximo al día por cliente<input inputMode="numeric" value={lp.dailyCap} onChange={(e) => setLp({ ...lp, dailyCap: e.target.value })} placeholder="Sin límite" /></label>
+      </div>
+      <label>Para<select value={lp.scope} onChange={(e) => setLp({ ...lp, scope: e.target.value })}><option value="todos">Todos los clientes</option><option value="por_persona">Solo los inscritos</option></select></label>
+      <p><button className="primary" onClick={run(() => api('PUT', '/loyalty', { unit: lp.unit, earnBy: lp.earnBy, earnAmount: lp.earnBy === 'monto' ? toCents(lp.earnAmount) : undefined, earnPoints: Number(lp.earnPoints) || 1, scope: lp.scope, dailyCap: Number(lp.dailyCap) > 0 ? Number(lp.dailyCap) : null }), 'Tarjeta guardada.')}>Guardar tarjeta</button></p>
+      <h3>Premios</h3>
+      <p className="muted small">Tú decides cuántos {word} debe juntar el cliente para cada premio. Toca uno para cambiarlo.</p>
+      <div className="table-wrap"><table className="list"><tbody>
+        {rewards.map((r) => (
+          <tr key={r.id} className="clickable" style={{ opacity: r.active ? 1 : 0.5 }} onClick={() => setNr({ id: r.id, name: r.name, cost: String(r.cost) })}>
+            <td>{r.name}{!r.active && <small className="muted"> · quitado</small>}</td><td className="num"><b>{r.cost}</b> {word}</td>
+          </tr>
+        ))}
+        {rewards.length === 0 && <tr><td className="muted">Ej. «Corte gratis» con 10 {word}.</td></tr>}
+      </tbody></table></div>
+      <div className="row">
+        <label>Premio<input value={nr.name} onChange={(e) => setNr({ ...nr, name: e.target.value })} placeholder="Corte gratis" /></label>
+        <label>{Word} que debe juntar<input inputMode="numeric" value={nr.cost} onChange={(e) => setNr({ ...nr, cost: e.target.value })} placeholder="10" /></label>
+      </div>
+      <p className="row">
+        {nr.id && <button onClick={() => setNr({ id: '', name: '', cost: '' })}>Cancelar</button>}
+        {nr.id && <button onClick={run(async () => { const r = rewards.find((x) => x.id === nr.id); await api('PATCH', `/loyalty/rewards/${nr.id}`, { active: !r?.active }); setNr({ id: '', name: '', cost: '' }) }, 'Listo.')}>{rewards.find((x) => x.id === nr.id)?.active ? 'Quitar premio' : 'Volver a activar'}</button>}
+        <button className="primary" disabled={nr.name.trim().length < 2 || !(Number(nr.cost) > 0)} onClick={run(async () => {
+          if (nr.id) await api('PATCH', `/loyalty/rewards/${nr.id}`, { name: nr.name, cost: Number(nr.cost) }); else await api('POST', '/loyalty/rewards', { name: nr.name, cost: Number(nr.cost) })
+          setNr({ id: '', name: '', cost: '' })
+        }, nr.id ? 'Premio guardado.' : 'Premio agregado.')}>{nr.id ? 'Guardar premio' : 'Agregar premio'}</button>
+      </p>
+      {(msg.err || msg.ok) && <p className={msg.err ? 'error' : 'okmsg'}>{msg.err ?? msg.ok}</p>}
+    </section>
   )
 }

@@ -91,8 +91,9 @@ export async function body(c: { req: { json: () => Promise<unknown> } }): Promis
   }
 }
 
-export const requirePerm = (p: Permission): MiddlewareHandler<Env> => async (c, next) => {
-  if (!hasPerm(c.get('session').user, p)) throw forbidden()
+/** Pide al menos uno de los permisos indicados. */
+export const requirePerm = (...ps: Permission[]): MiddlewareHandler<Env> => async (c, next) => {
+  if (!ps.some((p) => hasPerm(c.get('session').user, p))) throw forbidden()
   await next()
 }
 

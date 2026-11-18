@@ -44,13 +44,14 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.25); }
 label { display: block; font-weight: 600; margin: 12px 0 6px; color: var(--ink); }
 label > input, label > select, label > textarea { margin-top: 6px; font-weight: 400; }
-button {
+button, a.button {
   min-height: 56px; padding: 10px 18px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--input); cursor: pointer; font-weight: 600;
   transition: transform 0.08s ease, border-color 0.15s ease, background 0.15s ease;
 }
 button:hover:not(:disabled) { border-color: rgba(34, 211, 238, 0.5); }
 button:active:not(:disabled) { transform: scale(0.98); }
-button.primary { background: var(--gradient); color: #fff; border-color: transparent; box-shadow: var(--glow); }
+button.primary, a.button.primary { background: var(--gradient); color: #fff; border-color: transparent; box-shadow: var(--glow); }
+a.button { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: var(--ink); }
 button.danger { background: var(--danger); color: #1b0606; border-color: var(--danger); }
 button.big { min-height: 80px; font-size: 1.2rem; }
 button:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
@@ -364,3 +365,16 @@ a { overflow-wrap: anywhere; }
 pre.report { font: 13px/1.35 ui-monospace, Menlo, Consolas, monospace; background: var(--bg); padding: 12px; border-radius: 10px; overflow-x: auto; white-space: pre; }
 .tag.bad { color: var(--danger); border-color: rgba(248, 113, 113, 0.5); background: rgba(248, 113, 113, 0.1); }
 .pill.ok { color: var(--ok); border-color: rgba(52, 211, 153, 0.5); background: rgba(52, 211, 153, 0.1); }
+
+/* Tarjeta de sellos pública (teléfono del cliente) */
+.stamp-page { padding: 0 16px; }
+.stamp-page h1 { margin-bottom: 4px; }
+.stamp-logo { width: 64px; height: 64px; object-fit: contain; border-radius: 14px; }
+.stamp-card { text-align: center; }
+.stamp-total { font-size: 1.1rem; margin-bottom: 12px; }
+.stamp-total b { font-size: 3rem; font-weight: 800; display: block; line-height: 1.1; background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.stamp-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 6px auto 14px; max-width: 340px; }
+.stamp { aspect-ratio: 1; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; color: var(--muted); font-size: 0.85rem; }
+.stamp.on { border: 0; background: var(--gradient); color: #fff; font-size: 1.3rem; font-weight: 800; box-shadow: 0 4px 14px rgba(34, 211, 238, 0.25); }
+.stamp-reward { margin-bottom: 12px; }
+.stamp-reward .info-row { margin-bottom: 6px; }

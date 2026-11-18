@@ -1350,6 +1350,25 @@ const MIGRATIONS: Migration[] = [
   CREATE TRIGGER layaways_no_delete BEFORE DELETE ON layaways BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
   CREATE TRIGGER layaway_payments_no_delete BEFORE DELETE ON layaway_payments BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
   `,
+  // Fidelidad: sellos por cada cobro con cliente y tope de sellos por día.
+  {
+    fkOff: true,
+    sql: `
+  CREATE TABLE loyalty_program_new (
+    business_id TEXT PRIMARY KEY REFERENCES businesses(id),
+    unit TEXT NOT NULL CHECK (unit IN ('puntos','sellos')),
+    earn_by TEXT NOT NULL CHECK (earn_by IN ('monto','visita','venta')),
+    earn_amount INTEGER,
+    earn_points INTEGER NOT NULL CHECK (earn_points > 0),
+    scope TEXT NOT NULL CHECK (scope IN ('todos','por_persona')),
+    daily_cap INTEGER CHECK (daily_cap IS NULL OR daily_cap > 0),
+    updated_at TEXT NOT NULL
+  );
+  INSERT INTO loyalty_program_new (business_id, unit, earn_by, earn_amount, earn_points, scope, updated_at) SELECT business_id, unit, earn_by, earn_amount, earn_points, scope, updated_at FROM loyalty_program;
+  DROP TABLE loyalty_program;
+  ALTER TABLE loyalty_program_new RENAME TO loyalty_program;
+  `,
+  },
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

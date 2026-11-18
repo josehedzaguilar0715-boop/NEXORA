@@ -8,6 +8,7 @@ import { Devoluciones } from './screens/Devoluciones'
 import { Encargos } from './screens/Encargos'
 import { Agenda } from './screens/Agenda'
 import { Entradas } from './screens/Entradas'
+import { MiTarjeta } from './screens/MiTarjeta'
 import { Acceso, MisBoletos, Taquilla, TiendaBoletos } from './screens/Taquilla'
 import { Cocina, Mesas, Pedidos } from './screens/Mesas'
 import { MenuDia } from './screens/MenuDia'
@@ -126,6 +127,7 @@ export function App() {
   if (path.startsWith('/reservar/')) return <Reservar code={path.split('/')[2] ?? ''} />
   if (path.startsWith('/cita/')) return <EstadoCita token={path.split('/')[2] ?? ''} />
   if (path.startsWith('/boletos/')) return <TiendaBoletos code={path.split('/')[2] ?? ''} />
+  if (path.startsWith('/tarjeta/')) return <MiTarjeta code={path.split('/')[2] ?? ''} />
   if (path.startsWith('/mis-boletos/')) return <MisBoletos token={path.split('/')[2] ?? ''} />
   return (
     <>

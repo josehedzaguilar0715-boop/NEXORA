@@ -1,3 +1,4 @@
+import { loyaltyText, type Loyalty } from './Caja'
 import { useEffect, useMemo, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import { can, type Me } from '../App'
@@ -64,7 +65,7 @@ export function Agenda({ me }: { me: Me }) {
       {me.modules?.includes('recordatorios') && <Retoques />}
       {staff.length === 0 && <p className="card">Nadie está en la agenda todavía. En <a href="#/usuarios">Personal</a> abre a cada persona → «Horario de agenda» y marca «Atiende citas». Los servicios se dan de alta en <a href="#/configurar">Configurar negocio</a>.</p>}
       {form && <NuevaCita walkIn={form.walkIn} date={date} staff={staff} services={services} onClose={() => setForm(null)} onSaved={() => { setForm(null); setMsg({ ok: 'Cita guardada.' }); void load() }} />}
-      {checkout && <Cobro appt={checkout} onClose={() => setCheckout(null)} onDone={(t) => { setCheckout(null); setMsg({ ok: `Cobrado: ${mxn(t)}.` }); void load() }} />}
+      {checkout && <Cobro appt={checkout} onClose={() => setCheckout(null)} onDone={(t, l) => { setCheckout(null); setMsg({ ok: `Cobrado: ${mxn(t)}.${l ? ` ${loyaltyText(l)}.` : ''}` }); void load() }} />}
     </div>
   )
 }
@@ -112,7 +113,7 @@ function NuevaCita({ walkIn, date, staff, services, onClose, onSaved }: { walkIn
   )
 }
 
-function Cobro({ appt, onClose, onDone }: { appt: any; onClose: () => void; onDone: (total: number) => void }) {
+function Cobro({ appt, onClose, onDone }: { appt: any; onClose: () => void; onDone: (total: number, loyalty?: Loyalty | null) => void }) {
   const [method, setMethod] = useState('efectivo')
   const [tip, setTip] = useState('')
   const [err, setErr] = useState('')
@@ -120,7 +121,7 @@ function Cobro({ appt, onClose, onDone }: { appt: any; onClose: () => void; onDo
   const pay = async () => {
     try {
       const r = await api<any>('POST', `/appointments/${appt.id}/checkout`, { id: crypto.randomUUID(), paymentMethod: method, ...(toCents(tip) > 0 ? { tips: [{ staffId: appt.staffId, amount: toCents(tip) }] } : {}) })
-      onDone(r.sale.total)
+      onDone(r.sale.total, r.loyalty)
     } catch (e) { setErr((e as Error).message) }
   }
   return (

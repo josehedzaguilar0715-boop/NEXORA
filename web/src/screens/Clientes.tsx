@@ -96,6 +96,16 @@ function Cliente({ me, c, fiado, onChanged }: { me: Me; c: any; fiado: boolean; 
           <p className="muted" style={{ flex: 1 }}>Su código: <b style={{ color: 'var(--ink)' }}>{c.code}</b><br />Se escanea en «Escanear QR» para registrar su visita, usar su membresía o sumar puntos.<br /><a href={`/api/public/qr/${c.code}.svg`} download={`qr-${c.name}.svg`}>Descargar QR</a></p>
         </div>
       )}
+      {tab === 'qr' && (
+        <div className="danger-zone">
+          <b>Su tarjeta de sellos en su teléfono</b>
+          <p className="muted small">Mándale este link: ahí ve sus sellos, cuántos le faltan y sus premios. Solo puede verlos, no cambiarlos.</p>
+          <p className="row">
+            <a className="button" href={`/tarjeta/${c.code}`} target="_blank" rel="noreferrer">Abrir tarjeta</a>
+            <a className="button primary" href={`https://wa.me/${c.phone ? '52' + String(c.phone).replace(/\D/g, '').slice(-10) : ''}?text=${encodeURIComponent(`Hola ${c.name.split(' ')[0]}, aquí puedes ver tus sellos: ${location.origin}/tarjeta/${c.code}`)}`} target="_blank" rel="noreferrer">Enviar por WhatsApp</a>
+          </p>
+        </div>
+      )}
     </section>
   )
 }
