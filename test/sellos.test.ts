@@ -76,4 +76,23 @@ describe('tarjeta de sellos (barbería)', () => {
     expect(r.json.customers[0]).toEqual({ id: expect.any(String), name: 'Luis', loyaltyEnrolled: 0, active: 1 })
     expect((await s.call('POST', '/customers', { token: b.token, body: { name: 'Otro' } })).status).toBe(403)
   })
+
+  it('dar sellos a mano: el dueño y a quien él le dé el permiso, respetando el tope del día', async () => {
+    const { s, T, o } = await negocioListo()
+    s.setGiro('barberia')
+    await s.call('PUT', '/modules', { token: T, body: { active: ['fidelidad'] } })
+    await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'todos', dailyCap: 3 } })
+    const cli = (await s.call('POST', '/customers', { token: T, body: { name: 'Mario' } })).json.customer
+    const b = await s.createStaff(T, o.business.code, 'barbero2', 'barbero')
+    // Sin permiso, el barbero no puede.
+    expect((await s.call('POST', `/customers/${cli.id}/stamps`, { token: b.token, body: { quantity: 1 } })).status).toBe(403)
+    // El dueño sí.
+    expect((await s.call('POST', `/customers/${cli.id}/stamps`, { token: T, body: { quantity: 2 } })).json.loyalty).toMatchObject({ earned: 2, balance: 2 })
+    // El dueño le da el permiso al barbero.
+    const perms = (await s.call('GET', '/users', { token: T })).json.users.find((x: any) => x.id === b.id).permissions
+    expect((await s.call('PATCH', `/users/${b.id}`, { token: T, body: { permissions: [...perms, 'give_stamps'] } })).status).toBe(200)
+    // Le pide 2 pero el tope del día es 3: solo da 1.
+    expect((await s.call('POST', `/customers/${cli.id}/stamps`, { token: b.token, body: { quantity: 2 } })).json.loyalty).toMatchObject({ earned: 1, balance: 3 })
+    expect((await s.call('GET', `/public/loyalty/${cli.code}`)).json.history[0]).toMatchObject({ reason: 'manual', delta: 1 })
+  })
 })

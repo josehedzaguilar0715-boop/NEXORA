@@ -333,6 +333,11 @@ export function Caja({ me }: { me: Me }) {
       <aside className="pos-side card">
         <div className="pos-chips">
           <button className="chip" onClick={() => setModal({ kind: 'cliente' })}>👤 {customer ? customer.name : 'Público en general'} <K k={KEYS.cliente} /></button>
+          {customer && can(me, 'give_stamps') && me.modules?.includes('fidelidad') && <button className="chip" onClick={async () => {
+            const n = Number(prompt(`¿Cuántos sellos le das a ${customer.name}?`, '1'))
+            if (!(n > 0)) return
+            try { const r = await api<{ loyalty: Loyalty | null }>('POST', `/customers/${customer.id}/stamps`, { quantity: Math.floor(n) }); setMsg(r.loyalty ? loyaltyText(r.loyalty) : 'Listo.') } catch (e) { setMsg((e as Error).message) }
+          }}>⭐ Dar sello</button>}
           {held.length > 0 && <button className="chip" onClick={() => setModal({ kind: 'espera' })}>⏸ En espera: {held.length}</button>}
         </div>
         {withStaff && <label>¿Quién atendió?<select value={staffId} onChange={(e) => setStaffId(e.target.value)}><option value="">— Nadie (sin comisión) —</option>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>}

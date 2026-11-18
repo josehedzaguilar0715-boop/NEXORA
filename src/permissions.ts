@@ -11,6 +11,7 @@ export const PERMISSIONS = {
   configure_catalog: 'Configurar productos o menú',
   customers_credit: 'Clientes y fiado',
   attendance: 'Asistencia',
+  give_stamps: 'Dar sellos o puntos a mano',
 } as const
 
 export type Permission = keyof typeof PERMISSIONS

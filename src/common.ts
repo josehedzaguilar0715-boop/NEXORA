@@ -337,7 +337,7 @@ const balanceOf = (db: Db, customerId: string) => (db.prepare('SELECT COALESCE(S
 function underCap(db: Db, now: Clock, p: Program, customerId: string, wanted: number): number {
   if (!p.daily_cap) return wanted
   const start = new Date(`${localDate(now())}T06:00:00.000Z`).toISOString()
-  const today = (db.prepare("SELECT COALESCE(SUM(delta),0) n FROM loyalty_ledger WHERE customer_id = ? AND reason IN ('venta','visita') AND created_at >= ?").get(customerId, start) as { n: number }).n
+  const today = (db.prepare("SELECT COALESCE(SUM(delta),0) n FROM loyalty_ledger WHERE customer_id = ? AND reason IN ('venta','visita','manual') AND created_at >= ?").get(customerId, start) as { n: number }).n
   return Math.max(0, Math.min(wanted, p.daily_cap - Math.max(0, today)))
 }
 const program = (db: Db, businessId: string) => db.prepare('SELECT * FROM loyalty_program WHERE business_id = ?').get(businessId) as Program | undefined
@@ -421,6 +421,22 @@ common.patch('/loyalty/rewards/:id', requireModule('fidelidad'), ownerOnly, asyn
   db.prepare('UPDATE loyalty_rewards SET name = ?, cost = ?, active = ? WHERE id = ?').run(d.name ?? r.name, d.cost ?? r.cost, d.active === undefined ? r.active : d.active ? 1 : 0, r.id)
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fidelidad.premio_cambio', entity: 'loyalty_reward', entityId: r.id, oldValue: { name: r.name, cost: r.cost, active: !!r.active }, newValue: d })
   return c.json({ ok: true })
+})
+
+/** Dar sellos o puntos a mano (el dueño, o a quien él le dé el permiso). Respeta el tope por día. */
+common.post('/customers/:id/stamps', requireModule('fidelidad'), requirePerm('give_stamps'), async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const cu = loadCustomer(c)
+  const d = parse(z.object({ quantity: z.number().int().min(1).max(50), reason: z.string().trim().max(200).optional() }), await body(c))
+  const p = program(db, u.business_id)
+  if (!p) throw bad('Primero configura la tarjeta de sellos en «Membresías y promos».')
+  const given = underCap(db, now, p, cu.id, d.quantity)
+  if (given > 0) {
+    db.prepare("INSERT INTO loyalty_ledger (id, business_id, customer_id, delta, reason, created_by, created_at) VALUES (?,?,?,?,'manual',?,?)").run(newId(), u.business_id, cu.id, given, u.id, iso(now()))
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fidelidad.sellos_a_mano', entity: 'customer', entityId: cu.id, newValue: { pedidos: d.quantity, dados: given }, reason: d.reason })
+  }
+  return c.json({ loyalty: loyaltyStatus(db, u.business_id, cu.id, given) })
 })
 
 common.post('/customers/:id/redeem', requireModule('fidelidad'), requirePerm('sell'), async (c) => {

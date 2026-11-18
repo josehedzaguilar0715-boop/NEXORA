@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
-import { FIADO_GIROS, hasGiro, type Me } from '../App'
+import { can, FIADO_GIROS, hasGiro, type Me } from '../App'
+import { loyaltyText } from './Caja'
 
 const KIND: Record<string, string> = { cargo: 'Compra fiada', abono: 'Abono', cancelacion: 'Cancelación' }
 const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta', fiado: 'Fiado' }
@@ -87,7 +88,7 @@ function Cliente({ me, c, fiado, onChanged }: { me: Me; c: any; fiado: boolean; 
       <nav className="subtabs">{tabs.map(([k, v]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{v}</button>)}</nav>
       {tab === 'cuenta' && <Cuenta me={me} c={c} onChanged={onChanged} />}
       {tab === 'membresias' && <Membresias c={c} />}
-      {tab === 'puntos' && <Puntos c={c} />}
+      {tab === 'puntos' && <Puntos me={me} c={c} />}
       {tab === 'compras' && <Compras c={c} />}
       {tab === 'datos' && <Datos me={me} c={c} onChanged={onChanged} />}
       {tab === 'qr' && (
@@ -186,7 +187,9 @@ function Membresias({ c }: { c: any }) {
   )
 }
 
-function Puntos({ c }: { c: any }) {
+function Puntos({ me, c }: { me: Me; c: any }) {
+  const canGive = can(me, 'give_stamps')
+  const [give, setGive] = useState('1')
   const [data, setData] = useState<any>(null)
   const [rewards, setRewards] = useState<any[]>([])
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
@@ -199,6 +202,13 @@ function Puntos({ c }: { c: any }) {
       <h3>Canjear</h3>
       <div className="chips">{rewards.map((r) => <button key={r.id} className="chip" disabled={data.balance < r.cost} onClick={async () => { try { const x = await api<any>('POST', `/customers/${c.id}/redeem`, { rewardId: r.id }); setMsg({ ok: `Canjeado: ${x.reward}.` }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }}>{r.name} · {r.cost}</button>)}</div>
       {rewards.length === 0 && <p className="muted small">Crea premios en «Membresías y promos».</p>}
+      {canGive && (<>
+        <h3>Dar a mano</h3>
+        <div className="row" style={{ alignItems: 'end' }}>
+          <label>Cuántos<input inputMode="numeric" value={give} onChange={(e) => setGive(e.target.value)} /></label>
+          <button className="primary" disabled={!(Number(give) > 0)} onClick={async () => { try { const x = await api<any>('POST', `/customers/${c.id}/stamps`, { quantity: Math.floor(Number(give)) }); setMsg({ ok: x.loyalty ? loyaltyText(x.loyalty) : 'Listo.' }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }}>Dar</button>
+        </div>
+      </>)}
       {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
     </div>
   )
