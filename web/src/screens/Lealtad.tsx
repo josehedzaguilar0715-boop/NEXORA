@@ -30,7 +30,7 @@ export function Escanear({ me }: { me: Me }) {
           {res.membership && <p>Membresía: quedan <b>{res.membership.remaining}</b> de {res.membership.usesPerPeriod} en este periodo.</p>}
           {res.loyaltyEarned ? <p>Ganó {res.loyaltyEarned} puntos/sellos.</p> : null}
           {res.loyalty && <p className={res.loyalty.earned > 0 ? 'okmsg' : 'error'} style={{ fontSize: '1.15rem' }}>{loyaltyText(res.loyalty)}</p>}
-          <p className="muted">Saldo de puntos: {res.loyaltyBalance}{res.lastVisit ? ` · última visita ${new Date(res.lastVisit).toLocaleString('es-MX')}` : ''}</p>
+          <p className="muted">Saldo de puntos: {res.loyaltyBalance}{res.lastVisit ? ` · última visita ${new Date(res.lastVisit).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })}` : ''}</p>
           {res.memberships.map((m: any) => <p key={m.id} className="muted">{m.name}: vence {m.endsAt.slice(0, 10)}, quedan {m.remaining}</p>)}
         </div>
       )}

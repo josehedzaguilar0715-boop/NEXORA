@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mxn } from '../api'
-import { FIADO_GIROS, hasGiro, screensFor, type Me } from '../App'
+import { FIADO_GIROS, hasGiro, screensFor, toneStyle, type Me } from '../App'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const day = (d: string) => new Date(`${d}T12:00:00-06:00`).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
@@ -45,7 +45,7 @@ export function Inicio({ me }: { me: Me }) {
           <h2>Ventas de la semana</h2>
           <svg className="chart" viewBox={`0 0 ${W} ${H + 30}`} role="img" aria-label="Ventas de los últimos 7 días">
             <defs>
-              <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#22D3EE" /><stop offset="1" stopColor="#8B5CF6" /></linearGradient>
+              <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#22D3EE" /><stop offset="1" stopColor="#0891B2" /></linearGradient>
             </defs>
             {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} x1={pad} x2={W - pad} y1={H - (H - 20) * f} y2={H - (H - 20) * f} stroke="#232A3A" strokeDasharray="4 6" />)}
             {days.map((d, i) => {
@@ -66,7 +66,7 @@ export function Inicio({ me }: { me: Me }) {
           <h2>Movimientos recientes</h2>
           <div className="table-wrap"><table className="list"><tbody>{moves.map((m, i) => (
             <tr key={i}>
-              <td>{KIND[m.kind] ?? m.kind}<br /><small className="muted">{m.label} · {new Date(m.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}{m.status === 'cancelada' ? ' · cancelada' : ''}</small></td>
+              <td>{KIND[m.kind] ?? m.kind}<br /><small className="muted">{m.label} · {new Date(m.at).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}{m.status === 'cancelada' ? ' · cancelada' : ''}</small></td>
               <td className={`num ${m.kind === 'venta' || m.kind === 'deposito' ? (m.status === 'cancelada' ? 'muted' : 'pos') : 'neg'}`}>{m.kind === 'venta' || m.kind === 'deposito' ? '+' : '−'}{mxn(m.amount)}</td>
             </tr>
           ))}</tbody></table></div>
@@ -96,7 +96,7 @@ function QuickActions({ me }: { me: Me }) {
   return (
     <div className="quick-actions">
       {list.map((s) => (
-        <a key={s.key} href={`#/${s.key}`} className="quick-action">
+        <a key={s.key} href={`#/${s.key}`} className="quick-action" style={toneStyle(s.group)}>
           <span className="qa-icon"><s.icon size={26} strokeWidth={1.9} aria-hidden /></span>
           <b>{s.label}</b>
           {s.desc && <small>{s.desc}</small>}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, mxn } from '../api'
+import { api, h12, mxn } from '../api'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const STATUS: Record<string, string> = { pendiente: 'Por confirmar: te avisaremos', confirmada: 'Confirmada', en_atencion: 'En atención', atendida: 'Atendida', cancelada: 'Cancelada', no_asistio: 'No asistió' }
@@ -36,7 +36,7 @@ export function Reservar({ code }: { code: string }) {
         <h2 style={{ marginTop: 16 }}>3. Día y hora</h2>
         <label>Día<input type="date" min={today()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value, time: '' })} /></label>
         {f.serviceIds.length === 0 ? <p className="muted">Elige un servicio para ver las horas libres.</p> : slots.length === 0 ? <p className="muted">No hay horas libres ese día.</p> : (
-          <div className="row" style={{ marginTop: 8 }}>{slots.map((t) => <button key={t} style={{ flex: '0 0 90px' }} className={f.time === t ? 'primary' : ''} onClick={() => setF({ ...f, time: t })}>{t}</button>)}</div>
+          <div className="row" style={{ marginTop: 8 }}>{slots.map((t) => <button key={t} style={{ flex: '0 0 110px' }} className={f.time === t ? 'primary' : ''} onClick={() => setF({ ...f, time: t })}>{h12(t)}</button>)}</div>
         )}
         <h2 style={{ marginTop: 16 }}>4. Tus datos</h2>
         <label>Nombre<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
@@ -61,7 +61,7 @@ export function EstadoCita({ token }: { token: string }) {
       <h1>{d.business.name}</h1>
       <div className="card">
         <h2>{STATUS[a.status]}</h2>
-        <p>{new Date(a.startsAt).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'full', timeStyle: 'short' })}</p>
+        <p>{new Date(a.startsAt).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'full', timeStyle: 'short', hour12: true })}</p>
         <p>{a.services.map((s: any) => s.name).join(' + ')}{a.staffName ? ` · con ${a.staffName}` : ''}</p>
         {d.business.phone && <p className="muted">Dudas: {d.business.phone}</p>}
         <p className="muted">Guarda este link para ver el estado de tu cita.</p>

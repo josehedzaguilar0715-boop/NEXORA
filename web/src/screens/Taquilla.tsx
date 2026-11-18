@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ScanButton } from '../Scanner'
-import { api, mxn } from '../api'
+import { api, h12, mxn } from '../api'
 import type { Me } from '../App'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
@@ -36,7 +36,7 @@ export function Taquilla(_: { me: Me }) {
         <label>Día<input type="date" value={date} onChange={(e) => { setDate(e.target.value); setStart('') }} /></label>
         <h3 style={{ marginTop: 12 }}>Horario</h3>
         <div className="results">{slots.map((s) => (
-          <button key={s.start} disabled={s.closed || s.available === 0} className={start === s.start ? 'primary' : ''} onClick={() => setStart(s.start)}>{s.start}–{s.end}<small>{s.closed ? 'Cerrado' : `${s.available} lugares`}</small></button>
+          <button key={s.start} disabled={s.closed || s.available === 0} className={start === s.start ? 'primary' : ''} onClick={() => setStart(s.start)}>{h12(s.start)}–{h12(s.end)}<small>{s.closed ? 'Cerrado' : `${s.available} lugares`}</small></button>
         ))}</div>
         {slots.length === 0 && <p className="muted">No hay horarios para este día. Configúralos en <a href="#/configurar">Configurar negocio → Horarios y aforo</a>.</p>}
         <h3 style={{ marginTop: 12 }}>Boletos</h3>
@@ -114,7 +114,7 @@ export function TiendaBoletos({ code }: { code: string }) {
       <h1>{info.business.name}</h1>
       <div className="card">
         <label>Día de tu visita<input type="date" min={today()} value={date} onChange={(e) => { setDate(e.target.value); setF({ ...f, start: '' }) }} /></label>
-        <div className="results" style={{ marginTop: 8 }}>{info.slots.map((s: any) => <button key={s.start} disabled={!s.available} className={f.start === s.start ? 'primary' : ''} onClick={() => setF({ ...f, start: s.start })}>{s.start}–{s.end}<small>{s.available} lugares</small></button>)}</div>
+        <div className="results" style={{ marginTop: 8 }}>{info.slots.map((s: any) => <button key={s.start} disabled={!s.available} className={f.start === s.start ? 'primary' : ''} onClick={() => setF({ ...f, start: s.start })}>{h12(s.start)}–{h12(s.end)}<small>{s.available} lugares</small></button>)}</div>
         <div className="table-wrap"><table className="list" style={{ marginTop: 8 }}><tbody>{info.types.map((t: any) => (
           <tr key={t.id}><td>{t.name} · {mxn(t.price)}</td><td><div className="qty"><button onClick={() => setQty({ ...qty, [t.id]: Math.max(0, (qty[t.id] ?? 0) - 1) })}>−</button><b style={{ minWidth: 40, textAlign: 'center' }}>{qty[t.id] ?? 0}</b><button onClick={() => setQty({ ...qty, [t.id]: (qty[t.id] ?? 0) + 1 })}>+</button></div></td></tr>
         ))}</tbody></table></div>
@@ -142,7 +142,7 @@ export function MisBoletos({ token }: { token: string }) {
         <div key={t.code} className="card" style={{ textAlign: 'center' }}>
           <img alt={`QR ${t.code}`} src={`/api/public/ticket-qr/${t.code}.svg`} width={160} height={160} />
           <div><b>{t.type}</b></div>
-          <small className="muted">{t.date} {t.start} · {t.status === 'por_pagar' ? 'por pagar' : t.status}</small>
+          <small className="muted">{t.date} {h12(t.start)} · {t.status === 'por_pagar' ? 'por pagar' : t.status}</small>
         </div>
       ))}</div>
     </main>

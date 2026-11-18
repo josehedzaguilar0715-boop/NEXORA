@@ -224,7 +224,7 @@ export function Caja({ me }: { me: Me }) {
     let text = ''
     if (sale) text = (await api<{ text: string }>('GET', `/sales/${sale.id}/ticket`).catch(() => ({ text: '' }))).text
     if (!text) {
-      text = [me.business.name, me.business.phone ? `Tel. ${me.business.phone}` : '', 'Folio provisional (sin internet)', new Date().toLocaleString('es-MX'), '-'.repeat(32),
+      text = [me.business.name, me.business.phone ? `Tel. ${me.business.phone}` : '', 'Folio provisional (sin internet)', new Date().toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' }), '-'.repeat(32),
         ...cart.map((l) => `${l.quantity} ${l.name}`.slice(0, 22).padEnd(22) + mxn(lineTotal(l)).padStart(10)), '-'.repeat(32),
         `TOTAL ${mxn(total)}`, `Pago: ${method}`, `Atendió: ${me.user.name}`].filter(Boolean).join('\n')
     }
@@ -374,7 +374,7 @@ export function Caja({ me }: { me: Me }) {
           {held.length === 0 ? <p className="muted">No hay ventas en espera. Con una venta a medias, presiona {KEYS.espera} para apartarla y atender a otro cliente.</p> : (
             <div className="table-wrap"><table className="list"><tbody>{held.map((h) => (
               <tr key={h.id} className="clickable" onClick={() => recall(h)}>
-                <td><b>{h.customer?.name ?? 'Público en general'}</b><br /><small className="muted">{new Date(h.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} · {h.cart.length} renglones</small></td>
+                <td><b>{h.customer?.name ?? 'Público en general'}</b><br /><small className="muted">{new Date(h.at).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })} · {h.cart.length} renglones</small></td>
                 <td className="num">{mxn(Math.max(0, h.cart.reduce((a, l) => a + lineTotal(l), 0) - (h.discount?.amount ?? 0)))}</td>
                 <td className="num"><button className="mini">Recuperar</button></td>
               </tr>
@@ -669,7 +669,7 @@ function VentasTurno({ shift, me, onClose }: { shift: Shift; me: Me; onClose: ()
         <div className="table-wrap"><table className="list"><tbody>
           {list.map((s) => (
             <tr key={s.id}>
-              <td>#{s.folio}<br /><small className="muted">{new Date(s.createdAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} · {s.paymentMethod}</small></td>
+              <td>#{s.folio}<br /><small className="muted">{new Date(s.createdAt).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })} · {s.paymentMethod}</small></td>
               <td className="num">{s.status === 'cancelada' ? <s>{mxn(s.total)}</s> : mxn(s.total)}</td>
               <td>{s.status === 'completada' && can(me, 'cancel_discount') ? <button onClick={() => cancel(s.id)}>Cancelar</button> : <small className="muted">{s.status}</small>}</td>
             </tr>

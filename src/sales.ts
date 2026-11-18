@@ -373,7 +373,7 @@ const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'T
 function ticketText(t: { business: string; phone: string | null; folio: string; date: string; items: { description: string; quantity: number; total: number }[]; subtotal: number; discount: number; total: number; paymentMethod: string; payments: { method: string; amount: number }[]; cashReceived: number | null; change: number | null; cashier: string; cancelled: boolean }) {
   const W = 32
   const row = (l: string, r: string) => l.slice(0, W - r.length - 1).padEnd(W - r.length) + r
-  const fecha = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'short', timeStyle: 'short' }).format(new Date(t.date))
+  const fecha = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'short', timeStyle: 'short', hour12: true }).format(new Date(t.date))
   return [
     t.business, t.phone ? `Tel. ${t.phone}` : '', `Folio ${t.folio}`, fecha, t.cancelled ? '*** CANCELADO ***' : '', '-'.repeat(W),
     ...t.items.map((i) => row(`${i.quantity} ${i.description}`, mxn(i.total))),

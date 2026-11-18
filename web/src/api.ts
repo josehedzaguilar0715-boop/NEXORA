@@ -127,3 +127,15 @@ export const cache = {
     localStorage.setItem(`nx_c_${k}`, JSON.stringify(v))
   },
 }
+
+/** Horas siempre en formato de 12 horas («2:30 p.m.»), con la hora de México. */
+const MX = 'America/Mexico_City'
+export const hora = (d: string | Date) => new Date(d).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: MX })
+export const fechaHora = (d: string | Date) => new Date(d).toLocaleString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: MX })
+/** «14:00» → «2:00 p.m.» (el valor guardado sigue siendo de 24 horas). */
+export function h12(hhmm: string): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm ?? '')
+  if (!m) return hhmm
+  const h = Number(m[1]) % 24
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? 'a.m.' : 'p.m.'}`
+}

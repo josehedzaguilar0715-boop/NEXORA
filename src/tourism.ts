@@ -11,6 +11,9 @@ import type { Db } from './db.js'
 import { createSale, parseSale } from './sales.js'
 import { AppError, bad, conflict, forbidden, iso, localDate, newId, normalizePhone, notFound } from './util.js'
 
+/** «14:00» → «2:00 p.m.» para los mensajes al cliente. */
+const h12 = (hm: string) => { const [h = 0, m = 0] = hm.split(':').map(Number); return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a.m.' : 'p.m.'}` }
+
 /** Lugar turístico: boletos por tipo, fecha y horario con aforo; acceso con QR; taquilla; visitas guiadas; cierres. */
 export const tourism = new Hono<Env>()
 export const publicTourism = new Hono<Env>()
@@ -130,7 +133,7 @@ tourism.post('/tourism/sell', requirePerm('sell'), async (c) => {
   const result = db.transaction(() => {
     const lines = prepareTickets(db, u.business_id, d.date, d.start, d.items, d.tourId, now())
     // Grupos con descuento por cantidad: vía promociones (se aplican solas en la venta).
-    const sale = createSale(deps, u, parseSale({ id: d.id ?? newId(), paymentMethod: d.paymentMethod, cashReceived: d.cashReceived, items: lines.map((l) => ({ serviceId: l.serviceId, quantity: l.quantity, description: `Boleto ${l.name} ${d.date} ${d.start}` })) }))
+    const sale = createSale(deps, u, parseSale({ id: d.id ?? newId(), paymentMethod: d.paymentMethod, cashReceived: d.cashReceived, items: lines.map((l) => ({ serviceId: l.serviceId, quantity: l.quantity, description: `Boleto ${l.name} ${d.date} ${h12(d.start)}` })) }))
     if (sale.duplicate) return { sale: sale.sale, tickets: db.prepare('SELECT code, type_name AS type FROM entry_tickets WHERE sale_id = ?').all(sale.sale.id) }
     const tickets = insertTickets(db, u.business_id, lines, { date: d.date, start: d.start, tourId: d.tourId, channel: 'taquilla', status: 'pagado', saleId: sale.sale.id, orderToken: null, now: now() })
     return { sale: sale.sale, tickets }
@@ -148,7 +151,7 @@ tourism.post('/tourism/orders/:token/pay', requirePerm('sell'), async (c) => {
   const tks = db.prepare("SELECT * FROM entry_tickets WHERE order_token = ? AND business_id = ? AND status = 'por_pagar'").all(c.req.param('token'), u.business_id) as { id: string; service_id: string; type_name: string; price: number; date: string; start: string }[]
   if (!tks.length) throw notFound('No hay boletos por pagar con ese folio.')
   const result = db.transaction(() => {
-    const sale = createSale(deps, u, parseSale({ id: newId(), paymentMethod: d.paymentMethod, cashReceived: d.cashReceived, items: tks.map((t) => ({ serviceId: t.service_id, quantity: 1, unitPrice: t.price, description: `Boleto ${t.type_name} ${t.date} ${t.start} (en línea)` })) }), { trustedPrices: true }).sale
+    const sale = createSale(deps, u, parseSale({ id: newId(), paymentMethod: d.paymentMethod, cashReceived: d.cashReceived, items: tks.map((t) => ({ serviceId: t.service_id, quantity: 1, unitPrice: t.price, description: `Boleto ${t.type_name} ${t.date} ${h12(t.start)} (en línea)` })) }), { trustedPrices: true }).sale
     for (const t of tks) db.prepare("UPDATE entry_tickets SET status = 'pagado', sale_id = ? WHERE id = ?").run(sale.id, t.id)
     audit(db, now, { businessId: u.business_id, userId: u.id, action: 'turistico.pago_en_linea', newValue: { tickets: tks.length, saleId: sale.id } })
     return { sale, paid: tks.length }
@@ -166,11 +169,11 @@ tourism.post('/tourism/scan', async (c) => {
   const reject = (code: string, msg: string) => { throw new AppError(409, code, msg) }
   if (!t) throw new AppError(404, 'boleto_invalido', 'Boleto no válido.')
   if (t.status === 'cancelado') reject('boleto_cancelado', 'Boleto cancelado.')
-  if (t.status === 'usado') reject('boleto_usado', `Este boleto ya entró a las ${new Date(t.used_at!).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })}.`)
+  if (t.status === 'usado') reject('boleto_usado', `Este boleto ya entró a las ${new Date(t.used_at!).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit', hour12: true })}.`)
   if (t.status === 'por_pagar') reject('boleto_sin_pagar', 'Boleto sin pagar: cóbralo en taquilla.')
   const today = localDate(now())
   const end = t.tour_id ? null : slotsFor(db, u.business_id, t.date).find((s) => s.start === t.start)?.end
-  if (t.date < today || (t.date === today && end && localToIso(t.date, end) <= iso(now()))) reject('boleto_vencido', `Boleto vencido (era para el ${t.date} a las ${t.start}).`)
+  if (t.date < today || (t.date === today && end && localToIso(t.date, end) <= iso(now()))) reject('boleto_vencido', `Boleto vencido (era para el ${t.date} a las ${h12(t.start)}).`)
   if (t.date > today) reject('boleto_otro_dia', `Este boleto es para el ${t.date}.`)
   db.transaction(() => {
     db.prepare("UPDATE entry_tickets SET status = 'usado', used_at = ? WHERE id = ?").run(iso(now()), t.id)
@@ -254,7 +257,7 @@ tourism.post('/tourism/closures', requirePerm('cancel_discount'), async (c) => {
     const byPhone = new Map<string, { name: string | null; phone: string; codes: string[] }>()
     for (const a of affected) if (a.phone) { const k = byPhone.get(a.phone) ?? { name: a.buyer_name, phone: a.phone, codes: [] }; k.codes.push(a.code); byPhone.set(a.phone, k) }
     const notices = [...byPhone.values()].map((p) => {
-      const message = `Hola ${p.name ?? ''}, ${biz.name} estará cerrado el ${d.date}${d.start ? ` a las ${d.start}` : ''} por ${d.reason}. Tus boletos (${p.codes.length}) quedaron cancelados. Escríbenos para reprogramar o reembolsar.`
+      const message = `Hola ${p.name ?? ''}, ${biz.name} estará cerrado el ${d.date}${d.start ? ` a las ${h12(d.start)}` : ''} por ${d.reason}. Tus boletos (${p.codes.length}) quedaron cancelados. Escríbenos para reprogramar o reembolsar.`
       return { phone: p.phone, message, whatsapp: `https://wa.me/52${p.phone}?text=${encodeURIComponent(message)}` }
     })
     return { affected: affected.length, refunded, notices }

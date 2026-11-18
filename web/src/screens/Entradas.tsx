@@ -61,7 +61,7 @@ export function Entradas(_: { me: Me }) {
         <div className="row"><input aria-label="Código del pase" placeholder="Escanea el QR del pase" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code && pass()} /><ScanButton onCode={(c) => pass(c)} /><button style={{ flex: '0 0 auto' }} disabled={!code} onClick={() => pass()}>Validar</button></div>
         {msg.err && <p className="error">{msg.err}</p>}
         {msg.ok && <p className="okmsg">{msg.ok}</p>}
-        {open.length > 0 && (<><h3>Por tiempo (adentro)</h3>{open.map((a) => <p key={a.accessId} className="row"><span>{a.name} · desde {a.at.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span><button className="primary" onClick={() => exit(a)}>Cobrar salida</button></p>)}</>)}
+        {open.length > 0 && (<><h3>Por tiempo (adentro)</h3>{open.map((a) => <p key={a.accessId} className="row"><span>{a.name} · desde {a.at.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</span><button className="primary" onClick={() => exit(a)}>Cobrar salida</button></p>)}</>)}
       </section>
       <section>
         <div className="card">
@@ -71,7 +71,7 @@ export function Entradas(_: { me: Me }) {
         <div className="card" style={{ marginTop: 16 }}>
           <h2>Limpieza</h2>
           <div className="results">{tasks.map((t) => <button key={t.id} onClick={async () => { await api('POST', '/cleaning/log', { taskId: t.id }); void load() }}>✔ {t.name}</button>)}</div>
-          <div className="table-wrap"><table className="list"><tbody>{log.map((l, i) => <tr key={i}><td>{new Date(l.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td><td>{l.task}</td><td className="muted">{l.who}</td></tr>)}</tbody></table></div>
+          <div className="table-wrap"><table className="list"><tbody>{log.map((l, i) => <tr key={i}><td>{new Date(l.at).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</td><td>{l.task}</td><td className="muted">{l.who}</td></tr>)}</tbody></table></div>
         </div>
       </section>
     </div>

@@ -234,7 +234,7 @@ function BuzonAdmin() {
         <section className="card">
           <h2>{sel.subject}</h2>
           <p className="muted">{sel.business} · {sel.status}</p>
-          {sel.messages.map((m: any, i: number) => <div key={i} className="card" style={{ marginBottom: 8 }}><small className="muted">{m.author} · {new Date(m.createdAt).toLocaleString('es-MX')}</small><p style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{m.body}</p></div>)}
+          {sel.messages.map((m: any, i: number) => <div key={i} className="card" style={{ marginBottom: 8 }}><small className="muted">{m.author} · {new Date(m.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })}</small><p style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{m.body}</p></div>)}
           <label>Responder<textarea rows={3} value={reply} onChange={(e) => setReply(e.target.value)} /></label>
           <p className="row"><button className="primary" disabled={!reply.trim()} onClick={async () => { const r = await adm('POST', `/admin/tickets/${sel.id}/messages`, { message: reply }); setSel({ ...sel, ...r.ticket }); setReply('') }}>Enviar</button>
             {sel.type === 'cambio' ? ['en_revision', 'aceptada', 'rechazada'].map((s) => <button key={s} onClick={() => status(s)}>{s.replace('_', ' ')}</button>) : <button onClick={() => status('cerrado')}>Cerrar</button>}</p>

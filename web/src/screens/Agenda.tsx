@@ -1,11 +1,11 @@
 import { loyaltyText, type Loyalty } from './Caja'
 import { useEffect, useMemo, useState } from 'react'
-import { api, mxn, toCents } from '../api'
+import { api, h12, mxn, toCents } from '../api'
 import { can, type Me } from '../App'
 import type { Service } from './Caja'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
-const hm = (iso: string) => new Date(iso).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })
+const hm = (iso: string) => new Date(iso).toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit', hour12: true })
 const STATUS: Record<string, string> = { pendiente: 'Por confirmar', confirmada: 'Confirmada', en_atencion: 'Atendiendo', atendida: 'Cobrada', cancelada: 'Cancelada', no_asistio: 'No vino' }
 
 /** Agenda por persona (barbería, uñas): citas, clientes sin cita y cobro. */
@@ -28,7 +28,7 @@ export function Agenda({ me }: { me: Me }) {
   }
   const link = `${location.origin}/reservar/${me.business.code}`
   // Aviso manual: prepara el mensaje; nada se envía solo.
-  const wa = (a: any) => a.phone ? `https://wa.me/52${a.phone}?text=${encodeURIComponent(`Hola ${a.customerName}, tu cita en ${me.business.name} es el ${new Date(a.startsAt).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'medium', timeStyle: 'short' })}.`)}` : null
+  const wa = (a: any) => a.phone ? `https://wa.me/52${a.phone}?text=${encodeURIComponent(`Hola ${a.customerName}, tu cita en ${me.business.name} es el ${new Date(a.startsAt).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'medium', timeStyle: 'short', hour12: true })}.`)}` : null
 
   return (
     <div>
@@ -97,7 +97,7 @@ function NuevaCita({ walkIn, date, staff, services, onClose, onSaved }: { walkIn
         {!walkIn && f.serviceIds.length > 0 && (
           <>
             <h3 style={{ marginTop: 12 }}>Hora</h3>
-            {slots.length === 0 ? <p className="muted">No hay horas libres ese día.</p> : <div className="row">{slots.map((t) => <button key={t} className={f.time === t ? 'primary' : ''} style={{ flex: '0 0 90px' }} onClick={() => setF({ ...f, time: t })}>{t}</button>)}</div>}
+            {slots.length === 0 ? <p className="muted">No hay horas libres ese día.</p> : <div className="row">{slots.map((t) => <button key={t} className={f.time === t ? 'primary' : ''} style={{ flex: '0 0 110px' }} onClick={() => setF({ ...f, time: t })}>{h12(t)}</button>)}</div>}
           </>
         )}
         <div className="row"><label>Nombre del cliente<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label><label>Teléfono<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label></div>

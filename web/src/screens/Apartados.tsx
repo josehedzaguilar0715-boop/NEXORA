@@ -168,7 +168,7 @@ function Detalle({ me, id, onClose, onChanged }: { me: Me; id: string; onClose: 
         {!open && <p className="muted">{l.status === 'entregado' ? `Entregado el ${fmtDate(l.closedAt)}.` : `Cancelado el ${fmtDate(l.closedAt)}: ${l.cancelReason}`}</p>}
         <div className="table-wrap"><table className="list"><tbody>{d.items.map((i: any, k: number) => <tr key={k}><td>{i.quantity} × {i.description}</td><td className="num">{mxn(i.total)}</td></tr>)}</tbody></table></div>
         <h3 style={{ marginTop: 12 }}>Pagos</h3>
-        <div className="table-wrap"><table className="list"><tbody>{d.payments.map((p: any, k: number) => <tr key={k}><td>{p.kind === 'anticipo' ? 'Anticipo' : p.kind === 'abono' ? 'Abono' : 'Devolución'} · {METHOD[p.method]}<br /><small className="muted">{new Date(p.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</small></td><td className={`num ${p.amount < 0 ? 'neg' : ''}`}>{mxn(p.amount)}</td></tr>)}</tbody></table></div>
+        <div className="table-wrap"><table className="list"><tbody>{d.payments.map((p: any, k: number) => <tr key={k}><td>{p.kind === 'anticipo' ? 'Anticipo' : p.kind === 'abono' ? 'Abono' : 'Devolución'} · {METHOD[p.method]}<br /><small className="muted">{new Date(p.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })}</small></td><td className={`num ${p.amount < 0 ? 'neg' : ''}`}>{mxn(p.amount)}</td></tr>)}</tbody></table></div>
         {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
         {open && mode === '' && (
           <div className="pay" style={{ marginTop: 12 }}>

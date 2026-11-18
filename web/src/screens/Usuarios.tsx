@@ -1,3 +1,4 @@
+import { TimeSelect } from '../TimeSelect'
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { hasGiro, type Me } from '../App'
@@ -161,8 +162,8 @@ function Horario({ userId }: { userId: string }) {
       {days.map((d, i) => (
         <div className="row day" key={i}>
           <label className="check" style={{ flex: '0 0 150px' }}><input type="checkbox" checked={d.on} onChange={(e) => setDays(days.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))} />{DAYS[i]}</label>
-          <input aria-label={`Entrada ${DAYS[i]}`} type="time" disabled={!d.on} value={d.start} onChange={(e) => setDays(days.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))} />
-          <input aria-label={`Salida ${DAYS[i]}`} type="time" disabled={!d.on} value={d.end} onChange={(e) => setDays(days.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))} />
+          <TimeSelect aria-label={`Entrada ${DAYS[i]}`} step={30} disabled={!d.on} value={d.start} onChange={(v) => setDays(days.map((x, j) => (j === i ? { ...x, start: v } : x)))} />
+          <TimeSelect aria-label={`Salida ${DAYS[i]}`} step={30} disabled={!d.on} value={d.end} onChange={(v) => setDays(days.map((x, j) => (j === i ? { ...x, end: v } : x)))} />
         </div>
       ))}
       <p><button className="primary" onClick={save}>Guardar horario</button></p>
@@ -184,7 +185,7 @@ function Asistencia() {
       <h2>Asistencia de hoy</h2>
       <div className="pay"><button className="big" onClick={() => clock('entrada')}>Registrar mi entrada</button><button className="big" onClick={() => clock('salida')}>Registrar mi salida</button></div>
       {msg && <p className="error">{msg}</p>}
-      <div className="table-wrap"><table className="list"><tbody>{rows.map((r, i) => <tr key={i}><td>{r.name}</td><td>{r.type === 'entrada' ? 'Entrada' : 'Salida'}</td><td className="num">{new Date(r.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</td></tr>)}</tbody></table></div>
+      <div className="table-wrap"><table className="list"><tbody>{rows.map((r, i) => <tr key={i}><td>{r.name}</td><td>{r.type === 'entrada' ? 'Entrada' : 'Salida'}</td><td className="num">{new Date(r.at).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</td></tr>)}</tbody></table></div>
       {rows.length === 0 && <p className="muted">Nadie ha registrado hoy.</p>}
     </section>
   )

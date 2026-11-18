@@ -84,7 +84,7 @@ export function shiftReport(db: import('./db.js').Db, s: ShiftRow, kind: 'X' | '
   const number = kind === 'Z'
     ? (db.prepare("SELECT COUNT(*) n FROM shifts WHERE branch_id = ? AND status = 'cerrado' AND closed_at <= ?").get(s.branch_id, s.closed_at ?? '9999') as { n: number }).n
     : (db.prepare("SELECT COUNT(*) n FROM audit_log WHERE action = 'caja.corte_x' AND entity_id = ?").get(s.id) as { n: number }).n
-  const fmt = (d: string) => new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'short', timeStyle: 'short' }).format(new Date(d))
+  const fmt = (d: string) => new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'short', timeStyle: 'short', hour12: true }).format(new Date(d))
   const W = 32
   const row = (l: string, r: string) => l.slice(0, W - r.length - 1).padEnd(W - r.length) + r
   const line = '='.repeat(W)

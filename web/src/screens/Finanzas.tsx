@@ -312,7 +312,7 @@ function Movimientos({ from, to, onErr }: { from: string; to: string; onErr: (e:
             const d = new Date(e.at)
             return (
               <tr key={i}>
-                <td className="nowrap">{d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}{e.type !== 'Gasto' && <><br /><small className="muted">{d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</small></>}</td>
+                <td className="nowrap">{d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}{e.type !== 'Gasto' && <><br /><small className="muted">{d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</small></>}</td>
                 <td>{e.type}<br /><small className="muted">{e.concept}</small></td>
                 <td className="hide-sm">{METHOD[e.method] ?? e.method}</td>
                 <td className="num pos">{e.inflow ? mxn(e.inflow) : ''}</td>

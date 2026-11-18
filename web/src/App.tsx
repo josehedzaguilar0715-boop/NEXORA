@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { api, auth, cache, flush, outbox } from './api'
 import { Caja } from './screens/Caja'
 import { Clientes } from './screens/Clientes'
@@ -62,6 +62,9 @@ const PORTALS: { group: string; label: string; icon: Icon }[] = [
   { group: 'Finanzas', label: 'Dinero', icon: Landmark },
   { group: 'Administración', label: 'Mi negocio', icon: Settings },
 ]
+/** Cada portal con su color de ícono, para ubicarse de un vistazo (lo demás es neutro). */
+export const TONE: Record<string, string> = { '': '#22d3ee', Operación: '#34d399', Inventario: '#fbbf24', Clientes: '#22d3ee', Finanzas: '#a78bfa', Administración: '#94a3b8' }
+export const toneStyle = (group: string) => ({ '--tone': TONE[group] ?? TONE[''] }) as CSSProperties
 export const portalOf = (group: string) => PORTALS.find((p) => p.group === group)?.label ?? group
 
 /** Una línea de qué hace cada opción, para encontrarla sin buscar. */
@@ -241,7 +244,7 @@ function Privada() {
         {/* Un permiso no marcado no aparece en pantalla. */}
         <nav>
           {allowed.filter((s) => s.group === '').map((s) => (
-            <a key={s.key} href={`#/${s.key}`} className={current?.key === s.key ? 'on' : ''} aria-current={current?.key === s.key ? 'page' : undefined}>
+            <a key={s.key} href={`#/${s.key}`} style={toneStyle('')} className={current?.key === s.key ? 'on' : ''} aria-current={current?.key === s.key ? 'page' : undefined}>
               <s.icon size={20} strokeWidth={1.9} aria-hidden />{s.label}
             </a>
           ))}
@@ -252,10 +255,10 @@ function Privada() {
             const open = portal?.group === p.group
             // Un portal con una sola opción lleva directo a ella.
             if (items.length === 1) return (
-              <a key={p.group} href={`#/${items[0]!.key}`} className={`portal-btn ${on ? 'on' : ''}`}><p.icon size={20} strokeWidth={1.9} aria-hidden />{p.label}</a>
+              <a key={p.group} href={`#/${items[0]!.key}`} style={toneStyle(p.group)} className={`portal-btn ${on ? 'on' : ''}`}><p.icon size={20} strokeWidth={1.9} aria-hidden />{p.label}</a>
             )
             return (
-              <div key={p.group} className="nav-group">
+              <div key={p.group} className="nav-group" style={toneStyle(p.group)}>
                 <button type="button" className={`portal-btn ${on ? 'on' : ''} ${open ? 'open' : ''}`} aria-expanded={open}
                   onClick={(e) => { e.stopPropagation(); setPortal(open ? null : { group: p.group, top: e.currentTarget.getBoundingClientRect().top }) }}>
                   <p.icon size={20} strokeWidth={1.9} aria-hidden /><span>{p.label}</span><ChevronRight size={16} aria-hidden className="chev" />
@@ -276,7 +279,7 @@ function Privada() {
         const p = PORTALS.find((x) => x.group === portal.group)!
         const items = allowed.filter((s) => s.group === portal.group)
         return (
-          <div className="portal-pop" role="menu" style={{ top: Math.max(12, Math.min(portal.top - 12, window.innerHeight - 80 - items.length * 64)) }}>
+          <div className="portal-pop" role="menu" style={{ ...toneStyle(portal.group), top: Math.max(12, Math.min(portal.top - 12, window.innerHeight - 80 - items.length * 64)) }}>
             <div className="portal-head"><p.icon size={18} aria-hidden />{p.label}</div>
             {items.map((s) => <PortalItem key={s.key} s={s} on={current?.key === s.key} />)}
           </div>
@@ -289,7 +292,7 @@ function Privada() {
           const sib = allowed.filter((s) => s.group === current.group)
           if (sib.length < 2) return null
           return (
-            <nav className="portal-tabs" aria-label={portalOf(current.group)}>
+            <nav className="portal-tabs" aria-label={portalOf(current.group)} style={toneStyle(current.group)}>
               {sib.map((s) => <a key={s.key} href={`#/${s.key}`} className={s.key === current.key ? 'on' : ''} aria-current={s.key === current.key ? 'page' : undefined}><s.icon size={16} strokeWidth={2} aria-hidden />{s.label}</a>)}
             </nav>
           )

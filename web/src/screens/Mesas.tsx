@@ -1,3 +1,4 @@
+import { TimeSelect } from '../TimeSelect'
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import { can, type Me, hasGiro } from '../App'
@@ -241,7 +242,7 @@ function Reservas({ me, tables, onClose }: { me: Me; tables: any[]; onClose: () 
         <div className="table-wrap"><table className="list"><tbody>
           {list.map((r) => (
             <tr key={r.id}>
-              <td><b>{new Date(r.starts_at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' })} · {r.name}</b><br /><small className="muted">{r.people} personas{r.table_name ? ` · mesa ${r.table_name}` : ''}{r.phone ? ` · ${r.phone}` : ''} · {RES_STATUS[r.status] ?? r.status}</small></td>
+              <td><b>{new Date(r.starts_at).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })} · {r.name}</b><br /><small className="muted">{r.people} personas{r.table_name ? ` · mesa ${r.table_name}` : ''}{r.phone ? ` · ${r.phone}` : ''} · {RES_STATUS[r.status] ?? r.status}</small></td>
               <td className="num">
                 {r.status === 'pendiente' && manager && <button className="mini" onClick={() => run(() => api('POST', `/table-reservations/${r.id}/confirm`), 'Reserva confirmada.')}>Confirmar</button>}{' '}
                 {['pendiente', 'confirmada'].includes(r.status) && <button className="mini" onClick={() => run(() => api('POST', `/table-reservations/${r.id}/arrived`), 'Llegó.')}>Llegó</button>}{' '}
@@ -258,7 +259,7 @@ function Reservas({ me, tables, onClose }: { me: Me; tables: any[]; onClose: () 
           <label>Teléfono<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
         </div>
         <div className="row">
-          <label>Hora<input type="time" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} /></label>
+          <label>Hora<TimeSelect value={f.time} onChange={(v) => setF({ ...f, time: v })} /></label>
           <label>Personas<input inputMode="numeric" value={f.people} onChange={(e) => setF({ ...f, people: e.target.value })} /></label>
           <label>Mesa<select value={f.tableId} onChange={(e) => setF({ ...f, tableId: e.target.value })}><option value="">Cualquiera</option>{tables.map((t) => <option key={t.id} value={t.id}>Mesa {t.name} ({t.seats})</option>)}</select></label>
         </div>
@@ -308,7 +309,7 @@ function RentasFuera({ onClose }: { onClose: () => void }) {
         <div className="card-head"><h2>Rentas fuera</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
         <div className="table-wrap"><table className="list"><tbody>
           {list.map((r) => (
-            <tr key={r.id}><td><b>{r.quantity} {r.name}</b><br /><small className="muted">{r.tableName ? `Mesa ${r.tableName}` : r.customerName ?? ''} · desde {new Date(r.outAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</small></td>
+            <tr key={r.id}><td><b>{r.quantity} {r.name}</b><br /><small className="muted">{r.tableName ? `Mesa ${r.tableName}` : r.customerName ?? ''} · desde {new Date(r.outAt).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</small></td>
               <td className="num"><button className="mini" onClick={async () => { try { await api('POST', `/rentals/${r.id}/return`); await load() } catch (e) { setMsg((e as Error).message) } }}>Regresó</button></td></tr>
           ))}
           {list.length === 0 && <tr><td className="muted">Todo lo rentado ya regresó.</td></tr>}

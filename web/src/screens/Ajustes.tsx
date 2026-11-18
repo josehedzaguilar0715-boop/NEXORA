@@ -59,7 +59,7 @@ export function Ajustes({ me }: { me: Me }) {
         {msg.ok && <p className="okmsg">{msg.ok}</p>}
         <h2 style={{ marginTop: 16 }}>Mis dispositivos</h2>
         <div className="table-wrap"><table className="list"><tbody>{sessions.map((s) => (
-          <tr key={s.id}><td>{s.deviceName ?? 'Equipo'}<br /><small className="muted">última vez {new Date(s.lastSeenAt).toLocaleString('es-MX')}</small></td>
+          <tr key={s.id}><td>{s.deviceName ?? 'Equipo'}<br /><small className="muted">última vez {new Date(s.lastSeenAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })}</small></td>
             <td><button onClick={async () => { await api('DELETE', `/auth/sessions/${s.id}`); setSessions(sessions.filter((x) => x.id !== s.id)) }}>Cerrar sesión</button></td></tr>
         ))}</tbody></table></div>
         {trusted.length > 0 && <><h2 style={{ marginTop: 16 }}>Equipos de confianza</h2>
@@ -172,7 +172,7 @@ export function Buzon(_: { me: Me }) {
         <section className="card">
           <h2>{sel.subject}</h2>
           <p className="muted">{STATUS[sel.status] ?? sel.status}</p>
-          {sel.messages.map((m: any, i: number) => <div key={i} className="card" style={{ marginBottom: 8, background: m.author === 'soporte' ? 'var(--bg)' : undefined }}><small className="muted">{m.author === 'soporte' ? 'Soporte' : 'Tú'} · {new Date(m.createdAt).toLocaleString('es-MX')}</small><p style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{m.body}</p></div>)}
+          {sel.messages.map((m: any, i: number) => <div key={i} className="card" style={{ marginBottom: 8, background: m.author === 'soporte' ? 'var(--bg)' : undefined }}><small className="muted">{m.author === 'soporte' ? 'Soporte' : 'Tú'} · {new Date(m.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })}</small><p style={{ margin: '4px 0 0', whiteSpace: 'pre-wrap' }}>{m.body}</p></div>)}
           <label>Responder<textarea rows={3} value={f.reply} onChange={(e) => setF({ ...f, reply: e.target.value })} /></label>
           <p><button className="primary" disabled={!f.reply.trim()} onClick={async () => { const r = await api<any>('POST', `/support/tickets/${sel.id}/messages`, { message: f.reply }); setSel(r.ticket); setF({ ...f, reply: '' }) }}>Enviar</button></p>
         </section>

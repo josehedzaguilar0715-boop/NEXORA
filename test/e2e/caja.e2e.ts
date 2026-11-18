@@ -222,7 +222,7 @@ try {
   await pub.getByRole('button', { name: 'El primero disponible' }).click()
   // Mañana: así siempre hay horas libres, sin importar la hora en que corra la prueba.
   await pub.getByLabel('Día').fill(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(Date.now() + 86_400_000)))
-  await pub.locator('button', { hasText: /^\d{2}:\d{2}$/ }).first().click()
+  await pub.locator('button', { hasText: /^\d{1,2}:\d{2} [ap]\.m\.$/ }).first().click()
   await pub.getByLabel('Nombre').fill('Pedro Cliente')
   await pub.getByLabel('Teléfono (10 dígitos)').fill('5598765432')
   await pub.screenshot({ path: `${shots}/9-reservar.png` })

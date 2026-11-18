@@ -1,3 +1,4 @@
+import { TimeSelect } from '../TimeSelect'
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import { hasGiro, type Me } from '../App'
@@ -191,8 +192,8 @@ function Horarios(_: { me: Me }) {
         {rows.map((r, i) => (
           <tr key={i}>
             <td><select value={r.weekday} onChange={(e) => upd(i, 'weekday', Number(e.target.value))}>{DAYS.map((d, k) => <option key={k} value={k}>{d}</option>)}</select></td>
-            <td><input type="time" value={r.start} onChange={(e) => upd(i, 'start', e.target.value)} /></td>
-            <td><input type="time" value={r.end} onChange={(e) => upd(i, 'end', e.target.value)} /></td>
+            <td><TimeSelect aria-label="Desde" value={r.start} onChange={(v) => upd(i, 'start', v)} /></td>
+            <td><TimeSelect aria-label="Hasta" value={r.end} onChange={(v) => upd(i, 'end', v)} /></td>
             <td><input inputMode="numeric" value={r.capacity} onChange={(e) => upd(i, 'capacity', e.target.value)} /></td>
             <td><button className="mini" onClick={() => setRows(rows.filter((_, j) => j !== i))}>Quitar</button></td>
           </tr>

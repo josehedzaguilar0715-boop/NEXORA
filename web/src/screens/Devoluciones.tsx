@@ -28,7 +28,7 @@ export function Devoluciones({ me }: { me: Me }) {
       <div className="row"><input aria-label="Folio del ticket" inputMode="numeric" placeholder="Folio del ticket" value={folio} onChange={(e) => setFolio(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && find()} /><button className="primary" style={{ flex: '0 0 auto' }} onClick={find}>Buscar</button></div>
       {sale && (
         <>
-          <p className="muted">Folio {sale.folio} · {new Date(sale.createdAt).toLocaleString('es-MX')} · {sale.paymentMethod} · {mxn(sale.total)}</p>
+          <p className="muted">Folio {sale.folio} · {new Date(sale.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })} · {sale.paymentMethod} · {mxn(sale.total)}</p>
           <div className="table-wrap"><table className="list"><tbody>{sale.items.map((i: any) => (
             <tr key={i.id}><td>{i.description}<br /><small className="muted">vendió {i.quantity}</small></td><td style={{ width: 140 }}><input aria-label={`Devolver de ${i.description}`} inputMode="decimal" placeholder="0" value={qty[i.id] ?? ''} onChange={(e) => setQty({ ...qty, [i.id]: e.target.value })} />{perfume && <label style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 6 }} checked={!!sealed[i.id]} onChange={(e) => setSealed({ ...sealed, [i.id]: e.target.checked })} />Sellado</label>}</td></tr>
           ))}</tbody></table></div>

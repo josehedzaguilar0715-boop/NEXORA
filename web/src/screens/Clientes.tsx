@@ -142,7 +142,7 @@ function Cuenta({ me, c, onChanged }: { me: Me; c: any; onChanged: () => void })
       {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
       <h3 style={{ marginTop: 14 }}>Movimientos</h3>
       <div className="table-wrap"><table className="list"><tbody>
-        {credit.ledger.map((l: any, i: number) => <tr key={i}><td>{KIND[l.kind] ?? l.kind}{l.method ? ` · ${METHOD[l.method] ?? l.method}` : ''}{l.note ? <><br /><small className="muted">{l.note}</small></> : null}<br /><small className="muted">{new Date(l.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</small></td><td className={`num ${l.delta > 0 ? 'neg' : 'pos'}`}>{mxn(l.delta)}</td></tr>)}
+        {credit.ledger.map((l: any, i: number) => <tr key={i}><td>{KIND[l.kind] ?? l.kind}{l.method ? ` · ${METHOD[l.method] ?? l.method}` : ''}{l.note ? <><br /><small className="muted">{l.note}</small></> : null}<br /><small className="muted">{new Date(l.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })}</small></td><td className={`num ${l.delta > 0 ? 'neg' : 'pos'}`}>{mxn(l.delta)}</td></tr>)}
         {credit.ledger.length === 0 && <tr><td className="muted">Sin movimientos.</td></tr>}
       </tbody></table></div>
     </div>
@@ -240,7 +240,7 @@ function Puntos({ me, c }: { me: Me; c: any }) {
       <div className="table-wrap"><table className="list"><tbody>
         {data.ledger.map((l: any, i: number) => (
           <tr key={i}>
-            <td>{LREASON[l.reason] ?? l.reason}{l.note ? <>: <span className="muted">{l.note}</span></> : null}<br /><small className="muted">{new Date(l.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{l.byName ? ` · ${l.byName}` : ''}</small></td>
+            <td>{LREASON[l.reason] ?? l.reason}{l.note ? <>: <span className="muted">{l.note}</span></> : null}<br /><small className="muted">{new Date(l.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}{l.byName ? ` · ${l.byName}` : ''}</small></td>
             <td className="num"><b className={l.delta > 0 ? 'pos' : 'neg'}>{l.delta > 0 ? '+' : ''}{l.delta}</b></td>
           </tr>
         ))}
@@ -286,7 +286,7 @@ function Compras({ c }: { c: any }) {
   if (!sales) return <p className="muted">Cargando…</p>
   return (
     <div className="table-wrap"><table className="list"><tbody>
-      {sales.map((s) => <tr key={s.id}><td>Ticket #{s.folio}<br /><small className="muted">{new Date(s.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })} · {METHOD[s.paymentMethod] ?? s.paymentMethod}{s.status === 'cancelada' ? ' · cancelada' : ''}</small></td><td className="num">{mxn(s.total)}</td></tr>)}
+      {sales.map((s) => <tr key={s.id}><td>Ticket #{s.folio}<br /><small className="muted">{new Date(s.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })} · {METHOD[s.paymentMethod] ?? s.paymentMethod}{s.status === 'cancelada' ? ' · cancelada' : ''}</small></td><td className="num">{mxn(s.total)}</td></tr>)}
       {sales.length === 0 && <tr><td className="muted">Sin compras registradas a su nombre.</td></tr>}
     </tbody></table></div>
   )
