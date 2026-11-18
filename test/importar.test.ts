@@ -42,4 +42,25 @@ describe('importar datos de otro sistema', () => {
     const emp = await s.createStaff(T, o.business.code, 'cajera', 'cajero')
     expect((await s.call('POST', '/import/suppliers', { token: emp.token, body: { rows: [{ name: 'X proveedor' }] } })).status).toBe(403)
   })
+
+  it('clientes con los sellos que ya traían, sin duplicarlos al repetir', async () => {
+    const { s, T } = await negocioListo()
+    s.setGiro('barberia')
+    await s.call('PUT', '/modules', { token: T, body: { active: ['fidelidad'] } })
+    await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'todos', dailyCap: 3 } })
+    const rows = [{ name: 'Yosmar Zamorano', phone: '529631725190', stamps: 2 }, { name: 'Alexis Zamorano', phone: '9631366514', stamps: 3 }]
+    expect((await s.call('POST', '/import/customers', { token: T, body: { rows } })).json).toMatchObject({ created: 2 })
+    expect((await s.call('POST', '/import/customers', { token: T, body: { rows } })).json).toMatchObject({ updated: 2 })
+    const list = (await s.call('GET', '/customers', { token: T })).json.customers
+    const y = list.find((c: any) => c.name === 'Yosmar Zamorano')
+    expect(y.phone).toBe('9631725190')
+    const pub = (await s.call('GET', `/public/loyalty/${y.code}`)).json
+    expect(pub.balance).toBe(2)
+    expect(pub.history[0]).toMatchObject({ reason: 'importado', delta: 2 })
+    // Los sellos importados no cuentan para el tope del día.
+    await s.call('POST', '/shifts/open', { token: T, body: { openingFloat: 0 } })
+    const sv = (await s.call('POST', '/services', { token: T, body: { name: 'Corte', price: 15000, durationMin: 30 } })).json.service
+    const r = await s.call('POST', '/sales', { token: T, body: { id: s.uuid(), paymentMethod: 'efectivo', customerId: y.id, items: [{ serviceId: sv.id, quantity: 1 }] } })
+    expect(r.json.loyalty).toMatchObject({ earned: 1, balance: 3 })
+  })
 })

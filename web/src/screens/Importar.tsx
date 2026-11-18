@@ -26,6 +26,7 @@ const FIELDS: Record<Kind, Field[]> = {
     { key: 'phone', label: 'Teléfono', synonyms: ['telefono', 'tel', 'celular', 'whatsapp', 'movil', 'cel'], example: '5512345678' },
     { key: 'balance', label: 'Saldo que debe (fiado)', type: 'money', synonyms: ['saldo', 'adeudo', 'debe', 'deuda', 'fiado', 'saldo pendiente', 'por cobrar'], example: '350.00' },
     { key: 'creditLimit', label: 'Límite de crédito', type: 'money', synonyms: ['limite de credito', 'limite', 'credito', 'limite credito'], example: '1000.00' },
+    { key: 'stamps', label: 'Sellos o puntos que ya tiene', type: 'number', synonyms: ['sellos', 'puntos', 'sellos ciclo', 'sellos total', 'sellos actuales', 'stamps'], example: '3' },
     { key: 'notes', label: 'Notas', synonyms: ['notas', 'comentarios', 'observaciones', 'direccion', 'domicilio'], example: 'Calle Hidalgo 12' },
   ],
   proveedores: [
