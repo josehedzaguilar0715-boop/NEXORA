@@ -491,7 +491,8 @@ export function parseAmount(v: string): number | null {
 }
 
 function OpenShift({ onOpen, meals }: { onOpen: (s: Shift) => void; meals?: boolean }) {
-  const [amount, setAmount] = useState('')
+  // Propone el mismo fondo de la última vez en este equipo.
+  const [amount, setAmount] = useState(() => cache.get<string>('lastFloat', ''))
   const [meal, setMeal] = useState(() => { const h = new Date().getHours(); return h < 12 ? 'desayuno' : h < 18 ? 'comida' : 'cena' })
   const [err, setErr] = useState('')
   const open = async () => {
@@ -499,6 +500,7 @@ function OpenShift({ onOpen, meals }: { onOpen: (s: Shift) => void; meals?: bool
     if (cents == null) return setErr('Escribe con cuánto dinero abres (puede ser 0).')
     const id = crypto.randomUUID()
     const body = { id, openingFloat: cents, at: new Date().toISOString(), ...(meals ? { meal } : {}) }
+    cache.set('lastFloat', String(cents / 100))
     try {
       const r = await api<{ shift: Shift }>('POST', '/shifts/open', body, { 'idempotency-key': id })
       onOpen(r.shift)
@@ -513,7 +515,7 @@ function OpenShift({ onOpen, meals }: { onOpen: (s: Shift) => void; meals?: bool
   return (
     <div className="card login">
       <h1>Abrir caja</h1>
-      <p className="muted">Cuenta el dinero con el que empiezas el turno.</p>
+      <p className="muted">Cuenta el dinero con el que empiezas el turno.{amount ? ' Te propusimos el de la última vez.' : ''}</p>
       {meals && <div className="tabs">{['desayuno', 'comida', 'cena'].map((m) => <button key={m} className={meal === m ? 'on' : ''} onClick={() => setMeal(m)}>{m[0]!.toUpperCase() + m.slice(1)}</button>)}</div>}
       <label>Fondo inicial (lo que hay en la caja al empezar)<input inputMode="decimal" placeholder="$0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setErr('') }} autoFocus onKeyDown={(e) => e.key === 'Enter' && open()} /></label>
       <div className="quick">{[0, 500, 1000, 2000, 5000, 10000].map((v) => <button key={v} type="button" className={parseAmount(amount) === v * 100 ? 'on' : ''} onClick={() => setAmount(String(v))}>{mxn(v * 100).replace('.00', '')}</button>)}</div>

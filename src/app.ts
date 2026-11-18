@@ -11,6 +11,7 @@ import { importer } from './importer.js'
 import { layaways } from './layaways.js'
 import { reset } from './reset.js'
 import { campaigns, publicCampaigns } from './campaigns.js'
+import { today } from './today.js'
 import { inventory } from './inventory.js'
 import { hardware } from './hardware.js'
 import { services } from './services.js'
@@ -74,6 +75,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', layaways)
   protectedApp.route('/', reset)
   protectedApp.route('/', campaigns)
+  protectedApp.route('/', today)
   app.route('/', protectedApp)
 
   app.onError((err, c) => {

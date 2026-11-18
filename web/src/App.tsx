@@ -186,6 +186,13 @@ function Privada() {
   const hash = useHash()
   const [menu, setMenu] = useState(false)
   const [portal, setPortal] = useState<{ group: string; top: number } | null>(null)
+  // Cuántos pendientes hay hoy (se ve junto a «Inicio» desde cualquier pantalla).
+  const [pending, setPending] = useState(0)
+  useEffect(() => {
+    if (!me) return
+    const load = () => api<{ tasks: { tone: string }[] }>('GET', '/today').then((r) => setPending(r.tasks.filter((t) => t.tone !== 'info').length)).catch(() => {})
+    void load(); const t = setInterval(load, 120_000); return () => clearInterval(t)
+  }, [me?.user.id, hash])
   useEffect(() => { setPortal(null) }, [hash])
   // Esc cierra el panel lateral que esté abierto (el de más arriba).
   useEffect(() => {
@@ -245,7 +252,7 @@ function Privada() {
         <nav>
           {allowed.filter((s) => s.group === '').map((s) => (
             <a key={s.key} href={`#/${s.key}`} style={toneStyle('')} className={current?.key === s.key ? 'on' : ''} aria-current={current?.key === s.key ? 'page' : undefined}>
-              <s.icon size={20} strokeWidth={1.9} aria-hidden />{s.label}
+              <s.icon size={20} strokeWidth={1.9} aria-hidden />{s.label}{s.key === 'inicio' && pending > 0 && <span className="nav-badge" aria-label={`${pending} pendientes`}>{pending}</span>}
             </a>
           ))}
           {PORTALS.map((p) => {

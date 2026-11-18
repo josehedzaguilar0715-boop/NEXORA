@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
+import { Sheet } from '../Sheet'
 import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
 
@@ -17,6 +18,8 @@ export function Productos({ me }: { me: Me }) {
   const [filter, setFilter] = useState<Filter>('todos')
   const [edit, setEdit] = useState<{ p: P | null; tab?: string } | null>(null)
   const [alerts, setAlerts] = useState<{ low: any[]; expiring: any[] }>({ low: [], expiring: [] })
+  // Desde «Pendientes de hoy → Armar pedido» se abre directo el pedido sugerido.
+  const [order, setOrder] = useState(() => { try { const v = sessionStorage.getItem('nx_open') === 'pedido'; sessionStorage.removeItem('nx_open'); return v } catch { return false } })
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [err, setErr] = useState('')
   const load = async () => {
@@ -44,8 +47,10 @@ export function Productos({ me }: { me: Me }) {
     <div className="page">
       <div className="toolbar">
         <div className="row search"><input aria-label="Buscar producto" placeholder="Buscar por nombre o código…" value={q} onChange={(e) => setQ(e.target.value)} /><ScanButton onCode={(c) => setQ(c)} /></div>
+        {alerts.low.length > 0 && <button onClick={() => setOrder(true)}>🛒 Armar pedido ({alerts.low.length})</button>}
         {canEdit && <button className="primary" onClick={() => setEdit({ p: null })}>+ Nuevo producto</button>}
       </div>
+      {order && <Pedido me={me} onClose={() => setOrder(false)} />}
       <div className="seg wrap" role="tablist" style={{ marginBottom: 14 }}>
         {(Object.keys(LABEL) as Filter[]).filter((k) => k !== 'eliminados' || counts.eliminados > 0).map((k) => (
           <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{LABEL[k]}{counts[k] ? ` · ${counts[k]}` : ''}</button>
@@ -414,5 +419,54 @@ function Decants({ p, onDone }: { p: P; onDone: () => void }) {
       <p><button disabled={!f.targetId || !(Number(f.quantity) > 0)} onClick={run}>Fraccionar</button></p>
       {msg && <p className="muted">{msg}</p>}
     </div>
+  )
+}
+
+/** Pedido sugerido: lo que está debajo del mínimo, con cantidad para llegar al doble del mínimo, agrupado por proveedor y listo para WhatsApp. */
+function Pedido({ me, onClose }: { me: Me; onClose: () => void }) {
+  const [items, setItems] = useState<any[] | null>(null)
+  const [qty, setQty] = useState<Record<string, string>>({})
+  const [msg, setMsg] = useState('')
+  useEffect(() => { api<any>('GET', '/inventory/reorder').then((r) => { setItems(r.items); setQty(Object.fromEntries(r.items.map((i: any) => [i.productId, String(i.suggested)]))) }).catch((e) => setMsg(e.message)) }, [])
+  const groups = new Map<string, { supplier: any; items: any[] }>()
+  for (const it of items ?? []) {
+    const k = it.supplier?.id ?? ''
+    if (!groups.has(k)) groups.set(k, { supplier: it.supplier, items: [] })
+    groups.get(k)!.items.push(it)
+  }
+  const text = (g: { supplier: any; items: any[] }) => {
+    const lines = g.items.filter((i) => Number(qty[i.productId]) > 0).map((i) => `• ${i.name}: ${qty[i.productId]} ${i.unit === 'pieza' ? (Number(qty[i.productId]) === 1 ? 'pieza' : 'piezas') : i.unit}`)
+    return `Hola${g.supplier ? ` ${g.supplier.name}` : ''}, te hago un pedido para ${me.business.name}:\n${lines.join('\n')}\n¡Gracias!`
+  }
+  const wa = (g: { supplier: any; items: any[] }) => { const d = String(g.supplier?.phone ?? '').replace(/\D/g, '').slice(-10); return `https://wa.me/${d.length === 10 ? `52${d}` : ''}?text=${encodeURIComponent(text(g))}` }
+  return (
+    <Sheet onClose={onClose} wide>
+      <section className="card">
+        <div className="card-head"><h2>Pedido sugerido</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
+        <p className="muted small">Lo que está debajo del mínimo. Te sugerimos pedir lo necesario para llegar al doble del mínimo; puedes cambiar las cantidades. Se agrupa por el proveedor al que le compraste la última vez.</p>
+        {msg && <p className="error">{msg}</p>}
+        {items === null && <p className="muted">Calculando…</p>}
+        {items?.length === 0 && <p className="okmsg">No hay nada por surtir. ✓</p>}
+        {[...groups.values()].map((g) => {
+          const cost = g.items.reduce((a, i) => a + Math.round((Number(qty[i.productId]) || 0) * i.lastCost), 0)
+          return (
+            <div key={g.supplier?.id ?? 'sin'} className="danger-zone">
+              <div className="card-head"><h3>{g.supplier ? g.supplier.name : 'Sin proveedor registrado'}</h3>{cost > 0 && <span className="muted small">aprox. {mxn(cost)}</span>}</div>
+              <div className="table-wrap"><table className="list"><thead><tr><th>Producto</th><th className="num">Hay</th><th className="num">Mínimo</th><th className="num">Pedir</th></tr></thead><tbody>
+                {g.items.map((i) => (
+                  <tr key={i.productId}><td>{i.name}</td><td className="num">{i.stock}</td><td className="num">{i.minStock}</td>
+                    <td className="num" style={{ width: '7em' }}><input aria-label={`Pedir ${i.name}`} inputMode="decimal" value={qty[i.productId] ?? ''} onChange={(e) => setQty({ ...qty, [i.productId]: e.target.value })} /></td></tr>
+                ))}
+              </tbody></table></div>
+              <p className="row">
+                <a className="button primary" href={wa(g)} target="_blank" rel="noreferrer">Enviar por WhatsApp</a>
+                <button onClick={async () => { try { await navigator.clipboard.writeText(text(g)); setMsg('Pedido copiado.') } catch { prompt('Copia el pedido:', text(g)) } }}>Copiar</button>
+              </p>
+            </div>
+          )
+        })}
+        {msg === 'Pedido copiado.' && <p className="okmsg">{msg}</p>}
+      </section>
+    </Sheet>
   )
 }

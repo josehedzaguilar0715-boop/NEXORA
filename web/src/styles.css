@@ -463,3 +463,20 @@ ol.steps li { margin-bottom: 6px; }
 /* Indicador de selección: una barra del color del portal, no todo pintado. */
 .side nav a.on, .side nav .portal-btn.on { box-shadow: inset 3px 0 0 var(--tone, var(--cyan)); }
 .portal-item.on { box-shadow: inset 3px 0 0 var(--tone, var(--cyan)); }
+
+/* ---------- Pendientes de hoy (el sistema avisa qué toca hacer) ---------- */
+.tasks { margin-bottom: 16px; }
+.tasks h2 { display: flex; align-items: center; gap: 10px; }
+.task { border: 1px solid var(--line); border-left: 4px solid var(--task, var(--cyan)); border-radius: 14px; padding: 12px 14px; margin-top: 10px; background: var(--input); }
+.task-head { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.task-head b { display: block; }
+.task-head small { display: block; margin-top: 2px; }
+.task .table-wrap { margin-top: 8px; }
+a.button.mini-link { min-height: 40px; padding: 6px 14px; font-size: 0.88rem; border-radius: 10px; }
+.tasks-empty { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+.tasks-empty b { color: var(--ok); }
+@media (max-width: 600px) {
+  .task-head { flex-direction: column; align-items: stretch; }
+  .task-head .row { justify-content: flex-end; }
+}
+.nav-badge { margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #1a1302; font-size: 0.75rem; font-weight: 800; display: inline-grid; place-items: center; }
