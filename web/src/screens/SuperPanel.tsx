@@ -21,16 +21,16 @@ const PLANS: Record<string, string> = { inicial: 'Inicial ($500, 3 usuarios)', c
 
 export function SuperPanel() {
   const [logged, setLogged] = useState(!!localStorage.getItem(TOKEN))
-  const [tab, setTab] = useState<'negocios' | 'buzon' | 'alta' | 'ajustes'>('negocios')
+  const [tab, setTab] = useState<'negocios' | 'buzon' | 'alta' | 'demos' | 'ajustes'>('negocios')
   if (!logged) return <AdminLogin onLogin={() => setLogged(true)} />
   return (
     <div className="admin-app">
       <header className="adminbar">
         <span className="brand" style={{ padding: 0 }}><Logo size={28} /><span className="word">NEXORA</span><span className="muted" style={{ letterSpacing: 0, fontWeight: 600 }}>Super panel</span></span>
-        <nav>{(['negocios', 'buzon', 'alta', 'ajustes'] as const).map((k) => <a key={k} href="#" className={tab === k ? 'on' : ''} onClick={(e) => { e.preventDefault(); setTab(k) }}>{{ negocios: 'Negocios', buzon: 'Buzón', alta: 'Alta asistida', ajustes: 'Ajustes' }[k]}</a>)}</nav>
+        <nav>{(['negocios', 'buzon', 'alta', 'demos', 'ajustes'] as const).map((k) => <a key={k} href="#" className={tab === k ? 'on' : ''} onClick={(e) => { e.preventDefault(); setTab(k) }}>{{ negocios: 'Negocios', buzon: 'Buzón', alta: 'Alta asistida', demos: 'Demos', ajustes: 'Ajustes' }[k]}</a>)}</nav>
         <button onClick={() => { localStorage.removeItem(TOKEN); setLogged(false) }}>Salir</button>
       </header>
-      <main>{tab === 'negocios' ? <Negocios /> : tab === 'buzon' ? <BuzonAdmin /> : tab === 'alta' ? <Alta onDone={() => setTab('negocios')} /> : <AjustesAdmin />}</main>
+      <main>{tab === 'negocios' ? <Negocios /> : tab === 'buzon' ? <BuzonAdmin /> : tab === 'alta' ? <Alta onDone={() => setTab('negocios')} /> : tab === 'demos' ? <Demos /> : <AjustesAdmin />}</main>
     </div>
   )
 }
@@ -307,5 +307,47 @@ function Respaldos() {
       {enabled && list.length === 0 && <p className="muted">Todavía no hay respaldos.</p>}
       <p><button onClick={async () => { const d = await adm('GET', '/admin/export'); const url = URL.createObjectURL(new Blob([JSON.stringify(d)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = `nexora-${d.exportedAt.slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url) }}>Descargar todo ahora (sin comprimir)</button></p>
     </>
+  )
+}
+
+/** Demos: un negocio de prueba por giro, con datos ficticios, para conocer el sistema y capacitar. */
+function Demos() {
+  const [list, setList] = useState<any[]>([])
+  const [busy, setBusy] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  const load = async () => setList((await adm('GET', '/admin/demos')).demos)
+  useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
+  const create = async (giros: string[]) => {
+    setMsg({})
+    for (const g of giros) {
+      setBusy(g)
+      try { await adm('POST', `/admin/demos/${g}`) } catch (e) { setMsg({ err: (e as Error).message }); break }
+      await load()
+    }
+    setBusy(null)
+    setMsg((m) => (m.err ? m : { ok: 'Listo. Ya puedes entrar a cada demo con sus accesos.' }))
+  }
+  const missing = list.filter((d) => !d.created).map((d) => d.giro)
+  const text = list.filter((d) => d.created).map((d) => `${d.label}: dueño ${d.phone} / ${d.password} · empleado ${d.staffUser} / ${d.staffPassword} · código ${d.code}`).join('\n')
+  return (
+    <section className="card">
+      <div className="card-head"><h2>Negocios de demostración</h2>
+        {missing.length > 0 && <button className="primary" disabled={!!busy} onClick={() => void create(missing)}>{busy ? `Creando ${list.find((d) => d.giro === busy)?.label}…` : `Crear ${missing.length === list.length ? 'todas las demos' : `las ${missing.length} que faltan`}`}</button>}
+      </div>
+      <p className="muted small">Un negocio por giro con inventario, proveedores, clientes, fiados, ventas de la semana y lo propio de cada giro (agenda, mesas, boletos, recetas…), todo ficticio. Son gratis y no se cobran. Entra en {location.origin}: el dueño con «Dueño» (teléfono y contraseña) y el empleado con «Empleado» (usuario y contraseña). El código de autorización es <b>1234</b>. Si algo se ensucia, usa «Borrar datos de prueba» en ese negocio.</p>
+      {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
+      <div className="table-wrap"><table className="list">
+        <thead><tr><th>Giro</th><th>Dueño (teléfono / contraseña)</th><th>Empleado (usuario / contraseña)</th><th /></tr></thead>
+        <tbody>{list.map((d) => (
+          <tr key={d.giro}>
+            <td><b>{d.label}</b>{!d.created && <><br /><small className="muted">sin crear</small></>}</td>
+            <td><code>{d.phone}</code> / <code>{d.password}</code></td>
+            <td><code>{d.staffUser}</code> / <code>{d.staffPassword}</code></td>
+            <td className="num">{!d.created && <button className="mini" disabled={!!busy} onClick={() => void create([d.giro])}>{busy === d.giro ? 'Creando…' : 'Crear'}</button>}</td>
+          </tr>
+        ))}</tbody>
+      </table></div>
+      {text && <p><button onClick={async () => { try { await navigator.clipboard.writeText(text); setMsg({ ok: 'Accesos copiados.' }) } catch { prompt('Copia los accesos:', text) } }}>Copiar todos los accesos</button></p>}
+    </section>
   )
 }

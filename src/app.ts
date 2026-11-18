@@ -12,6 +12,7 @@ import { layaways } from './layaways.js'
 import { reset } from './reset.js'
 import { campaigns, publicCampaigns } from './campaigns.js'
 import { today } from './today.js'
+import { setDemoApp } from './demo.js'
 import { inventory } from './inventory.js'
 import { hardware } from './hardware.js'
 import { services } from './services.js'
@@ -84,5 +85,6 @@ export function createApp(deps: Deps) {
     return c.json({ error: { code: 'error_interno', message: 'Ocurrió un error. Inténtalo de nuevo.' } }, 500)
   })
   app.notFound((c) => c.json({ error: { code: 'no_encontrado', message: 'Ruta no encontrada.' } }, 404))
+  setDemoApp(app)
   return app
 }

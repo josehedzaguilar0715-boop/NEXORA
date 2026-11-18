@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
+import { authorize } from './authcode.js'
 import { loadCustomer } from './common.js'
 import { body, ownerOnly, parse, requirePerm, type Env } from './context.js'
 import type { Db } from './db.js'
@@ -52,6 +53,25 @@ finance.post('/customers/:id/credit-payments', requirePerm('customers_credit'), 
     // El abono en efectivo entra a la caja como depósito, así cuadra el corte.
     if (d.method === 'efectivo') db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'deposito',?,?,?,?)").run(newId(), shift!.id, d.amount, `Abono de ${cu.name}`, u.id, iso(now()))
     audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fiado.abono', entity: 'customer', entityId: cu.id, newValue: { amount: d.amount, method: d.method } })
+  })()
+  return c.json({ balance: customerBalance(db, cu.id) }, 201)
+})
+
+/**
+ * Deuda anterior: lo que el cliente ya debía antes de usar NEXORA (o un cargo que no pasó por la caja), con motivo.
+ * No es una venta (no cuenta como ingreso ni sale del inventario). El dueño directo; los demás con el código del dueño.
+ */
+finance.post('/customers/:id/credit-charges', requirePerm('customers_credit'), async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const u = c.get('session').user
+  const cu = loadCustomer(c)
+  const d = parse(z.object({ id: z.string().uuid().optional(), amount: z.number().int().min(1).max(100_000_000), note: z.string().trim().min(3, 'Escribe el motivo').max(200), authCode: z.string().optional() }), await body(c))
+  if (d.id && db.prepare('SELECT 1 FROM credit_ledger WHERE id = ?').get(d.id)) return c.json({ duplicate: true, balance: customerBalance(db, cu.id) })
+  const auth = u.role === 'owner' ? null : authorize(deps, u, d.authCode, 'customers_credit', 'cargar deuda anterior', { ownerOnly: true })
+  db.transaction(() => {
+    db.prepare("INSERT INTO credit_ledger (id, business_id, customer_id, delta, kind, note, created_by, created_at) VALUES (?,?,?,?,'cargo',?,?,?)").run(d.id ?? newId(), u.business_id, cu.id, d.amount, d.note, u.id, iso(now()))
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fiado.deuda_anterior', entity: 'customer', entityId: cu.id, newValue: { amount: d.amount }, reason: d.note, ...(auth ? { authorizedBy: auth.id } : {}) })
   })()
   return c.json({ balance: customerBalance(db, cu.id) }, 201)
 })

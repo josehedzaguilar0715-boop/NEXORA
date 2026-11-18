@@ -114,7 +114,7 @@ function Cliente({ me, c, fiado, onChanged, onClose }: { me: Me; c: any; fiado: 
 
 function Cuenta({ me, c, onChanged }: { me: Me; c: any; onChanged: () => void }) {
   const [credit, setCredit] = useState<any>(null)
-  const [f, setF] = useState({ abono: '', method: 'efectivo', limit: '' })
+  const [f, setF] = useState({ abono: '', method: 'efectivo', limit: '', debt: '', debtNote: '', code: '' })
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = async () => setCredit(await api('GET', `/customers/${c.id}/credit`))
   useEffect(() => { void load().catch(() => {}) }, [c.id])
@@ -135,6 +135,16 @@ function Cuenta({ me, c, onChanged }: { me: Me; c: any; onChanged: () => void })
           <button className="primary" style={{ flex: '0 0 auto' }} disabled={!(toCents(f.abono) > 0)} onClick={run(async () => { await api('POST', `/customers/${c.id}/credit-payments`, { id: crypto.randomUUID(), amount: toCents(f.abono), method: f.method }); setF({ ...f, abono: '' }) }, 'Abono registrado.')}>Abonar</button>
         </div>
       </>)}
+      <details className="danger-zone">
+        <summary><b>Agregar deuda anterior</b> <span className="muted small">— lo que ya debía antes de usar NEXORA</span></summary>
+        <p className="muted small">No es una venta: no cuenta como ingreso ni descuenta inventario. Queda en sus movimientos y en la bitácora.</p>
+        <div className="row">
+          <label>Cuánto debe<input inputMode="decimal" placeholder="$0.00" value={f.debt} onChange={(e) => setF({ ...f, debt: e.target.value })} /></label>
+          <label>Motivo<input value={f.debtNote} onChange={(e) => setF({ ...f, debtNote: e.target.value })} placeholder="Deuda de la libreta" /></label>
+        </div>
+        {me.user.role !== 'owner' && <label>Código del dueño<input type="password" inputMode="numeric" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} /></label>}
+        <p><button className="primary" disabled={!(toCents(f.debt) > 0) || f.debtNote.trim().length < 3 || (me.user.role !== 'owner' && !f.code)} onClick={run(async () => { await api('POST', `/customers/${c.id}/credit-charges`, { id: crypto.randomUUID(), amount: toCents(f.debt), note: f.debtNote, ...(me.user.role !== 'owner' ? { authCode: f.code } : {}) }); setF({ ...f, debt: '', debtNote: '', code: '' }) }, 'Deuda agregada a su cuenta.')}>Agregar a su cuenta</button></p>
+      </details>
       {me.user.role === 'owner' && (<>
         <h3 style={{ marginTop: 14 }}>Límite de crédito</h3>
         <div className="row"><input aria-label="Límite de crédito" inputMode="decimal" placeholder={credit.limit ? String(credit.limit / 100) : '$0.00'} value={f.limit} onChange={(e) => setF({ ...f, limit: e.target.value })} /><button style={{ flex: '0 0 auto' }} disabled={f.limit.trim() === ''} onClick={run(async () => { await api('PUT', `/customers/${c.id}/credit-limit`, { limit: toCents(f.limit) }); setF({ ...f, limit: '' }) }, 'Límite guardado.')}>Guardar límite</button></div>

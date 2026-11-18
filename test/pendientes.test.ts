@@ -66,4 +66,20 @@ describe('pendientes de hoy y pedido sugerido', () => {
     expect(rb).not.toContain('surtir')
     expect(rb).not.toContain('fiado')
   })
+
+  it('deuda anterior: se agrega a la cuenta del cliente con motivo, sin contar como venta', async () => {
+    const { s, T, o } = await negocioListo()
+    const cli = (await s.call('POST', '/customers', { token: T, body: { name: 'Don Beto' } })).json.customer
+    expect((await s.call('POST', `/customers/${cli.id}/credit-charges`, { token: T, body: { amount: 35000 } })).status).toBe(400)
+    const r = await s.call('POST', `/customers/${cli.id}/credit-charges`, { token: T, body: { amount: 35000, note: 'Deuda de la libreta' } })
+    expect(r.json.balance).toBe(35000)
+    const cr = (await s.call('GET', `/customers/${cli.id}/credit`, { token: T })).json
+    expect(cr.ledger[0]).toMatchObject({ kind: 'cargo', note: 'Deuda de la libreta', delta: 35000 })
+    expect((await s.call('GET', '/reports/summary', { token: T })).json.sales.total).toBe(0)
+    expect((await s.call('GET', '/receivables', { token: T })).json.total).toBe(35000)
+    // Un cajero necesita el código del dueño.
+    const caj = await s.createStaff(T, o.business.code, 'cajero8', 'cajero')
+    expect((await s.call('POST', `/customers/${cli.id}/credit-charges`, { token: caj.token, body: { amount: 1000, note: 'Faltó' } })).json.error.code).toBe('codigo_requerido')
+    expect((await s.call('POST', `/customers/${cli.id}/credit-charges`, { token: caj.token, body: { amount: 1000, note: 'Faltó', authCode: '4321' } })).json.balance).toBe(36000)
+  })
 })

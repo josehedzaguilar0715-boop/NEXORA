@@ -15,7 +15,7 @@ const BAD_CREDENTIALS = 'Datos incorrectos.'
 
 const device = z.object({ deviceId: z.string().max(100).optional(), deviceName: z.string().max(100).optional() })
 
-function createSession(deps: Deps, user: UserRow, dev: { deviceId?: string; deviceName?: string }) {
+export function createSession(deps: Deps, user: UserRow, dev: { deviceId?: string; deviceName?: string }) {
   const { db, now } = deps
   const token = newToken()
   const t = now()

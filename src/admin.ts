@@ -6,6 +6,7 @@ import { businessGiros, enforceLimits, GIROS, limits, monthlyFee, PLAN_KEYS, ref
 import { body, LOCK_MINUTES, MAX_FAILED, parse, smsOn, type Deps, type UserRow } from './context.js'
 import { consumeChallenge, createChallenge, extraOf, forgetDevices } from './auth.js'
 import { resetDemoData } from './reset.js'
+import { demoAccess, demoApp, DEMOS, seedDemo } from './demo.js'
 import { ticketView } from './support.js'
 import { exportAll, runBackup } from './backup.js'
 import {
@@ -297,6 +298,21 @@ admin.post('/admin/businesses/:id/free', async (c) => {
   }
   audit(db, now, { businessId: b.id, userId: c.get('admin').id, action: d.free ? 'admin.cuenta_gratis' : 'admin.cuenta_con_mensualidad', entity: 'business', entityId: b.id, oldValue: { status: b.status, paidUntil: b.paid_until }, reason: d.reason })
   return c.json({ business: businessView(db, refreshStatus(db, now, b.id), now()) })
+})
+
+/** Negocios de demostración: uno por giro, gratis, con datos ficticios y accesos fáciles. */
+admin.get('/admin/demos', (c) => c.json({ demos: demoAccess(c.get('deps').db) }))
+admin.post('/admin/demos/:giro', async (c) => {
+  const deps = c.get('deps')
+  const giro = c.req.param('giro')
+  if (!DEMOS.some((d) => d.giro === giro)) throw bad('Giro no válido.')
+  try {
+    const r = await seedDemo(demoApp() as never, deps, giro)
+    if (r.created) audit(deps.db, deps.now, { businessId: r.businessId!, userId: c.get('admin').id, action: 'admin.demo_creada', entity: 'business', entityId: r.businessId! })
+    return c.json({ ...r, demo: demoAccess(deps.db).find((d) => d.giro === giro) })
+  } catch (e) {
+    throw bad(`No se pudo crear la demo de ${giro}: ${(e as Error).message}`)
+  }
 })
 
 /** Empezar de cero: borrar las ventas y movimientos de prueba de una cuenta asistida (se escribe BORRAR y un motivo). */
