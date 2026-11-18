@@ -98,7 +98,7 @@ function Empleado({ me, u, catalog, onClose, onChanged }: { me: Me; u: any; cata
   const owner = me.user.role === 'owner'
   const agenda = owner && hasGiro(me, 'barberia', 'unas')
   return (
-    <div className="modal" onClick={onClose}>
+    <div className="modal sheet" onClick={onClose}>
       <div className="card wide" onClick={(e) => e.stopPropagation()}>
         <div className="card-head"><h2>{u.name}</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
         <p className="muted small" style={{ marginTop: -4 }}>Usuario: <b>{u.username}</b>{!active && ' · desactivado'}</p>

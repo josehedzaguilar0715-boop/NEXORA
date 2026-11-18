@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mxn } from '../api'
-import type { Me } from '../App'
+import { FIADO_GIROS, hasGiro, screensFor, type Me } from '../App'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const day = (d: string) => new Date(`${d}T12:00:00-06:00`).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
@@ -33,10 +33,11 @@ export function Inicio({ me }: { me: Me }) {
     <div>
       <h1>Hola, {me.user.name.split(' ')[0]}</h1>
       <p className="muted" style={{ marginTop: -6 }}>{me.business.name} · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+      <QuickActions me={me} />
       <div className="kpis">
         <div className="card kpi"><div className="label">Ventas de hoy</div><div className="value">{sum ? mxn(sum.sales.total) : '—'}</div><div className="hint">{sum ? `${sum.sales.tickets} tickets${sum.cancelled ? ` · ${sum.cancelled} canceladas` : ''}` : ''}</div></div>
         <div className="card kpi"><div className="label">Utilidad del mes</div><div className={`value ${month && month.profit < 0 ? 'neg' : ''}`}>{month ? mxn(month.profit) : '—'}</div><div className="hint">ventas − costo − gastos · <a href="#/finanzas">ver finanzas</a></div></div>
-        <div className="card kpi"><div className="label">Por cobrar (fiado)</div><div className="value">{rec == null ? '—' : mxn(rec)}</div><div className="hint">saldo de clientes</div></div>
+        {hasGiro(me, ...FIADO_GIROS) && <div className="card kpi"><div className="label">Por cobrar (fiado)</div><div className="value">{rec == null ? '—' : mxn(rec)}</div><div className="hint">saldo de clientes</div></div>}
         <div className="card kpi"><div className="label">Productos por surtir</div><div className={`value ${low ? 'neg' : 'pos'}`}>{low ?? '—'}</div><div className="hint">debajo del mínimo</div></div>
       </div>
       <div className="grid2" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
@@ -72,6 +73,35 @@ export function Inicio({ me }: { me: Me }) {
           {moves.length === 0 && <p className="muted">Todavía no hay movimientos.</p>}
         </section>
       </div>
+    </div>
+  )
+}
+
+/** Lo que más usa cada tipo de negocio, a un toque. */
+const QUICK: Record<string, string[]> = {
+  barberia: ['caja', 'agenda', 'escanear', 'clientes'], unas: ['caja', 'agenda', 'escanear', 'clientes'],
+  restaurante: ['mesas', 'caja', 'cocina', 'pedidos'], palapa: ['mesas', 'caja', 'cocina', 'precios'], taqueria: ['caja', 'mesas', 'carne', 'menu'],
+  comedor: ['caja', 'menu', 'clientes'], banos: ['entradas', 'caja', 'escanear'], turistico: ['taquilla', 'acceso', 'caja'],
+  verduleria: ['caja', 'precios', 'pedidos', 'cierre'], abarrotes: ['caja', 'productos', 'apartados', 'clientes'],
+  ferreteria: ['caja', 'cotizaciones', 'productos', 'clientes'], papeleria: ['caja', 'encargos', 'productos', 'clientes'],
+  perfumeria: ['caja', 'productos', 'clientes', 'devoluciones'],
+}
+
+function QuickActions({ me }: { me: Me }) {
+  const allowed = screensFor(me)
+  const giros = me.business.giros ?? [me.business.giro]
+  const keys = [...new Set([...giros.flatMap((g) => QUICK[g] ?? []), 'caja', 'productos', 'clientes', 'reportes'])]
+  const list = keys.map((k) => allowed.find((s) => s.key === k)).filter((s): s is NonNullable<typeof s> => !!s).slice(0, 6)
+  if (!list.length) return null
+  return (
+    <div className="quick-actions">
+      {list.map((s) => (
+        <a key={s.key} href={`#/${s.key}`} className="quick-action">
+          <span className="qa-icon"><s.icon size={26} strokeWidth={1.9} aria-hidden /></span>
+          <b>{s.label}</b>
+          {s.desc && <small>{s.desc}</small>}
+        </a>
+      ))}
     </div>
   )
 }

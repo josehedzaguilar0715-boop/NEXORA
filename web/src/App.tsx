@@ -32,7 +32,7 @@ import { Importar } from './screens/Importar'
 import { Configurar } from './screens/Configurar'
 import { Apartados } from './screens/Apartados'
 import {
-  Archive, Armchair, Boxes, CalendarDays, ChartColumn, ChefHat, ClipboardCheck, Clock, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
+  Archive, Armchair, Boxes, CalendarDays, ChevronRight, ChartColumn, ChefHat, ClipboardCheck, Clock, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
   LifeBuoy, LogOut, Menu, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
 } from 'lucide-react'
 
@@ -53,9 +53,30 @@ export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.bus
 export const can = (me: Me, p: string) => (p === 'owner' ? me.user.role === 'owner' : p === 'view_reports' || me.permissions === 'todos' || me.permissions.includes(p))
 
 type Icon = import('lucide-react').LucideIcon
-type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[]; group: string; icon: Icon; ownTitle?: boolean }
-/** Menú por secciones: lo de todos los días arriba y la administración al final. */
-const GROUPS = ['', 'Operación', 'Inventario', 'Clientes', 'Finanzas', 'Administración']
+export type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[]; group: string; icon: Icon; ownTitle?: boolean; desc?: string }
+/** Portales del menú: cada uno abre un panel con sus opciones (lo de todos los días arriba, la administración al final). */
+const PORTALS: { group: string; label: string; icon: Icon }[] = [
+  { group: 'Operación', label: 'Vender', icon: ShoppingCart },
+  { group: 'Inventario', label: 'Inventario', icon: Boxes },
+  { group: 'Clientes', label: 'Clientes', icon: Users },
+  { group: 'Finanzas', label: 'Dinero', icon: Landmark },
+  { group: 'Administración', label: 'Mi negocio', icon: Settings },
+]
+export const portalOf = (group: string) => PORTALS.find((p) => p.group === group)?.label ?? group
+
+/** Una línea de qué hace cada opción, para encontrarla sin buscar. */
+const DESC: Record<string, string> = {
+  caja: 'Cobrar, abrir y cerrar caja, cortes', agenda: 'Citas del día y por barbero o técnica', entradas: 'Cobrar la entrada y ver aforo',
+  taquilla: 'Vender boletos y cortes de taquilla', acceso: 'Validar boletos con QR', mesas: 'Cuentas por mesa, reservas y rentas',
+  pedidos: 'Para llevar, para recoger y por teléfono', cocina: 'Comandas por estación', menu: 'Publicar lo de hoy y marcar agotados',
+  carne: 'Trompo o asada: lo que se pone y el sobrante', apartados: 'Apartados con anticipo y abonos', cotizaciones: 'Cotizar y convertir en venta',
+  encargos: 'Trabajos con anticipo', devoluciones: 'Con ticket y código', escanear: 'Dar sello, registrar entrada o usar membresía',
+  productos: 'Altas, precios, existencias y mayoreo', precios: 'Actualizar el precio de hoy', compras: 'Lo que compras a proveedores',
+  cierre: 'Merma y conteo al cerrar', clientes: 'Lista, saldo, sellos y su QR', lealtad: 'Tarjeta de sellos, premios, rifa y promociones',
+  finanzas: 'Estado de resultados, gastos y contabilidad', reportes: 'Ventas del periodo y retiro sugerido', comisiones: 'Comisiones y propinas del personal',
+  configurar: 'Servicios, mesas, horarios y catálogo', asistencia: 'Mi entrada y salida', usuarios: 'Empleados, permisos y horarios',
+  buzon: 'Dudas y solicitudes a soporte', importar: 'Traer datos de Excel u otro sistema', ajustes: 'Datos del negocio, módulos e instalar en otros equipos',
+}
 const SCREENS: Screen[] = [
   { key: 'inicio', label: 'Inicio', perm: 'view_reports', C: Inicio, group: '', icon: LayoutDashboard, ownTitle: true },
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja, group: 'Operación', icon: ShoppingCart },
@@ -72,7 +93,7 @@ const SCREENS: Screen[] = [
   { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria'], group: 'Operación', icon: FileText },
   { key: 'encargos', label: 'Encargos', perm: 'sell', C: Encargos, giros: ['papeleria'], group: 'Operación', icon: Package },
   { key: 'devoluciones', label: 'Devoluciones', perm: 'cancel_discount', C: Devoluciones, giros: ['ferreteria', 'perfumeria'], group: 'Operación', icon: Undo2 },
-  { key: 'escanear', label: 'Escanear QR', perm: 'sell', C: Escanear, group: 'Operación', icon: QrCode },
+  { key: 'escanear', label: 'Escanear QR', perm: 'sell', C: Escanear, group: 'Clientes', icon: QrCode },
   { key: 'productos', label: 'Productos', perm: 'view_inventory', C: Productos, group: 'Inventario', icon: Boxes },
   { key: 'precios', label: 'Precio del día', perm: 'change_prices', C: PrecioDia, giros: ['verduleria', 'palapa', 'taqueria'], group: 'Inventario', icon: Tag },
   { key: 'compras', label: 'Compras', perm: 'edit_inventory', C: Compras, group: 'Inventario', icon: Truck },
@@ -139,11 +160,37 @@ export function App() {
   )
 }
 
+/** Pantallas que ve este usuario: según permisos, giro y módulos; con el nombre que corresponde a su negocio. */
+export function screensFor(me: Me): Screen[] {
+  // Comedor: el mapa de mesas es opcional (apagado por defecto).
+  const giroOk = (s: Screen) => !s.giros || hasGiro(me, ...s.giros) || (s.key === 'mesas' && hasGiro(me, 'comedor') && !!me.settings?.tablesEnabled)
+  const needsModule: Record<string, string[]> = { escanear: ['membresias', 'asistencia', 'fidelidad'] }
+  const moduleOk = (s: Screen) => !needsModule[s.key] || needsModule[s.key]!.some((m) => me.modules?.includes(m))
+  // Algunos nombres cambian según el giro, para que cada sistema hable de su negocio.
+  const fiado = hasGiro(me, ...FIADO_GIROS)
+  const rename = (s: Screen): Screen =>
+    s.key === 'clientes' ? { ...s, label: fiado ? 'Clientes y fiado' : 'Clientes' }
+    : s.key === 'menu' ? { ...s, label: hasGiro(me, 'comedor') ? 'Menú del día' : 'Guisados del día' }
+    : s.key === 'precios' ? { ...s, label: hasGiro(me, 'verduleria') ? 'Precio del día' : 'Precio por kilo' }
+    : s.key === 'lealtad' ? { ...s, label: me.modules?.includes('fidelidad') ? 'Sellos y promociones' : 'Membresías y promos' }
+    : s
+  return SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s) && !(s.key === 'asistencia' && can(me, 'create_employees'))).map((s) => ({ ...rename(s), desc: DESC[s.key] }))
+}
+
 function Privada() {
   const [me, setMe] = useState<Me | null>(cache.get<Me | null>('me', null))
   const [checking, setChecking] = useState(!!auth.token)
   const hash = useHash()
   const [menu, setMenu] = useState(false)
+  const [portal, setPortal] = useState<{ group: string; top: number } | null>(null)
+  useEffect(() => { setPortal(null) }, [hash])
+  useEffect(() => {
+    if (!portal) return
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setPortal(null)
+    const out = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.portal-pop, .portal-btn, .portal-inline')) setPortal(null) }
+    window.addEventListener('keydown', esc); window.addEventListener('mousedown', out)
+    return () => { window.removeEventListener('keydown', esc); window.removeEventListener('mousedown', out) }
+  }, [portal])
 
   useEffect(() => {
     if (!auth.token) return
@@ -166,18 +213,7 @@ function Privada() {
   }
   if (me.user.mustChangePassword) return <Login forceChange onLogin={(m) => { setMe(m); cache.set('me', m) }} />
 
-  // Comedor: el mapa de mesas es opcional (apagado por defecto).
-  const giroOk = (s: Screen) => !s.giros || hasGiro(me, ...s.giros) || (s.key === 'mesas' && hasGiro(me, 'comedor') && !!me.settings?.tablesEnabled)
-  const needsModule: Record<string, string[]> = { escanear: ['membresias', 'asistencia', 'fidelidad'] }
-  const moduleOk = (s: Screen) => !needsModule[s.key] || needsModule[s.key]!.some((m) => me.modules?.includes(m))
-  // Algunos nombres cambian según el giro, para que cada sistema hable de su negocio.
-  const fiado = hasGiro(me, ...FIADO_GIROS)
-  const rename = (s: Screen): Screen =>
-    s.key === 'clientes' ? { ...s, label: fiado ? 'Clientes y fiado' : 'Clientes' }
-    : s.key === 'menu' ? { ...s, label: hasGiro(me, 'comedor') ? 'Menú del día' : 'Guisados del día' }
-    : s.key === 'precios' ? { ...s, label: hasGiro(me, 'verduleria') ? 'Precio del día' : 'Precio por kilo' }
-    : s
-  const allowed = SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s) && !(s.key === 'asistencia' && can(me, 'create_employees'))).map(rename)
+  const allowed = screensFor(me)
   // El personal que cobra entra directo a la caja; el dueño, al inicio.
   const current = allowed.find((s) => s.key === hash) ?? (me.user.role === 'staff' ? allowed.find((s) => s.key === 'caja') : undefined) ?? allowed[0]
   const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'
@@ -194,17 +230,28 @@ function Privada() {
         <div className="biz">{me.business.name}</div>
         {/* Un permiso no marcado no aparece en pantalla. */}
         <nav>
-          {GROUPS.map((g) => {
-            const items = allowed.filter((s) => s.group === g)
+          {allowed.filter((s) => s.group === '').map((s) => (
+            <a key={s.key} href={`#/${s.key}`} className={current?.key === s.key ? 'on' : ''} aria-current={current?.key === s.key ? 'page' : undefined}>
+              <s.icon size={20} strokeWidth={1.9} aria-hidden />{s.label}
+            </a>
+          ))}
+          {PORTALS.map((p) => {
+            const items = allowed.filter((s) => s.group === p.group)
             if (!items.length) return null
+            const on = current?.group === p.group
+            const open = portal?.group === p.group
+            // Un portal con una sola opción lleva directo a ella.
+            if (items.length === 1) return (
+              <a key={p.group} href={`#/${items[0]!.key}`} className={`portal-btn ${on ? 'on' : ''}`}><p.icon size={20} strokeWidth={1.9} aria-hidden />{p.label}</a>
+            )
             return (
-              <div key={g || 'top'} className="nav-group">
-                {g && <div className="nav-title">{g}</div>}
-                {items.map((s) => (
-                  <a key={s.key} href={`#/${s.key}`} className={current?.key === s.key ? 'on' : ''} aria-current={current?.key === s.key ? 'page' : undefined}>
-                    <s.icon size={20} strokeWidth={1.9} aria-hidden />{s.label}
-                  </a>
-                ))}
+              <div key={p.group} className="nav-group">
+                <button type="button" className={`portal-btn ${on ? 'on' : ''} ${open ? 'open' : ''}`} aria-expanded={open}
+                  onClick={(e) => { e.stopPropagation(); setPortal(open ? null : { group: p.group, top: e.currentTarget.getBoundingClientRect().top }) }}>
+                  <p.icon size={20} strokeWidth={1.9} aria-hidden /><span>{p.label}</span><ChevronRight size={16} aria-hidden className="chev" />
+                </button>
+                {/* En celular el panel se abre debajo del portal, dentro del menú. */}
+                {open && <div className="portal-inline">{items.map((s) => <PortalItem key={s.key} s={s} on={current?.key === s.key} />)}</div>}
               </div>
             )
           })}
@@ -215,11 +262,31 @@ function Privada() {
           <button className="logout" onClick={logout}><LogOut size={18} aria-hidden />Salir</button>
         </div>
       </aside>
+      {portal && (() => {
+        const p = PORTALS.find((x) => x.group === portal.group)!
+        const items = allowed.filter((s) => s.group === portal.group)
+        return (
+          <div className="portal-pop" role="menu" style={{ top: Math.max(12, Math.min(portal.top - 12, window.innerHeight - 80 - items.length * 64)) }}>
+            <div className="portal-head"><p.icon size={18} aria-hidden />{p.label}</div>
+            {items.map((s) => <PortalItem key={s.key} s={s} on={current?.key === s.key} />)}
+          </div>
+        )
+      })()}
       <main>
         {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
-        {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <p className="muted">{current.group}</p>}</div></header>}
+        {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <p className="muted">{portalOf(current.group)}</p>}</div></header>}
         {current ? <current.C me={me} /> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}
       </main>
     </div>
+  )
+}
+
+/** Opción dentro de un portal: ícono, nombre y qué hace. */
+function PortalItem({ s, on }: { s: Screen; on: boolean }) {
+  return (
+    <a href={`#/${s.key}`} className={`portal-item ${on ? 'on' : ''}`} role="menuitem" aria-current={on ? 'page' : undefined}>
+      <s.icon size={20} strokeWidth={1.9} aria-hidden />
+      <span><b>{s.label}</b>{s.desc && <small>{s.desc}</small>}</span>
+    </a>
   )
 }

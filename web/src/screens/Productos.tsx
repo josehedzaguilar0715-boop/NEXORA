@@ -95,7 +95,7 @@ function Editor({ me, p, tab: initialTab, categories, onClose, onSaved }: { me: 
   ].filter((t) => t.show)
   const [tab, setTab] = useState(initialTab && tabs.some((t) => t.key === initialTab) ? initialTab : 'datos')
   return (
-    <div className="modal" onClick={onClose}>
+    <div className="modal sheet" onClick={onClose}>
       <div className="card wide" onClick={(e) => e.stopPropagation()}>
         <div className="card-head"><h2>{p ? p.name : 'Nuevo producto'}</h2><button className="mini" onClick={onClose} aria-label="Cerrar">Cerrar</button></div>
         {tabs.length > 1 && <nav className="subtabs">{tabs.map((t) => <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => setTab(t.key)}>{t.label}</button>)}</nav>}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import { can, FIADO_GIROS, hasGiro, type Me } from '../App'
 import { cardWhatsApp } from './MiTarjeta'
+import { Sheet } from '../Sheet'
 
 const KIND: Record<string, string> = { cargo: 'Compra fiada', abono: 'Abono', cancelacion: 'Cancelación' }
 const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta', fiado: 'Fiado' }
@@ -30,7 +31,7 @@ export function Clientes({ me }: { me: Me }) {
       </div>
       {fiado && <div className="kpis mini"><div><span className="muted">Te deben en total</span><b>{mxn(rec.total)}</b></div><div><span className="muted">Clientes con saldo</span><b>{rec.customers.length}</b></div></div>}
       {msg && <p className="error">{msg}</p>}
-      <div className="grid2 config">
+      <div>
         <section className="card">
           <div className="table-wrap"><table className="list">
             <thead><tr><th>Cliente</th>{fiado && <th className="num">Debe</th>}</tr></thead>
@@ -45,7 +46,7 @@ export function Clientes({ me }: { me: Me }) {
             </tbody>
           </table></div>
         </section>
-        {sel ? <Cliente me={me} c={sel} fiado={fiado} onChanged={() => void load()} /> : <section className="card"><p className="muted">Elige un cliente para ver {fiado ? 'su cuenta, ' : ''}sus compras{hasGiro(me, 'barberia', 'unas', 'banos') ? ' y membresías' : ''}.</p></section>}
+        {sel && <Sheet onClose={() => setSel(null)}><Cliente me={me} c={sel} fiado={fiado} onChanged={() => void load()} onClose={() => setSel(null)} /></Sheet>}
       </div>
       {adding && <NuevoCliente onClose={() => setAdding(false)} onDone={(c) => { setAdding(false); setSel(c); void load() }} />}
     </div>
@@ -68,7 +69,7 @@ function NuevoCliente({ onClose, onDone }: { onClose: () => void; onDone: (c: an
   )
 }
 
-function Cliente({ me, c, fiado, onChanged }: { me: Me; c: any; fiado: boolean; onChanged: () => void }) {
+function Cliente({ me, c, fiado, onChanged, onClose }: { me: Me; c: any; fiado: boolean; onChanged: () => void; onClose: () => void }) {
   const membresias = me.modules?.includes('membresias')
   const puntos = me.modules?.includes('fidelidad')
   const tabs = [
@@ -83,7 +84,7 @@ function Cliente({ me, c, fiado, onChanged }: { me: Me; c: any; fiado: boolean; 
   useEffect(() => { setTab(tabs[0]![0]) }, [c.id])
   return (
     <section className="card">
-      <h2>{c.name}</h2>
+      <div className="card-head"><h2>{c.name}</h2><button className="mini" onClick={onClose} aria-label="Cerrar">Cerrar</button></div>
       <p className="muted small" style={{ marginTop: -6 }}>{c.phone ?? 'sin teléfono'}</p>
       <nav className="subtabs">{tabs.map(([k, v]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{v}</button>)}</nav>
       {tab === 'cuenta' && <Cuenta me={me} c={c} onChanged={onChanged} />}
@@ -174,7 +175,7 @@ function Membresias({ c }: { c: any }) {
         <div className="table-wrap"><table className="list"><tbody>{status.memberships.map((m: any) => <tr key={m.id}><td><b>{m.name}</b><br /><small className="muted">vence {new Date(m.endsAt).toLocaleDateString('es-MX')}</small></td><td className="num">quedan {m.remaining} de {m.usesPerPeriod}</td></tr>)}</tbody></table></div>
       ) : <p className="muted">No tiene membresías activas.</p>}
       <h3 style={{ marginTop: 14 }}>Vender membresía o paquete</h3>
-      {plans.length === 0 ? <p className="muted small">Primero crea tus membresías en «Membresías y promos».</p> : (<>
+      {plans.length === 0 ? <p className="muted small">Primero crea tus membresías en «Sellos y promociones» (o «Membresías y promos»).</p> : (<>
         <div className="row">
           <label>Membresía<select value={f.planId} onChange={(e) => setF({ ...f, planId: e.target.value })}>{plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {mxn(p.price)}</option>)}</select></label>
           <label>Pago<select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta</option></select></label>
@@ -234,7 +235,7 @@ function Puntos({ me, c }: { me: Me; c: any }) {
       {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
       <h3>Canjear</h3>
       <div className="chips">{rewards.map((r) => <button key={r.id} className="chip" disabled={data.balance < r.cost} onClick={async () => { try { const x = await api<any>('POST', `/customers/${c.id}/redeem`, { rewardId: r.id }); setMsg({ ok: `Canjeado: ${x.reward}.` }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }}>{r.name} · {r.cost}</button>)}</div>
-      {rewards.length === 0 && <p className="muted small">Crea premios en «Membresías y promos».</p>}
+      {rewards.length === 0 && <p className="muted small">Crea premios en «Sellos y promociones» (o «Membresías y promos»).</p>}
       <h3>Movimientos</h3>
       <div className="table-wrap"><table className="list"><tbody>
         {data.ledger.map((l: any, i: number) => (
