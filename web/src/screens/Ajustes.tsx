@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, cache, mxn, outbox, toCents } from '../api'
 import { hasGiro, type Me } from '../App'
 import { giroLabel } from '../giros'
+import { WhatsAppShare } from './Descargar'
 
 const MODULES: Record<string, string> = { membresias: 'Membresías y paquetes', promociones: 'Promociones', fidelidad: 'Puntos o sellos', asistencia: 'Asistencia con QR', reservas: 'Reservas y venta por link', recordatorios: 'Recordatorios (solo prepara el mensaje)' }
 
@@ -68,6 +69,12 @@ export function Ajustes({ me }: { me: Me }) {
             <td><button onClick={async () => { await api('DELETE', `/auth/trusted-devices/${t.id}`); setTrusted(trusted.filter((x) => x.id !== t.id)) }}>Quitar</button></td></tr>
         ))}</tbody></table></div>
         {st.travelFee != null && <p className="muted">Traslado: {mxn(st.travelFee)}</p>}
+      </section>
+      <section className="card">
+        <h2>Instalar en otros equipos</h2>
+        <p className="muted">NEXORA se instala como app desde el navegador en Android, iPhone y computadora, sin tiendas de apps. Manda el link a tus empleados por WhatsApp.</p>
+        <WhatsAppShare />
+        <p><a href="/descargar" target="_blank" rel="noreferrer">Ver la página de descarga</a></p>
       </section>
       <EmpezarDeCero />
     </div>

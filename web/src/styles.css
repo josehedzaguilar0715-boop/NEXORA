@@ -378,3 +378,10 @@ pre.report { font: 13px/1.35 ui-monospace, Menlo, Consolas, monospace; backgroun
 .stamp.on { border: 0; background: var(--gradient); color: #fff; font-size: 1.3rem; font-weight: 800; box-shadow: 0 4px 14px rgba(34, 211, 238, 0.25); }
 .stamp-reward { margin-bottom: 12px; }
 .stamp-reward .info-row { margin-bottom: 6px; }
+
+/* Página pública de descarga */
+.download-page { padding: 0 16px; }
+.download-page .seg { margin-bottom: 14px; }
+ol.steps { padding-left: 22px; line-height: 1.6; }
+ol.steps li { margin-bottom: 6px; }
+.download-logo { display: flex; justify-content: center; margin-bottom: 8px; }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ApiError, mxn, toCents } from '../api'
+import { downloadUrl, WhatsAppShare } from './Descargar'
 import { Logo } from '../Brand'
 import { GIROS, giroLabel } from '../giros'
 
@@ -96,6 +97,9 @@ function Negocios() {
             <button className="danger" onClick={() => { if (prompt(`Esto borra TODAS las ventas y movimientos de ${sel.name}. Escribe BORRAR para confirmar:`)?.trim().toUpperCase() !== 'BORRAR') return; const r = prompt('Motivo (ej. terminó la demostración):'); if (r) void run(async () => { const x = await adm('POST', `/admin/businesses/${sel.id}/reset-demo`, { confirm: 'BORRAR', reason: r }); return x }, 'Listo: datos de prueba borrados. El negocio empieza de cero.')() }}>Borrar datos de prueba</button>
             {sel.status === 'vencido' && <button className="danger big" onClick={() => { const r = prompt('Motivo de la suspensión:'); if (r) void run(() => adm('POST', `/admin/businesses/${sel.id}/suspend`, { reason: r }), 'Suspendido. Sus datos quedan intactos.')() }}>Suspender</button>}
           </div>
+          <h3 style={{ marginTop: 14 }}>Instalar NEXORA</h3>
+          <p className="muted small">Manda al dueño el link para instalar la app en su celular o computadora.</p>
+          <WhatsAppShare phone={sel.owner?.phone} who={sel.owner?.name?.split(' ')[0]} />
           <h3 style={{ marginTop: 14 }}>Tipo de negocio</h3>
           <Giros b={sel} onSave={(body) => run(() => adm('PATCH', `/admin/businesses/${sel.id}`, body), 'Tipo de negocio guardado. El cliente lo verá al volver a entrar.')()} />
           <h3 style={{ marginTop: 14 }}>Extras</h3>
@@ -179,7 +183,19 @@ function Alta({ onDone }: { onDone: () => void }) {
   const [f, setF] = useState({ businessName: '', ownerName: '', phone: '', tempPassword: '', trialDays: '', giro: 'abarrotes', extraGiros: [] as string[], free: false })
   const [err, setErr] = useState('')
   const [done, setDone] = useState<any>(null)
-  if (done) return <div className="card login"><h2>Negocio creado</h2><p>Entrégale al dueño: teléfono <b>{f.phone}</b>, contraseña temporal <b>{f.tempPassword}</b>. Sus empleados entrarán con el usuario y la contraseña que el dueño les cree.</p><button className="primary" onClick={onDone}>Listo</button></div>
+  if (done) {
+    const text = `Hola ${f.ownerName.split(' ')[0]}, ya está lista tu cuenta de NEXORA para ${f.businessName}.\n\n1. Instala la app desde aquí (Android, iPhone o computadora): ${downloadUrl()}\n2. Entra con tu teléfono ${f.phone} y la contraseña temporal ${f.tempPassword}. Te pedirá cambiarla.`
+    return (
+      <div className="card login">
+        <h2>Negocio creado</h2>
+        <p>Entrégale al dueño: teléfono <b>{f.phone}</b>, contraseña temporal <b>{f.tempPassword}</b>. Sus empleados entrarán con el usuario y la contraseña que el dueño les cree.</p>
+        <p className="row">
+          <a className="button primary" href={`https://wa.me/52${f.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">Enviar acceso por WhatsApp</a>
+          <button onClick={onDone}>Listo</button>
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="card login">
       <h2>Alta asistida</h2>
