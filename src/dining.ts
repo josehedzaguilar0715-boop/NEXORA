@@ -7,6 +7,7 @@ import { body, hasPerm, isManager, ownerOnly, parse, requirePerm, type C, type D
 import type { Db } from './db.js'
 import { currentPrice, getProduct } from './inventory.js'
 import { createSale, parseSale } from './sales.js'
+import { notify } from './notifications.js'
 import { getSettings } from './settings.js'
 import { bad, conflict, forbidden, iso, localDate, newId, notFound } from './util.js'
 
@@ -221,11 +222,14 @@ dining.post('/tabs/:id/send', requirePerm('sell'), (c) => {
     if (t.kind !== 'mesa') db.prepare("UPDATE tabs SET order_status = 'en_cocina' WHERE id = ?").run(t.id)
     return { id, station, items: items.length }
   }))()
+  const where = t.table_id ? `Mesa ${(db.prepare('SELECT name FROM dining_tables WHERE id = ?').get(t.table_id) as { name: string }).name}` : `Pedido #${t.order_number}`
+  const what = pending.map((i) => `${i.quantity} ${i.description}`).join(', ')
+  notify(c.get('deps'), u.business_id, { kind: 'comanda', title: `Nueva comanda · ${where}`, body: what, link: '#/cocina', audience: ['perm:kitchen'] })
   return c.json({ comandas: out })
 })
 
 /** Pantalla de cada estación: solo lo suyo, con el tiempo que lleva. */
-dining.get('/kitchen', (c) => {
+dining.get('/kitchen', requirePerm('sell', 'kitchen'), (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const station = c.req.query('station')
@@ -239,7 +243,7 @@ dining.get('/kitchen', (c) => {
   })
 })
 
-dining.post('/comandas/:id/ready', (c) => {
+dining.post('/comandas/:id/ready', requirePerm('sell', 'kitchen'), (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const k = db.prepare('SELECT * FROM comandas WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; tab_id: string; status: string; created_at: string } | undefined
@@ -251,6 +255,10 @@ dining.post('/comandas/:id/ready', (c) => {
     const left = (db.prepare("SELECT COUNT(*) n FROM comandas WHERE tab_id = ? AND status = 'en_preparacion'").get(k.tab_id) as { n: number }).n
     if (!left) db.prepare("UPDATE tabs SET order_status = 'listo' WHERE id = ? AND kind != 'mesa'").run(k.tab_id)
   })()
+  const tab = db.prepare('SELECT table_id, order_number, opened_by, waiter_id FROM tabs WHERE id = ?').get(k.tab_id) as { table_id: string | null; order_number: number | null; opened_by: string; waiter_id: string | null }
+  const where = tab.table_id ? `Mesa ${(db.prepare('SELECT name FROM dining_tables WHERE id = ?').get(tab.table_id) as { name: string }).name}` : `Pedido #${tab.order_number}`
+  const to = [...new Set([tab.waiter_id, tab.opened_by].filter(Boolean))].filter((id) => id !== u.id).map((id) => `user:${id}`)
+  if (to.length) notify(c.get('deps'), u.business_id, { kind: 'listo', title: `Listo para entregar · ${where}`, body: `Cocina lo marcó listo.`, link: tab.table_id ? '#/mesas' : '#/pedidos', audience: to })
   return c.json({ minutes: Math.round((now().getTime() - Date.parse(k.created_at)) / 60_000) })
 })
 

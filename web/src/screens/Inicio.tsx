@@ -8,38 +8,101 @@ const KIND: Record<string, string> = { venta: 'Venta', retiro: 'Retiro de caja',
 
 /** Inicio (dashboard): indicadores del día, gráfica de la semana y movimientos recientes. Se actualiza solo. */
 export function Inicio({ me }: { me: Me }) {
-  const [sum, setSum] = useState<any>(null)
-  const [month, setMonth] = useState<any>(null)
+  const [db, setDb] = useState<any>(null)
   const [days, setDays] = useState<any[]>([])
   const [moves, setMoves] = useState<any[]>([])
   const [rec, setRec] = useState<number | null>(null)
-  const [low, setLow] = useState<number | null>(null)
+  const owner = me.user.role === 'owner'
   const load = async () => {
-    const t = today()
-    const [a, b, c, d] = await Promise.all([
-      api('GET', `/reports/summary?from=${t}&to=${t}`),
-      api('GET', `/reports/summary?from=${t.slice(0, 8)}01&to=${t}`),
+    const [a, c, d] = await Promise.all([
+      api<any>('GET', '/dashboard/panel'),
       api<any>('GET', '/reports/daily?days=7'),
       api<any>('GET', '/reports/recent?limit=10'),
     ])
-    setSum(a); setMonth(b); setDays(c.days); setMoves(d.movements)
-    api<any>('GET', '/receivables').then((r) => setRec(r.total)).catch(() => setRec(null))
-    api<any>('GET', '/inventory/low-stock').then((r) => setLow(r.products.length)).catch(() => setLow(null))
+    setDb(a); setDays(c.days); setMoves(d.movements)
+    if (hasGiro(me, ...FIADO_GIROS)) api<any>('GET', '/receivables').then((r) => setRec(r.total)).catch(() => setRec(null))
   }
   useEffect(() => { void load().catch(() => {}); const t = setInterval(() => void load().catch(() => {}), 30_000); return () => clearInterval(t) }, [])
   const max = Math.max(1, ...days.map((d) => d.total))
   const W = 640, H = 220, pad = 28, bw = (W - pad * 2) / Math.max(1, days.length)
+  const T = db?.today, M = db?.month, R = db?.real
+  const [goalOpen, setGoalOpen] = useState(false)
+  const setGoal = () => setGoalOpen(true)
   return (
     <div>
-      <h1>Hola, {me.user.name.split(' ')[0]}</h1>
-      <p className="muted" style={{ marginTop: -6 }}>{me.business.name} · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+      <div className="dash-head">
+        <div>
+          <h1>Hola, {me.user.name.split(' ')[0]}</h1>
+          <p className="muted" style={{ marginTop: -6 }}>{me.business.name}</p>
+        </div>
+        <div className="dash-status">
+          <Clock />
+          {db?.lowStockCount > 0 && <a className="stock-badge" href="#/productos">⚠ {db.lowStockCount} bajo stock</a>}
+        </div>
+      </div>
+      {/* Indicadores del día y del mes, comparados contra ayer y contra el mes anterior. */}
+      <div className="dash-kpis">
+        <div className="card dkpi">
+          <div className="dkpi-top"><span className="dkpi-label">Ventas de hoy</span>{T?.goal ? <GoalRing value={T.sales} goal={T.goal} /> : owner && <button className="mini" onClick={setGoal}>Poner meta</button>}</div>
+          <div className="dkpi-value pos">{T ? mxn(T.sales) : '—'}</div>
+          <div className="dkpi-sub">{T ? `${T.tickets} ${T.tickets === 1 ? 'venta' : 'ventas'}` : ''}</div>
+          {T && <Trend pct={T.vsYesterday} label="vs ayer" />}
+          {T?.goal ? <div className="dkpi-sub">Meta {mxn(T.goal)} · {Math.min(999, Math.round((T.sales / T.goal) * 100))}%{owner && <> · <button className="link" onClick={setGoal}>cambiar</button></>}</div> : null}
+        </div>
+        <div className="card dkpi">
+          <div className="dkpi-top"><span className="dkpi-label">Ingresos del mes</span></div>
+          <div className="dkpi-value">{M ? mxn(M.sales) : '—'}</div>
+          {M && <Trend pct={M.vsPrev.sales} label="vs mes anterior" />}
+          <Spark data={db?.series.map((x: any) => x.sales) ?? []} color="#38bdf8" />
+        </div>
+        <div className="card dkpi">
+          <div className="dkpi-top"><span className="dkpi-label">Egresos del mes</span></div>
+          <div className="dkpi-value neg">{M ? mxn(M.out) : '—'}</div>
+          {M && <Trend pct={M.vsPrev.out} label="vs mes anterior" inverse />}
+          <Spark data={db?.series.map((x: any) => x.out) ?? []} color="#f87171" />
+        </div>
+        <div className="card dkpi">
+          <div className="dkpi-top"><span className="dkpi-label">Utilidad del mes</span></div>
+          <div className={`dkpi-value ${M && M.profit < 0 ? 'neg' : 'pos'}`}>{M ? mxn(M.profit) : '—'}</div>
+          {M && <Trend pct={M.vsPrev.profit} label="vs mes anterior" />}
+          <Spark data={db?.series.map((x: any) => x.profit) ?? []} color="#34d399" />
+        </div>
+        {T?.bulk != null && (
+          <div className="card dkpi">
+            <div className="dkpi-top"><span className="dkpi-label">Granel de hoy</span></div>
+            <div className="dkpi-value" style={{ color: 'var(--accent)' }}>{mxn(T.bulk)}</div>
+            <div className="dkpi-sub">por kilo, litro o metro</div>
+          </div>
+        )}
+        {rec != null && rec > 0 && (
+          <div className="card dkpi">
+            <div className="dkpi-top"><span className="dkpi-label">Por cobrar (fiado)</span></div>
+            <div className="dkpi-value">{mxn(rec)}</div>
+            <div className="dkpi-sub"><a href="#/clientes">ver clientes</a></div>
+          </div>
+        )}
+      </div>
+      {/* Ganancia real: lo que de verdad entró, por forma de pago, menos costos y egresos. */}
+      {R && (
+        <GananciaReal R={R} title="Ganancia real del mes" />
+      )}
       <Pendientes />
       <QuickActions me={me} />
-      <div className="kpis">
-        <div className="card kpi"><div className="label">Ventas de hoy</div><div className="value">{sum ? mxn(sum.sales.total) : '—'}</div><div className="hint">{sum ? `${sum.sales.tickets} tickets${sum.cancelled ? ` · ${sum.cancelled} canceladas` : ''}` : ''}</div></div>
-        <div className="card kpi"><div className="label">Utilidad del mes</div><div className={`value ${month && month.profit < 0 ? 'neg' : ''}`}>{month ? mxn(month.profit) : '—'}</div><div className="hint">ventas − costo − gastos · <a href="#/finanzas">ver finanzas</a></div></div>
-        {hasGiro(me, ...FIADO_GIROS) && <div className="card kpi"><div className="label">Por cobrar (fiado)</div><div className="value">{rec == null ? '—' : mxn(rec)}</div><div className="hint">saldo de clientes</div></div>}
-        <div className="card kpi"><div className="label">Productos por surtir</div><div className={`value ${low ? 'neg' : 'pos'}`}>{low ?? '—'}</div><div className="hint">debajo del mínimo</div></div>
+      <div className="grid2">
+        <section className="card">
+          <h2>Lo que más ganancia dejó hoy</h2>
+          <div className="table-wrap"><table className="list"><tbody>
+            {db?.topProfit.map((p: any) => <tr key={p.name}><td>{p.name}<br /><small className="muted">{Math.round(p.qty * 1000) / 1000} vendidos · {mxn(p.sales)}</small></td><td className="num pos">{mxn(p.profit)}</td></tr>)}
+            {db && db.topProfit.length === 0 && <tr><td className="muted">Todavía no hay ventas hoy.</td></tr>}
+          </tbody></table></div>
+        </section>
+        <section className="card">
+          <div className="card-head"><h2>Stock bajo</h2>{db?.lowStockCount > 0 && <a className="mini-link" href="#/productos">Armar pedido</a>}</div>
+          <div className="table-wrap"><table className="list"><tbody>
+            {db?.lowStock.map((p: any) => <tr key={p.name}><td>{p.name}</td><td className="num"><span className="stock-badge">{p.stock} {p.unit === 'pieza' ? 'pzas' : p.unit}</span></td></tr>)}
+            {db && db.lowStock.length === 0 && <tr><td className="pos">Todo surtido ✓</td></tr>}
+          </tbody></table></div>
+        </section>
       </div>
       <div className="grid2" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
         <section className="card">
@@ -73,6 +136,31 @@ export function Inicio({ me }: { me: Me }) {
           ))}</tbody></table></div>
           {moves.length === 0 && <p className="muted">Todavía no hay movimientos.</p>}
         </section>
+      </div>
+      {goalOpen && <MetaDiaria current={T?.goal ?? null} avg={M?.tickets ? Math.round(M.sales / Math.max(1, Number(T.date.slice(8, 10)))) : 0} onClose={() => setGoalOpen(false)} onSaved={() => { setGoalOpen(false); void load() }} />}
+    </div>
+  )
+}
+
+/** Meta de ventas del día: la pone el dueño; sugiere un poco arriba del promedio diario del mes. */
+function MetaDiaria({ current, avg, onClose, onSaved }: { current: number | null; avg: number; onClose: () => void; onSaved: () => void }) {
+  const [v, setV] = useState(current ? String(current / 100) : avg ? String(Math.ceil((avg * 1.1) / 10000) * 100) : '')
+  const [err, setErr] = useState('')
+  const save = async (amount: number) => {
+    try { await api('PUT', '/dashboard/goal', { amount }); onSaved() } catch (e) { setErr((e as Error).message) }
+  }
+  return (
+    <div className="modal sheet" onClick={onClose}>
+      <div className="card" onClick={(e) => e.stopPropagation()}>
+        <div className="card-head"><h2>Meta de ventas del día</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
+        <p className="muted">Se muestra en el anillo de «Ventas de hoy» para que tú y tu equipo vean cuánto falta.</p>
+        <label>Meta en pesos<input inputMode="decimal" value={v} autoFocus onChange={(e) => setV(e.target.value)} placeholder="Ej. 5000" /></label>
+        {avg > 0 && <p className="muted">Este mes vendes en promedio {mxn(avg)} al día.</p>}
+        {err && <p className="error">{err}</p>}
+        <div className="row-actions" style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button className="primary" onClick={() => void save(Math.round(Number(v.replace(/[$,\s]/g, '')) * 100) || 0)}>Guardar meta</button>
+          {current ? <button onClick={() => void save(0)}>Quitar meta</button> : null}
+        </div>
       </div>
     </div>
   )
@@ -145,6 +233,61 @@ function Pendientes() {
           )}
         </div>
       ))}
+    </section>
+  )
+}
+
+/** Reloj con fecha (hora de México, 12 horas). */
+function Clock() {
+  const [n, setN] = useState(new Date())
+  useEffect(() => { const t = setInterval(() => setN(new Date()), 15_000); return () => clearInterval(t) }, [])
+  return <span className="clock">{n.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Mexico_City' })} · {n.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</span>
+}
+
+/** ▲ 12.5% vs ayer (verde si sube; en egresos al revés). */
+function Trend({ pct, label, inverse = false }: { pct: number | null; label: string; inverse?: boolean }) {
+  if (pct == null) return <div className="trend"><span className="muted">Sin datos para comparar {label.replace(/^vs /, 'con ')}</span></div>
+  if (pct === 0) return <div className="trend"><span className="muted">Igual {label.replace(/^vs /, 'que ')}</span></div>
+  const good = inverse ? pct < 0 : pct > 0
+  return <div className={`trend ${good ? 'pos' : 'neg'}`}>{pct > 0 ? '▲' : '▼'} {Math.abs(pct)}% <span className="muted">{label}</span></div>
+}
+
+/** Minigráfica de línea del mes. */
+function Spark({ data, color }: { data: number[]; color: string }) {
+  if (data.length < 2) return <svg className="spark" viewBox="0 0 120 32" aria-hidden />
+  const lo = Math.min(0, ...data), hi = Math.max(1, ...data)
+  const pts = data.map((v, i) => `${(i / (data.length - 1)) * 120},${30 - ((v - lo) / (hi - lo || 1)) * 28}`).join(' ')
+  return <svg className="spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden><polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+}
+
+/** Anillo de avance contra la meta del día. */
+function GoalRing({ value, goal }: { value: number; goal: number }) {
+  const p = goal > 0 ? Math.min(1, value / goal) : 0
+  const r = 18, c = 2 * Math.PI * r
+  return (
+    <svg width="48" height="48" viewBox="0 0 48 48" aria-label={`${Math.round(p * 100)}% de la meta`}>
+      <circle cx="24" cy="24" r={r} fill="none" stroke="var(--line)" strokeWidth="5" />
+      <circle cx="24" cy="24" r={r} fill="none" stroke={p >= 1 ? 'var(--ok)' : 'var(--accent)'} strokeWidth="5" strokeDasharray={`${c * p} ${c}`} strokeLinecap="round" transform="rotate(-90 24 24)" />
+      <text x="24" y="28" textAnchor="middle" fontSize="11" fontWeight="800" fill="var(--ink)">{Math.round(p * 100)}%</text>
+    </svg>
+  )
+}
+
+/** Ganancia real por forma de cobro: lo que entró, lo que salió y lo que queda. */
+export function GananciaReal({ R, title }: { R: any; title: string }) {
+  return (
+    <section className="card real">
+      <div className="card-head"><h2>{title}</h2><span className="pill">por forma de cobro</span></div>
+      <div className="real-grid">
+        {[['Efectivo', R.efectivo, 'pos'], ['Transferencia', R.transferencia, ''], ['Tarjeta', R.tarjeta, ''], ...(R.abonos ? [['Abonos de fiado', R.abonos, 'warn']] : []), ...(R.apartados ? [['Apartados', R.apartados, 'warn']] : [])].map(([l, v, c]) => (
+          <div key={l as string} className="real-cell"><span>{l}</span><b className={c as string}>{mxn(v as number)}</b><small>{R.ingresado ? `${Math.round(((v as number) / R.ingresado) * 1000) / 10}% del ingreso` : '—'}</small></div>
+        ))}
+        <div className="real-cell"><span>Total ingresado</span><b>{mxn(R.ingresado)}</b><small>dinero que entró</small></div>
+        <div className="real-cell"><span>Costo + egresos</span><b className="neg">{mxn(R.costo + R.egresos)}</b><small>mercancía, gastos, comisiones</small></div>
+        <div className="real-cell hi"><span>Utilidad real</span><b className={R.utilidad < 0 ? 'neg' : 'pos'}>{mxn(R.utilidad)}</b><small>lo que te queda</small></div>
+      </div>
+      <div className="bar-track" style={{ marginTop: 12 }}><div className="bar-fill profit" style={{ width: `${R.ingresado > 0 ? Math.max(0, Math.min(100, (R.utilidad / R.ingresado) * 100)) : 0}%` }} /></div>
+      {R.fiado > 0 && <p className="muted small" style={{ marginTop: 8 }}>Además se vendieron {mxn(R.fiado)} a crédito (fiado) que todavía no entran como dinero.</p>}
     </section>
   )
 }

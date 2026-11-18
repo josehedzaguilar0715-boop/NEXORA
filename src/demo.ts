@@ -294,9 +294,9 @@ const SEEDS: Record<string, Seed> = {
   },
   async palapa(c) {
     const sup = await c.supplier('Mariscos El Puerto', '9631000081')
-    const pescado = await c.product({ name: 'Pescado frito', unit: 'kg', price: 32000, trackStock: false, attrs: { station: 'cocina' } })
-    const camaron = await c.product({ name: 'Cóctel de camarón', unit: 'pieza', price: 18000, trackStock: false, attrs: { station: 'cocina' } })
-    const michelada = await c.product({ name: 'Michelada', unit: 'pieza', price: 9000, trackStock: false, attrs: { station: 'barra' } })
+    const pescado = await c.product({ name: 'Pescado frito', unit: 'kg', price: 32000, cost: 11200, trackStock: false, attrs: { station: 'cocina' } })
+    const camaron = await c.product({ name: 'Cóctel de camarón', unit: 'pieza', price: 18000, cost: 6300, trackStock: false, attrs: { station: 'cocina' } })
+    const michelada = await c.product({ name: 'Michelada', unit: 'pieza', price: 9000, cost: 3200, trackStock: false, attrs: { station: 'barra' } })
     const cerveza = await c.product({ name: 'Cerveza 355 ml', unit: 'pieza', price: 4000, minStock: 48, attrs: { station: 'barra' } })
     const hielo = await c.product({ name: 'Bolsa de hielo 5 kg', unit: 'pieza', price: 0, minStock: 5, sellable: false })
     await c.buy(sup, [{ productId: cerveza.id, quantity: 120, cost: 216000 }, { productId: hielo.id, quantity: 10, cost: 25000 }])
@@ -308,11 +308,11 @@ const SEEDS: Record<string, Seed> = {
   async restaurante(c) {
     const sup = await c.supplier('Abastos Central', '9631000091')
     const P = [
-      await c.product({ name: 'Enchiladas verdes', unit: 'pieza', price: 12000, trackStock: false, attrs: { station: 'cocina_caliente' } }),
-      await c.product({ name: 'Ensalada César', unit: 'pieza', price: 11000, trackStock: false, attrs: { station: 'cocina_fria' } }),
-      await c.product({ name: 'Arrachera 300 g', unit: 'pieza', price: 26000, trackStock: false, attrs: { station: 'cocina_caliente' } }),
-      await c.product({ name: 'Limonada', unit: 'pieza', price: 4500, trackStock: false, attrs: { station: 'barra' } }),
-      await c.product({ name: 'Flan napolitano', unit: 'pieza', price: 5500, trackStock: false, attrs: { station: 'postres' } }),
+      await c.product({ name: 'Enchiladas verdes', unit: 'pieza', price: 12000, cost: 4200, trackStock: false, attrs: { station: 'cocina_caliente' } }),
+      await c.product({ name: 'Ensalada César', unit: 'pieza', price: 11000, cost: 3800, trackStock: false, attrs: { station: 'cocina_fria' } }),
+      await c.product({ name: 'Arrachera 300 g', unit: 'pieza', price: 26000, cost: 9100, trackStock: false, attrs: { station: 'cocina_caliente' } }),
+      await c.product({ name: 'Limonada', unit: 'pieza', price: 4500, cost: 1600, trackStock: false, attrs: { station: 'barra' } }),
+      await c.product({ name: 'Flan napolitano', unit: 'pieza', price: 5500, cost: 1900, trackStock: false, attrs: { station: 'postres' } }),
       await c.product({ name: 'Refresco 355 ml', unit: 'pieza', price: 3500, minStock: 24, attrs: { station: 'barra' } }),
     ]
     await c.buy(sup, [{ productId: P[5]!.id, quantity: 48, cost: 57600 }])
@@ -322,9 +322,9 @@ const SEEDS: Record<string, Seed> = {
   },
   async comedor(c, { t }) {
     const sup = await c.supplier('Abastos Central', '9631000101')
-    const corrida = await c.product({ name: 'Comida corrida', unit: 'pieza', price: 8500, trackStock: false })
-    const desayuno = await c.product({ name: 'Desayuno completo', unit: 'pieza', price: 7500, trackStock: false })
-    const agua = await c.product({ name: 'Agua de jamaica', unit: 'pieza', price: 2000, trackStock: false })
+    const corrida = await c.product({ name: 'Comida corrida', unit: 'pieza', price: 8500, cost: 3000, trackStock: false })
+    const desayuno = await c.product({ name: 'Desayuno completo', unit: 'pieza', price: 7500, cost: 2600, trackStock: false })
+    const agua = await c.product({ name: 'Agua de jamaica', unit: 'pieza', price: 2000, cost: 700, trackStock: false })
     const refresco = await c.product({ name: 'Refresco 355 ml', unit: 'pieza', price: 2500, minStock: 24 })
     await c.buy(sup, [{ productId: refresco.id, quantity: 36, cost: 43200 }])
     const cu = await customers(c, ['Taller Mecánico Gómez', 'Oficinas del Ayuntamiento', 'Pedro Sánchez'])
@@ -341,7 +341,7 @@ const SEEDS: Record<string, Seed> = {
     await c.buy(sup, [{ productId: pastor.id, quantity: 20, cost: 240000 }, { productId: tortilla.id, quantity: 10, cost: 25000 }])
     const taco = await c.product({ name: 'Taco al pastor', unit: 'pieza', price: 1800, trackStock: false })
     const gringa = await c.product({ name: 'Gringa de pastor', unit: 'pieza', price: 6500, trackStock: false })
-    const agua = await c.product({ name: 'Agua de horchata', unit: 'pieza', price: 2500, trackStock: false })
+    const agua = await c.product({ name: 'Agua de horchata', unit: 'pieza', price: 2500, cost: 900, trackStock: false })
     await c.call('PUT', `/recipes/${taco.id}`, { items: [{ productId: pastor.id, quantity: 0.03 }, { productId: tortilla.id, quantity: 0.02 }] })
     await c.call('PUT', `/recipes/${gringa.id}`, { items: [{ productId: pastor.id, quantity: 0.1 }] })
     await c.call('POST', '/daily-menu', { date: localDate(t), meal: 'dia', productIds: [taco.id, gringa.id, agua.id], authCode: DEMO_CODE })

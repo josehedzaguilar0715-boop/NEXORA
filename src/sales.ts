@@ -5,7 +5,8 @@ import { authorize } from './authcode.js'
 import { earnForSale, loyaltyStatus, moduleOn, reverseSalePoints } from './common.js'
 import { activePromotions, bestPromotions } from './promotions.js'
 import { body, hasPerm, parse, requirePerm, type C, type Deps, type Env, type UserRow } from './context.js'
-import { consume, currentPrice, getProduct, priceFor, restore, toMilli, type MoveCtx } from './inventory.js'
+import { consume, currentPrice, getProduct, priceFor, restore, stockOf, toMilli, type MoveCtx } from './inventory.js'
+import { saleCancelledNotice, stockAlerts } from './notifications.js'
 import { bad, conflict, forbidden, iso, newId, notFound } from './util.js'
 
 export const sales = new Hono<Env>()
@@ -92,11 +93,15 @@ export function carryMilli(db: Deps['db'], branchId: string, productId: string, 
  */
 export function consumeProduct(ctx: MoveCtx, productId: string, qtyMilli: number, refId: string, depth = 0): number {
   const { db } = ctx
-  const p = db.prepare('SELECT track_stock FROM products WHERE id = ?').get(productId) as { track_stock: number }
+  const p = db.prepare('SELECT track_stock, last_cost FROM products WHERE id = ?').get(productId) as { track_stock: number; last_cost: number }
   const parts = db.prepare('SELECT product_id, qty_milli FROM combo_items WHERE combo_id = ?').all(productId) as { product_id: string; qty_milli: number }[]
   let cost = 0
   if (parts.length && depth < 3) for (const pt of parts) cost += consumeProduct(ctx, pt.product_id, Math.round((pt.qty_milli * qtyMilli) / 1000), refId, depth + 1)
   else if (p.track_stock) cost += consume(ctx, productId, qtyMilli, 'venta', refId).cost
+  else if (!db.prepare('SELECT 1 FROM recipes WHERE owner_id = ? LIMIT 1').get(productId)) {
+    // Sin inventario ni receta (platillo, servicio por pieza): cuenta el costo que el dueño capturó.
+    cost += Math.round((p.last_cost * qtyMilli) / 1000)
+  }
   return cost + consumeRecipe(ctx, productId, qtyMilli / 1000, refId)
 }
 
@@ -282,6 +287,7 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
     for (const h of saleHooks) h({ deps, user: u, saleId: d.id, branchId: shift.branch_id, shiftId: shift.id, input: d, lines, total })
   })()
   const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(d.id) as SaleRow
+  stockAlerts(deps, u.business_id, shift.branch_id, lines.filter((l) => l.productId).map((l) => l.productId!), stockOf)
   return { duplicate: false, sale: saleView(deps, sale), ...(d.customerId ? { loyalty: loyaltyStatus(db, u.business_id, d.customerId, earned) } : {}) }
 }
 
@@ -346,6 +352,7 @@ sales.post('/sales/:id/cancel', requirePerm('cancel_discount'), async (c) => {
     businessId: u.business_id, userId: u.id, action: 'venta.cancelacion', entity: 'sale', entityId: s.id,
     oldValue: { status: 'completada', total: s.total }, newValue: { status: 'cancelada' }, authorizedBy: auth.id, reason: d.reason,
   })
+  saleCancelledNotice(deps, u.business_id, u, s.folio, s.total, d.reason)
   return c.json({ sale: saleView(deps, db.prepare('SELECT * FROM sales WHERE id = ?').get(s.id) as SaleRow) })
 })
 

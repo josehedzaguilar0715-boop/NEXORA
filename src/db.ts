@@ -1409,6 +1409,32 @@ const MIGRATIONS: Migration[] = [
   `ALTER TABLE loyalty_ledger ADD COLUMN ext_ref TEXT;`,
   // Costo directo de un servicio (material, insumos que no van por receta): cuenta como costo de lo vendido.
   `ALTER TABLE services ADD COLUMN cost INTEGER NOT NULL DEFAULT 0;`,
+  // Avisos al dueño y al personal (campana y push al celular).
+  `
+  CREATE TABLE notifications (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    link TEXT,
+    audience TEXT NOT NULL,
+    dedupe TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX notifications_biz ON notifications(business_id, created_at);
+  CREATE UNIQUE INDEX notifications_dedupe ON notifications(business_id, dedupe) WHERE dedupe IS NOT NULL;
+  CREATE TABLE notification_seen (user_id TEXT PRIMARY KEY, seen_at TEXT NOT NULL);
+  CREATE TABLE push_subscriptions (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    endpoint TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX push_subscriptions_user ON push_subscriptions(user_id);
+  CREATE TABLE app_keys (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  `,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

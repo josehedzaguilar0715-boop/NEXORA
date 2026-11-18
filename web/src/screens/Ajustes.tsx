@@ -49,7 +49,6 @@ export function Ajustes({ me }: { me: Me }) {
       <section className="card">
         <h2>Opciones</h2>
         {check('tipsEnabled', 'Propinas')}
-        {hasGiro(me, 'comedor') && check('tablesEnabled', 'Mapa de mesas')}
         {hasGiro(me, 'restaurante', 'taqueria') && check('pickupScheduling', 'Reservar hora para pedidos para recoger')}
         {hasGiro(me, 'verduleria') && check('phoneOrdersPrepaid', 'Cobrar pedidos por teléfono antes de entregar')}
         {hasGiro(me, 'unas') && <label>Cargo por traslado a domicilio (vacío = apagado)<input inputMode="decimal" value={st.travelFee != null ? String(st.travelFee / 100) : ''} onChange={(e) => setSt({ ...st, travelFee: e.target.value.trim() ? toCents(e.target.value) : null })} /></label>}

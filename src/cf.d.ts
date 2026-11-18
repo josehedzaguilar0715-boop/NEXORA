@@ -7,5 +7,6 @@ declare module 'cloudflare:workers' {
   }
   export interface DurableObjectState {
     storage: { sql: { exec(query: string, ...bindings: unknown[]): { toArray(): Record<string, unknown>[] } }; transactionSync<T>(fn: () => T): T }
+    waitUntil(p: Promise<unknown>): void
   }
 }

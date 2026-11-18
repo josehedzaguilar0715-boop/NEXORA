@@ -12,6 +12,7 @@ export const PERMISSIONS = {
   customers_credit: 'Clientes y fiado',
   attendance: 'Asistencia',
   give_stamps: 'Dar sellos o puntos a mano',
+  kitchen: 'Cocina: ver comandas y pedidos y marcarlos listos',
 } as const
 
 export type Permission = keyof typeof PERMISSIONS
@@ -26,4 +27,5 @@ export const TEMPLATES: Record<string, { label: string; permissions: Permission[
   },
   barbero: { label: 'Barbero', permissions: ['sell', 'view_commissions', 'view_reports'] },
   empleado_piso: { label: 'Empleado de piso', permissions: ['view_inventory', 'attendance', 'view_reports'] },
+  cocina: { label: 'Cocina', permissions: ['kitchen', 'attendance', 'view_reports'] },
 }

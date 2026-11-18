@@ -6,6 +6,7 @@ import { moduleOn } from './common.js'
 import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Deps, type Env, type UserRow } from './context.js'
 import type { Db } from './db.js'
 import { createSale, parseSale } from './sales.js'
+import { notify } from './notifications.js'
 import { getSettings } from './settings.js'
 import { AppError, bad, conflict, forbidden, iso, localDate, newId, normalizePhone, notFound } from './util.js'
 
@@ -330,6 +331,8 @@ publicAgenda.post('/public/book/:code', async (c) => {
   const branch = db.prepare('SELECT id FROM branches WHERE business_id = ? AND active = 1 ORDER BY created_at LIMIT 1').get(b.id) as { id: string }
   // Solo horas libres: se vuelve a validar al guardar.
   const { row, token } = createAppointment(deps, b.id, branch.id, { staffId: d.staffId, serviceIds: d.serviceIds, startsAt, customerName: d.name, phone, status: 'pendiente', source: 'link', createdBy: null })
+  const when = new Date(startsAt).toLocaleString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })
+  notify(deps, b.id, { kind: 'cita', title: `Nueva cita por confirmar · ${d.name}`, body: when, link: '#/agenda', audience: ['owner', `user:${(row as { staff_id: string }).staff_id}`] })
   return c.json({ token, appointment: apptView(db, row, false) }, 201)
 })
 

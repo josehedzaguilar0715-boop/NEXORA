@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
 import { Sheet } from '../Sheet'
@@ -70,7 +71,11 @@ export function Productos({ me }: { me: Me }) {
                     <td className="num">{mxn(p.price)}{p.tiers?.length ? <><br /><small className="muted">mayoreo {mxn(p.tiers[0]!.price)} desde {p.tiers[0]!.minQuantity}</small></> : null}</td>
                     <td className="num">{p.trackStock === false ? <span className="muted">receta</span> : <span className={low ? 'pill bad' : 'pill'}>{p.stock ?? 0}</span>}{(p as P & { reserved?: number }).reserved ? <><br /><small className="muted">{(p as P & { reserved?: number }).reserved} apartados</small></> : null}{expIds.has(p.id) && <><br /><small className="neg">por caducar</small></>}</td>
                     <td className="num hide-sm">{p.lastCost ? mxn(Math.round(p.lastCost)) : '—'}</td>
-                    <td className="num">{canStock && p.active !== false && p.trackStock !== false && <button className="mini" onClick={(e) => { e.stopPropagation(); setEdit({ p, tab: 'existencia' }) }}>+ Agregar</button>}</td>
+                    <td className="num row-actions">
+                      {canStock && p.active !== false && p.trackStock !== false && <button className="mini" onClick={(e) => { e.stopPropagation(); setEdit({ p, tab: 'existencia' }) }}>+ Agregar</button>}
+                      {canEdit && p.active !== false && <button className="mini icon-btn" aria-label={`Eliminar ${p.name}`} title="Eliminar" onClick={async (e) => { e.stopPropagation(); if (!confirm(`¿Eliminar «${p.name}»? Ya no aparecerá en la caja ni en la lista. Sus ventas se conservan y puedes restaurarlo desde «Eliminados».`)) return; try { await api('PATCH', `/products/${p.id}`, { active: false, baseVersion: p.version, updatedAt: new Date().toISOString() }); await load() } catch (er) { setErr((er as Error).message) } }}><Trash2 size={16} aria-hidden /></button>}
+                      {canEdit && p.active === false && <button className="mini" onClick={async (e) => { e.stopPropagation(); try { await api('PATCH', `/products/${p.id}`, { active: true, baseVersion: p.version, updatedAt: new Date().toISOString() }); await load() } catch (er) { setErr((er as Error).message) } }}>Restaurar</button>}
+                    </td>
                   </tr>
                 )
               })}

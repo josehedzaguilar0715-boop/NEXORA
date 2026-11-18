@@ -25,6 +25,8 @@ export interface Deps {
   /** Donde se guardan los respaldos automáticos (opcional). */
   backups?: import('./backup.js').BackupStore
   now: Clock
+  /** Mantiene vivo el trabajo en segundo plano (push) después de responder; en Cloudflare es waitUntil. */
+  defer?: (p: Promise<unknown>) => void
 }
 
 export interface UserRow {

@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { api, auth, cache, flush, outbox } from './api'
+import { AvisosPanel, BellButton, forgetPush, NoticeToast, useNotices } from './Avisos'
 import { Caja } from './screens/Caja'
 import { Clientes } from './screens/Clientes'
 import { Compras } from './screens/Compras'
@@ -50,7 +51,8 @@ export const FIADO_GIROS = ['abarrotes', 'ferreteria', 'papeleria', 'comedor', '
 /** ¿El negocio tiene alguno de estos giros? (negocio mixto: principal + adicionales) */
 export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.business.giro]).some((x) => g.includes(x))
 /** Ver reportes lo tiene todo usuario (solo lectura), igual que en el servidor. */
-export const can = (me: Me, p: string) => (p === 'owner' ? me.user.role === 'owner' : p === 'view_reports' || me.permissions === 'todos' || me.permissions.includes(p))
+/** Acepta varios permisos separados por «|» (basta uno). */
+export const can = (me: Me, p: string): boolean => (p.includes('|') ? p.split('|').some((x) => can(me, x)) : p === 'owner' ? me.user.role === 'owner' : p === 'view_reports' || me.permissions === 'todos' || me.permissions.includes(p))
 
 type Icon = import('lucide-react').LucideIcon
 export type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[]; group: string; icon: Icon; ownTitle?: boolean; desc?: string }
@@ -87,10 +89,10 @@ const SCREENS: Screen[] = [
   { key: 'entradas', label: 'Entradas', perm: 'sell', C: Entradas, giros: ['banos'], group: 'Operación', icon: DoorOpen },
   { key: 'taquilla', label: 'Taquilla', perm: 'sell', C: Taquilla, giros: ['turistico'], group: 'Operación', icon: Ticket },
   { key: 'acceso', label: 'Acceso', perm: 'sell', C: Acceso, giros: ['turistico'], group: 'Operación', icon: ScanLine, ownTitle: true },
-  { key: 'mesas', label: 'Mesas', perm: 'sell', C: Mesas, giros: ['palapa', 'restaurante', 'taqueria'], group: 'Operación', icon: Armchair },
-  { key: 'pedidos', label: 'Pedidos', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'verduleria'], group: 'Operación', icon: ClipboardList },
-  { key: 'cocina', label: 'Cocina', perm: 'sell', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria'], group: 'Operación', icon: ChefHat },
-  { key: 'menu', label: 'Menú del día', perm: 'sell', C: MenuDia, giros: ['comedor', 'taqueria'], group: 'Operación', icon: UtensilsCrossed },
+  { key: 'mesas', label: 'Mesas', perm: 'sell', C: Mesas, giros: ['palapa', 'restaurante', 'taqueria', 'comedor'], group: 'Operación', icon: Armchair },
+  { key: 'pedidos', label: 'Pedidos', perm: 'sell', C: Pedidos, giros: ['restaurante', 'taqueria', 'comedor', 'verduleria'], group: 'Operación', icon: ClipboardList },
+  { key: 'cocina', label: 'Cocina', perm: 'sell|kitchen', C: Cocina, giros: ['palapa', 'restaurante', 'taqueria', 'comedor'], group: 'Operación', icon: ChefHat },
+  { key: 'menu', label: 'Menú del día', perm: 'sell', C: MenuDia, giros: ['comedor', 'taqueria', 'restaurante'], group: 'Operación', icon: UtensilsCrossed },
   { key: 'carne', label: 'Carne', perm: 'sell', C: Trompo, giros: ['taqueria'], group: 'Operación', icon: Flame },
   { key: 'apartados', label: 'Apartados', perm: 'sell', C: Apartados, giros: ['abarrotes'], group: 'Operación', icon: Archive },
   { key: 'cotizaciones', label: 'Cotizaciones', perm: 'sell', C: Cotizaciones, giros: ['ferreteria'], group: 'Operación', icon: FileText },
@@ -166,7 +168,7 @@ export function App() {
 /** Pantallas que ve este usuario: según permisos, giro y módulos; con el nombre que corresponde a su negocio. */
 export function screensFor(me: Me): Screen[] {
   // Comedor: el mapa de mesas es opcional (apagado por defecto).
-  const giroOk = (s: Screen) => !s.giros || hasGiro(me, ...s.giros) || (s.key === 'mesas' && hasGiro(me, 'comedor') && !!me.settings?.tablesEnabled)
+  const giroOk = (s: Screen) => !s.giros || hasGiro(me, ...s.giros)
   const needsModule: Record<string, string[]> = { escanear: ['membresias', 'asistencia', 'fidelidad'] }
   const moduleOk = (s: Screen) => !needsModule[s.key] || needsModule[s.key]!.some((m) => me.modules?.includes(m))
   // Algunos nombres cambian según el giro, para que cada sistema hable de su negocio.
@@ -188,6 +190,8 @@ function Privada() {
   const [portal, setPortal] = useState<{ group: string; top: number } | null>(null)
   // Cuántos pendientes hay hoy (se ve junto a «Inicio» desde cualquier pantalla).
   const [pending, setPending] = useState(0)
+  const notices = useNotices(me?.user.id)
+  const [avisos, setAvisos] = useState(false)
   useEffect(() => {
     if (!me) return
     const load = () => api<{ tasks: { tone: string }[] }>('GET', '/today').then((r) => setPending(r.tasks.filter((t) => t.tone !== 'info').length)).catch(() => {})
@@ -221,6 +225,7 @@ function Privada() {
   }, [])
 
   const logout = async () => {
+    await forgetPush()
     await api('POST', '/auth/logout').catch(() => {})
     auth.set(null)
     cache.set('me', null)
@@ -235,7 +240,8 @@ function Privada() {
 
   const allowed = screensFor(me)
   // El personal que cobra entra directo a la caja; el dueño, al inicio.
-  const current = allowed.find((s) => s.key === hash) ?? (me.user.role === 'staff' ? allowed.find((s) => s.key === 'caja') : undefined) ?? allowed[0]
+  // El personal entra directo a su lugar de trabajo: la caja, la cocina o la agenda.
+  const current = allowed.find((s) => s.key === hash) ?? (me.user.role === 'staff' ? ['caja', 'cocina', 'agenda'].map((k) => allowed.find((s) => s.key === k)).find(Boolean) : undefined) ?? allowed[0]
   const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'
   return (
     <div className="app">
@@ -243,10 +249,11 @@ function Privada() {
         <button className="menu-btn" aria-label="Abrir menú" onClick={() => setMenu(true)}><Menu size={22} aria-hidden /></button>
         <Logo size={26} />
         <span style={{ flex: 1 }} />
+        <BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} />
         <PendingBadge />
       </header>
       <aside className={`side ${menu ? 'open' : ''}`} onClick={() => setMenu(false)}>
-        <div className="brand"><Logo size={36} /><span className="word">NEXORA</span></div>
+        <div className="brand"><Logo size={36} /><span className="word">NEXORA</span><span style={{ flex: 1 }} /><BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} /></div>
         <div className="biz">{me.business.name}</div>
         {/* Un permiso no marcado no aparece en pantalla. */}
         <nav>
@@ -292,6 +299,8 @@ function Privada() {
           </div>
         )
       })()}
+      {avisos && <AvisosPanel data={notices.data} reload={notices.reload} onClose={() => { setAvisos(false); void notices.reload().catch(() => {}) }} />}
+      {notices.toast && !avisos && <NoticeToast n={notices.toast} onClose={notices.closeToast} onOpen={() => { const l = notices.toast?.link; notices.closeToast(); if (l) location.hash = l }} />}
       <main>
         {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
         {/* Pantallas del mismo portal a un toque, sin abrir el menú. */}

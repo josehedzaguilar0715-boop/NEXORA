@@ -6,6 +6,7 @@ import { hasGiro, type Me } from '../App'
 const TEMPLATE_LABEL: Record<string, string> = { cajero: 'Cajero', encargado: 'Encargado', barbero: 'Barbero', empleado_piso: 'Empleado de piso' }
 /** El puesto «que atiende» se llama según el giro; en tiendas sin agenda ni comisiones no aparece. */
 function templateLabel(me: Me, key: string): string | null {
+  if (key === 'cocina') return hasGiro(me, 'restaurante', 'palapa', 'taqueria', 'comedor') ? 'Cocina (ve comandas y pedidos)' : null
   if (key !== 'barbero') return TEMPLATE_LABEL[key] ?? key
   if (hasGiro(me, 'barberia')) return 'Barbero'
   if (hasGiro(me, 'unas')) return 'Técnica de uñas'

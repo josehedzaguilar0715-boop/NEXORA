@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
+import { cashDifferenceNotice } from './notifications.js'
 import { body, hasPerm, parse, requirePerm, type C, type Env } from './context.js'
 import { bad, clampTime, conflict, forbidden, iso, localDate, newId, notFound } from './util.js'
 
@@ -244,6 +245,7 @@ cash.post('/shifts/:id/close', requirePerm('open_close_cash'), async (c) => {
     businessId: u.business_id, userId: u.id, action: 'caja.corte', entity: 'shift', entityId: s.id,
     newValue: { expected: totals.expectedCash, counted: d.countedCash, difference }, reason: d.reason ?? null,
   })
+  cashDifferenceNotice(c.get('deps'), u.business_id, u, difference, d.reason ?? null)
   const closed = db.prepare('SELECT * FROM shifts WHERE id = ?').get(s.id) as ShiftRow
   return c.json({ shift: closed, totals, difference, report: shiftReport(db, closed, 'Z') })
 })

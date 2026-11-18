@@ -26,6 +26,7 @@ const SALE_MOVES = "('venta','cancelacion','devolucion','consumo')"
 export const STEPS: [table: string, sql: string][] = [
   ['asset_rentals', `DELETE FROM asset_rentals WHERE tab_id IN ${TABS}`],
   ['tab_items', `DELETE FROM tab_items WHERE tab_id IN ${TABS}`],
+  ['notifications', 'DELETE FROM notifications WHERE business_id = ?'],
   ['comandas', 'DELETE FROM comandas WHERE business_id = ?'],
   ['tabs', 'DELETE FROM tabs WHERE business_id = ?'],
   ['table_reservations', 'DELETE FROM table_reservations WHERE business_id = ?'],

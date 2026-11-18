@@ -1,5 +1,5 @@
 import { TimeSelect } from '../TimeSelect'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
@@ -153,7 +153,14 @@ function Cobrar({ tab, person, onClose, onDone }: { tab: any; person?: number; o
 export function Cocina(_: { me: Me }) {
   const [station, setStation] = useState(localStorage.getItem('nx_station') ?? '')
   const [list, setList] = useState<any[]>([])
-  const load = () => api<any>('GET', `/kitchen${station ? `?station=${encodeURIComponent(station)}` : ''}`).then((r) => setList(r.comandas)).catch(() => {})
+  const seen = useRef<Set<string> | null>(null)
+  const load = () => api<any>('GET', `/kitchen${station ? `?station=${encodeURIComponent(station)}` : ''}`).then((r) => {
+    // Aviso con sonido cuando llega una comanda nueva (la cocina no tiene que estar viendo la pantalla).
+    const ids = new Set<string>(r.comandas.map((k: any) => k.id))
+    if (seen.current && [...ids].some((id) => !seen.current!.has(id))) beep()
+    seen.current = ids
+    setList(r.comandas)
+  }).catch(() => {})
   useEffect(() => { void load(); const t = setInterval(load, 8_000); return () => clearInterval(t) }, [station])
   const stations = ['', 'cocina', 'cocina_caliente', 'cocina_fria', 'barra', 'postres']
   return (
@@ -167,9 +174,18 @@ export function Cocina(_: { me: Me }) {
           <button className="primary big" style={{ width: '100%' }} onClick={async () => { await api('POST', `/comandas/${k.id}/ready`); void load() }}>Lista</button>
         </div>
       ))}</div>
-      {list.length === 0 && <p className="card muted">Sin comandas pendientes.</p>}
+      {list.length === 0 && <p className="card muted">Sin comandas pendientes. Aquí aparecen solas las de las mesas y los pedidos para llevar, con sonido.</p>}
     </div>
   )
+}
+
+/** Dos tonos cortos (sin archivos de audio). */
+function beep() {
+  try {
+    const ctx = new AudioContext()
+    ;[0, 0.25].forEach((t) => { const o = ctx.createOscillator(); const g = ctx.createGain(); o.frequency.value = 880; g.gain.value = 0.15; o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.15) })
+    navigator.vibrate?.(200)
+  } catch { /* sin audio */ }
 }
 
 /** Pedidos para llevar y para recoger: número de pedido y estados. Se cobran al hacerlos. */

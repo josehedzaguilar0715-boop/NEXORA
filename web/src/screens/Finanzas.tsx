@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { api, auth, mxn, toCents } from '../api'
 import { can, type Me } from '../App'
+import { GananciaReal } from './Inicio'
 
 /** Finanzas y contabilidad: estado de resultados, flujo de efectivo, balance, gastos y libro de movimientos. */
 
@@ -36,8 +37,8 @@ async function download(kind: string, from: string, to: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
-type Tab = 'resumen' | 'plan' | 'resultados' | 'flujo' | 'balance' | 'gastos' | 'movimientos'
-const TABS: [Tab, string][] = [['resumen', 'Resumen'], ['plan', 'Plan 50/30/20'], ['resultados', 'Estado de resultados'], ['flujo', 'Flujo de efectivo'], ['balance', 'Balance'], ['gastos', 'Gastos'], ['movimientos', 'Movimientos']]
+type Tab = 'resumen' | 'resultados' | 'flujo' | 'balance' | 'gastos' | 'movimientos'
+const TABS: [Tab, string][] = [['resumen', 'Resumen'], ['resultados', 'Estado de resultados'], ['flujo', 'Flujo de efectivo'], ['balance', 'Balance'], ['gastos', 'Gastos'], ['movimientos', 'Movimientos']]
 
 export function Finanzas({ me }: { me: Me }) {
   const [tab, setTab] = useState<Tab>('resumen')
@@ -63,7 +64,6 @@ export function Finanzas({ me }: { me: Me }) {
       <nav className="subtabs" aria-label="Secciones de finanzas">{TABS.map(([k, v]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{v}</button>)}</nav>
       {err && <p className="error">{err}</p>}
       {tab === 'resumen' && <Resumen from={from} to={to} onErr={setErr} go={setTab} />}
-      {tab === 'plan' && (me.user.role === 'owner' ? <PlanFinanciero from={from} to={to} /> : <p className="card muted">El plan 50/30/20 y el retiro sugerido los ve el dueño.</p>)}
       {tab === 'resultados' && <Resultados from={from} to={to} onErr={setErr} />}
       {tab === 'flujo' && <Flujo from={from} to={to} onErr={setErr} />}
       {tab === 'balance' && <Balance onErr={setErr} />}
@@ -92,6 +92,7 @@ function Resumen({ from, to, onErr, go }: { from: string; to: string; onErr: (e:
   const [is] = useLoad<any>(`/accounting/income-statement?from=${from}&to=${to}`, [from, to], onErr)
   const [cf] = useLoad<any>(`/accounting/cash-flow?from=${from}&to=${to}`, [from, to], onErr)
   const [bal] = useLoad<any>('/accounting/balance', [], onErr)
+  const [tr] = useLoad<any>(`/finance/trend?from=${from}&to=${to}`, [from, to], onErr)
   const c = is?.current, p = is?.previous
   const max = Math.max(1, c?.netSales ?? 0, (c?.costOfSales ?? 0) + (c?.operatingExpenses ?? 0))
   return (
@@ -102,6 +103,8 @@ function Resumen({ from, to, onErr, go }: { from: string; to: string; onErr: (e:
         <div className="card kpi"><div className="label">Flujo de efectivo</div><div className={`value ${cf && cf.net < 0 ? 'neg' : 'pos'}`}>{cf ? `${cf.net >= 0 ? '+' : ''}${mxn(cf.net)}` : '—'}</div><div className="hint">entró {cf ? mxn(cf.totalIn) : '—'} · salió {cf ? mxn(cf.totalOut) : '—'}</div></div>
         <div className="card kpi"><div className="label">Ticket promedio</div><div className="value">{c ? mxn(c.averageTicket) : '—'}</div><div className="hint">{c ? `${c.tickets} ventas` : ''}</div></div>
       </div>
+      {tr && tr.points.length > 1 && <Tendencia tr={tr} />}
+      {tr && <GananciaReal R={tr.real} title="Ganancia real del periodo" />}
       <div className="grid2">
         <section className="card">
           <div className="card-head"><h2>¿A dónde se fue cada peso?</h2><button className="link" onClick={() => go('resultados')}>Ver estado de resultados →</button></div>
@@ -130,6 +133,49 @@ function Resumen({ from, to, onErr, go }: { from: string; to: string; onErr: (e:
         </section>
       </div>
     </>
+  )
+}
+
+const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const pointLabel = (p: any, by: string) => (by === 'mes' ? `${MES[Number(p.label.slice(5, 7)) - 1]} ${p.label.slice(2, 4)}` : String(Number(p.label.slice(8, 10))))
+
+/** Ingresos contra egresos por día (o por mes en periodos largos); al tocar una barra se ve el detalle. */
+function Tendencia({ tr }: { tr: any }) {
+  const pts = tr.points as any[]
+  const [sel, setSel] = useState<number>(pts.length - 1)
+  const max = Math.max(1, ...pts.map((p) => Math.max(p.income, p.out)))
+  const narrow = typeof window !== 'undefined' && window.innerWidth < 600
+  const W = narrow ? 380 : 760, H = narrow ? 200 : 220, pad = narrow ? 14 : 24, slot = (W - pad * 2) / pts.length, bw = Math.max(2, Math.min(14, slot / 2 - 2))
+  const y = (v: number) => H - pad - (v / max) * (H - pad * 2)
+  const step = Math.ceil(pts.length / (narrow ? 7 : 12))
+  const s = pts[Math.min(sel, pts.length - 1)]
+  return (
+    <section className="card trend-card">
+      <div className="card-head"><h2>Tendencia: ingresos vs egresos</h2><div className="legend"><span><i className="dot in" />Ingresos</span><span><i className="dot out" />Egresos</span></div></div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="trend-chart" role="img" aria-label="Ingresos y egresos por día">
+        <line x1={pad} x2={W - pad} y1={H - pad} y2={H - pad} className="axis" />
+        {pts.map((p, i) => {
+          const x = pad + i * slot + slot / 2
+          return (
+            <g key={p.label} onClick={() => setSel(i)} className={i === sel ? 'on' : ''} style={{ cursor: 'pointer' }}>
+              <rect x={pad + i * slot} y={pad} width={slot} height={H - pad * 2} className="hit" />
+              <rect x={x - bw - 1} y={y(p.income)} width={bw} height={Math.max(0, H - pad - y(p.income))} rx={2} className="b-in" />
+              <rect x={x + 1} y={y(p.out)} width={bw} height={Math.max(0, H - pad - y(p.out))} rx={2} className="b-out" />
+              {i % step === 0 && <text x={x} y={H - 6} textAnchor="middle" className="tick">{pointLabel(p, tr.by)}</text>}
+            </g>
+          )
+        })}
+      </svg>
+      {s && (
+        <div className="trend-detail">
+          <b>{tr.by === 'mes' ? `${MES[Number(s.label.slice(5, 7)) - 1]} ${s.label.slice(0, 4)}` : fmtDate(s.label)}</b>
+          <span>Ingresos <b className="pos">{mxn(s.income)}</b></span>
+          <span>Egresos <b className="neg">{mxn(s.out)}</b></span>
+          <span>Utilidad <b className={s.profit < 0 ? 'neg' : 'pos'}>{mxn(s.profit)}</b></span>
+        </div>
+      )}
+      <p className="muted small">Egresos: gastos, comisiones, mermas y devoluciones. La utilidad ya descuenta el costo de la mercancía.</p>
+    </section>
   )
 }
 

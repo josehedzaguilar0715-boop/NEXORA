@@ -22,7 +22,7 @@ export function Configurar({ me }: { me: Me }) {
     { key: 'boletos', label: 'Tipos de boleto', show: hasGiro(me, 'turistico'), C: Boletos },
     { key: 'horarios', label: 'Horarios y aforo', show: owner && hasGiro(me, 'turistico'), C: Horarios },
     { key: 'copiadoras', label: 'Copiadoras', show: owner && hasGiro(me, 'papeleria'), C: Copiadoras },
-    { key: 'mesas', label: 'Mesas', show: owner && (hasGiro(me, 'palapa', 'restaurante', 'taqueria') || (hasGiro(me, 'comedor') && !!me.settings?.tablesEnabled)), C: Mesas },
+    { key: 'mesas', label: 'Mesas', show: owner && hasGiro(me, 'palapa', 'restaurante', 'taqueria', 'comedor'), C: Mesas },
     { key: 'rentas', label: 'Rentas (sillas, camastros…)', show: owner && hasGiro(me, 'palapa'), C: Rentas },
     { key: 'limpieza', label: 'Tareas de limpieza', show: owner && hasGiro(me, 'banos'), C: Limpieza },
     { key: 'comisiones', label: 'Comisiones', show: owner && hasGiro(me, 'barberia', 'unas', 'perfumeria'), C: Comisiones },
@@ -95,7 +95,7 @@ function Servicios({ me }: { me: Me }) {
                 <td>{s.name}{s.category && <><br /><small className="muted">{s.category}</small></>}</td>
                 {agenda && <td className="num">{s.durationMin ? `${s.durationMin} min` : '—'}</td>}
                 <td className="num">{mxn(s.price)}</td>
-                <td className="num"><button className="mini" onClick={(e) => { e.stopPropagation(); void run(async () => { await api('PATCH', `/services/${s.id}`, { active: !s.active }); await load() }, s.active ? 'Quitado. Su historial se conserva.' : 'Activado de nuevo.')() }}>{s.active ? 'Quitar' : 'Activar'}</button></td>
+                <td className="num"><button className="mini" onClick={(e) => { e.stopPropagation(); void run(async () => { await api('PATCH', `/services/${s.id}`, { active: !s.active }); await load() }, s.active ? 'Eliminado. Su historial se conserva y lo puedes reactivar.' : 'Activado de nuevo.')() }}>{s.active ? 'Eliminar' : 'Reactivar'}</button></td>
               </tr>
             ))}
             {shown.length === 0 && <tr><td colSpan={4} className="muted">Todavía no hay {noun}s. Agrega el primero.</td></tr>}
@@ -151,7 +151,7 @@ function Boletos(_: { me: Me }) {
             {list.map((s) => (
               <tr key={s.id} className={s.active ? 'clickable' : 'muted'} onClick={() => setF({ id: s.id, name: s.name, price: String(s.price / 100), orig: s.price, authCode: '' })}>
                 <td>{s.name}</td><td className="num">{mxn(s.price)}</td>
-                <td className="num"><button className="mini" onClick={(e) => { e.stopPropagation(); void run(async () => { await api('PATCH', `/services/${s.id}`, { active: !s.active }); await load() }, s.active ? 'Quitado.' : 'Activado.')() }}>{s.active ? 'Quitar' : 'Activar'}</button></td>
+                <td className="num"><button className="mini" onClick={(e) => { e.stopPropagation(); void run(async () => { await api('PATCH', `/services/${s.id}`, { active: !s.active }); await load() }, s.active ? 'Eliminado. Lo puedes reactivar.' : 'Activado de nuevo.')() }}>{s.active ? 'Eliminar' : 'Reactivar'}</button></td>
               </tr>
             ))}
             {list.length === 0 && <tr><td className="muted">Agrega adulto, niño, adulto mayor, estudiante…</td></tr>}

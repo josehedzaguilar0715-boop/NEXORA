@@ -48,4 +48,15 @@ describe('costos, ganancia y plan 50/30/20', () => {
     expect((await s.call('PUT', '/finance/plan/rule', { token: T, body: { ops: 60, owner: 25, savings: 15 } })).status).toBe(200)
     expect((await s.call('GET', '/finance/plan', { token: T })).json.rule).toEqual({ ops: 60, owner: 25, savings: 15 })
   })
+
+  it('platillo sin inventario ni receta: el costo capturado sí baja la ganancia', async () => {
+    const { s, T, product, open, sell } = await negocioListo()
+    s.setGiro('comedor')
+    const corrida = await product({ name: 'Comida corrida', unit: 'pieza', price: 9500, trackStock: false, cost: 4000 })
+    await open(0)
+    await sell([{ productId: corrida.id, quantity: 3 }])
+    const sum = (await s.call('GET', '/reports/summary', { token: T })).json
+    expect(sum.costOfSales).toBe(12000)
+    expect(sum.grossProfit).toBe(28500 - 12000)
+  })
 })
