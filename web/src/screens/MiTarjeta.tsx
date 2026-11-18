@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 
-const REASON: Record<string, string> = { importado: 'Sellos anteriores', manual: 'Sello', venta: 'Compra', visita: 'Visita', canje: 'Canjeó', cancelacion: 'Compra cancelada' }
+const REASON: Record<string, string> = { rifa: 'Premio de rifa', importado: 'Sellos anteriores', manual: 'Sello', venta: 'Compra', visita: 'Visita', canje: 'Canjeó', cancelacion: 'Compra cancelada' }
 
 /** Página pública: el cliente ve su tarjeta de sellos o puntos en su teléfono con su link (solo lectura). */
 export function MiTarjeta({ code }: { code: string }) {
   const [d, setD] = useState<any>(null)
   const [err, setErr] = useState('')
-  useEffect(() => { api('GET', `/public/loyalty/${encodeURIComponent(code)}`).then(setD).catch((e) => setErr(e.message)) }, [code])
+  const [camp, setCamp] = useState<any>(null)
+  useEffect(() => {
+    api('GET', `/public/loyalty/${encodeURIComponent(code)}`).then(setD).catch((e) => setErr(e.message))
+    api<any>('GET', `/public/loyalty/${encodeURIComponent(code)}/campaign`).then((r) => setCamp(r.campaign)).catch(() => {})
+  }, [code])
   if (!d) return <main className="login">{err ? <p className="error">{err}</p> : <p className="muted">Cargando…</p>}</main>
   const stamps = d.unit === 'sellos'
   const word = (n: number) => (stamps ? (n === 1 ? 'sello' : 'sellos') : n === 1 ? 'punto' : 'puntos')
@@ -34,6 +38,21 @@ export function MiTarjeta({ code }: { code: string }) {
           {d.dailyCap ? ` (máximo ${d.dailyCap} al día).` : '.'}
         </p>
       </section>
+      {camp && (
+        <section className="card">
+          <h2>{camp.name}</h2>
+          {camp.prizes.map((p: any) => (
+            <div key={p.name} className="stamp-reward">
+              <div className="info-row"><span>{p.name}</span><b>{p.goal} sellos</b></div>
+              <small className="muted">
+                {p.status === 'entregado' ? '¡Ya lo ganaste!' : p.status === 'ganador' ? `¡Vas ganando! Lugar ${p.place}. Pídelo en tu próxima visita.` : p.status === 'en_espera' ? `Llegaste: lugar ${p.place} (hay ${p.quantity}).` : p.remaining > 0 ? `Te faltan ${Math.max(0, p.goal - d.balance)} ${word(Math.max(0, p.goal - d.balance))} · quedan ${p.remaining} de ${p.quantity}.` : 'Ya se entregaron todos.'}
+                {p.tiebreak !== 'ninguno' && !p.status ? ` Si varios llegan el mismo día, gana quien tenga más ${p.tiebreak === 'faciales' ? 'faciales pagados' : 'productos comprados'}.` : ''}
+              </small>
+              <div className="bar-track"><div className="bar-fill in" style={{ width: `${Math.min(100, (d.balance / p.goal) * 100)}%` }} /></div>
+            </div>
+          ))}
+        </section>
+      )}
       {d.rewards.length > 0 && (
         <section className="card">
           <h2>Premios</h2>

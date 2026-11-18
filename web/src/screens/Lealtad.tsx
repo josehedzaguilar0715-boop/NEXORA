@@ -79,6 +79,7 @@ export function Lealtad(_: { me: Me }) {
         </section>
       )}
       {mods.includes('fidelidad') && <Fidelidad />}
+      {mods.includes('fidelidad') && <Rifa />}
       {(msg.err || msg.ok) && <p className={msg.err ? 'error' : 'okmsg'}>{msg.err ?? msg.ok}</p>}
     </div>
   )
@@ -139,6 +140,73 @@ function Fidelidad() {
           setNr({ id: '', name: '', cost: '' })
         }, nr.id ? 'Premio guardado.' : 'Premio agregado.')}>{nr.id ? 'Guardar premio' : 'Agregar premio'}</button>
       </p>
+      {(msg.err || msg.ok) && <p className={msg.err ? 'error' : 'okmsg'}>{msg.err ?? msg.ok}</p>}
+    </section>
+  )
+}
+
+const TIE: Record<string, string> = { faciales: 'Más faciales pagados', productos: 'Más productos comprados', ninguno: 'Solo quien llegó primero' }
+const STATUS_R: Record<string, string> = { ganador: 'Gana', entregado: 'Entregado', en_espera: 'En espera' }
+
+/** Rifa de sellos: premios con cupo para los primeros que lleguen a la meta; el mismo día desempata faciales o compras. */
+function Rifa() {
+  const [list, setList] = useState<any[]>([])
+  const [f, setF] = useState({ name: '', prizes: [{ name: '', goal: '', quantity: '1', tiebreak: 'ninguno' }] })
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  const load = async () => setList((await api<any>('GET', '/campaigns')).campaigns)
+  useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
+  const run = (fn: () => Promise<unknown>, ok: string) => async () => { try { await fn(); setMsg({ ok }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }
+  const active = list.find((c) => c.active)
+  const setP = (i: number, k: string, v: string) => setF({ ...f, prizes: f.prizes.map((p, j) => (j === i ? { ...p, [k]: v } : p)) })
+  const ok = f.name.trim().length >= 2 && f.prizes.every((p) => p.name.trim().length >= 2 && Number(p.goal) > 0 && Number(p.quantity) > 0)
+  return (
+    <section className="card">
+      <h2>Rifa de sellos</h2>
+      <p className="muted small">Premios para los primeros que junten cierta cantidad de sellos. Si varios llegan el mismo día, gana quien tenga más faciales o más compras, según el premio. Cada cliente gana un solo premio y al entregárselo se le descuentan los sellos.</p>
+      {active ? (
+        <>
+          <div className="card-head"><h3>{active.name}</h3><button className="mini" onClick={() => { if (confirm('¿Terminar la rifa? Ya no aparecerá en las tarjetas de los clientes.')) void run(() => api('POST', `/campaigns/${active.id}/end`), 'Rifa terminada.')() }}>Terminar rifa</button></div>
+          <p className="muted small">Desde {new Date(active.startsAt).toLocaleDateString('es-MX')}</p>
+          {active.prizes.map((p: any) => (
+            <div key={p.id} style={{ marginBottom: 14 }}>
+              <div className="info-row"><b>{p.name}</b><span>{p.goal} sellos · quedan {p.remaining} de {p.quantity}</span></div>
+              <p className="muted small">Desempate el mismo día: {TIE[p.tiebreak]}</p>
+              <div className="table-wrap"><table className="list"><tbody>
+                {p.standings.map((x: any, i: number) => (
+                  <tr key={x.customerId}>
+                    <td>{i + 1}. <b>{x.name}</b><br /><small className="muted">llegó {new Date(x.reachedAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}{x.score != null ? ` · ${x.score} ${p.tiebreak === 'faciales' ? 'faciales' : 'productos'}` : ''}</small></td>
+                    <td className="num"><span className={x.status === 'ganador' ? 'pill' : 'muted'}>{STATUS_R[x.status]}</span>{' '}
+                      {x.status === 'ganador' && <button className="mini primary" onClick={() => { if (confirm(`¿Entregar «${p.name}» a ${x.name}? Se le descuentan ${p.goal} sellos.`)) void run(() => api('POST', `/campaigns/${active.id}/prizes/${p.id}/deliver`, { customerId: x.customerId }), 'Premio entregado.')() }}>Entregar</button>}
+                    </td>
+                  </tr>
+                ))}
+                {p.standings.length === 0 && <tr><td className="muted">Nadie ha llegado a {p.goal} sellos todavía.</td></tr>}
+              </tbody></table></div>
+            </div>
+          ))}
+        </>
+      ) : (
+        <>
+          <label>Nombre de la rifa<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Rifa de diciembre" /></label>
+          {f.prizes.map((p, i) => (
+            <div key={i} className="danger-zone">
+              <div className="row">
+                <label>Premio<input value={p.name} onChange={(e) => setP(i, 'name', e.target.value)} placeholder="Perfume" /></label>
+                <label>Sellos<input inputMode="numeric" value={p.goal} onChange={(e) => setP(i, 'goal', e.target.value)} placeholder="10" /></label>
+                <label>Cuántos hay<input inputMode="numeric" value={p.quantity} onChange={(e) => setP(i, 'quantity', e.target.value)} /></label>
+              </div>
+              <div className="row" style={{ alignItems: 'end' }}>
+                <label>Si llegan el mismo día, gana<select value={p.tiebreak} onChange={(e) => setP(i, 'tiebreak', e.target.value)}>{Object.entries(TIE).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+                {f.prizes.length > 1 && <button onClick={() => setF({ ...f, prizes: f.prizes.filter((_, j) => j !== i) })}>Quitar</button>}
+              </div>
+            </div>
+          ))}
+          <p className="row">
+            <button onClick={() => setF({ ...f, prizes: [...f.prizes, { name: '', goal: '', quantity: '1', tiebreak: 'ninguno' }] })}>+ Otro premio</button>
+            <button className="primary" disabled={!ok} onClick={run(async () => { await api('POST', '/campaigns', { name: f.name, prizes: f.prizes.map((p) => ({ name: p.name, goal: Number(p.goal), quantity: Number(p.quantity), tiebreak: p.tiebreak })) }); setF({ name: '', prizes: [{ name: '', goal: '', quantity: '1', tiebreak: 'ninguno' }] }) }, 'Rifa iniciada. Los clientes la ven en su tarjeta.')}>Empezar rifa</button>
+          </p>
+        </>
+      )}
       {(msg.err || msg.ok) && <p className={msg.err ? 'error' : 'okmsg'}>{msg.err ?? msg.ok}</p>}
     </section>
   )

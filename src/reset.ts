@@ -46,6 +46,7 @@ export const STEPS: [table: string, sql: string][] = [
   ['quotes', 'DELETE FROM quotes WHERE business_id = ?'],
   ['credit_ledger', 'DELETE FROM credit_ledger WHERE business_id = ?'],
   ['loyalty_ledger', 'DELETE FROM loyalty_ledger WHERE business_id = ?'],
+  ['campaign_awards', 'DELETE FROM campaign_awards WHERE campaign_id IN (SELECT id FROM campaigns WHERE business_id = ?)'],
   ['visits', 'DELETE FROM visits WHERE business_id = ?'],
   ['membership_uses', 'DELETE FROM membership_uses WHERE membership_id IN (SELECT id FROM customer_memberships WHERE business_id = ?)'],
   ['customer_memberships', 'DELETE FROM customer_memberships WHERE business_id = ?'],

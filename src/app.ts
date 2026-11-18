@@ -10,6 +10,7 @@ import { accounting } from './accounting.js'
 import { importer } from './importer.js'
 import { layaways } from './layaways.js'
 import { reset } from './reset.js'
+import { campaigns, publicCampaigns } from './campaigns.js'
 import { inventory } from './inventory.js'
 import { hardware } from './hardware.js'
 import { services } from './services.js'
@@ -38,6 +39,7 @@ export function createApp(deps: Deps) {
   app.get('/health', (c) => c.json({ ok: true }))
   app.route('/', publicAuth)
   app.route('/', publicCommon)
+  app.route('/', publicCampaigns)
   app.route('/', publicAgenda)
   app.route('/', publicTourism)
   app.route('/', admin as unknown as Hono<Env>)
@@ -71,6 +73,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', importer)
   protectedApp.route('/', layaways)
   protectedApp.route('/', reset)
+  protectedApp.route('/', campaigns)
   app.route('/', protectedApp)
 
   app.onError((err, c) => {

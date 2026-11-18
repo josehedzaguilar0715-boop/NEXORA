@@ -1371,6 +1371,36 @@ const MIGRATIONS: Migration[] = [
   },
   // Cuentas gratis (cortesía): no vencen ni pagan mensualidad. Las elige el super panel.
   `ALTER TABLE businesses ADD COLUMN free INTEGER NOT NULL DEFAULT 0;`,
+  // Rifas de sellos: premios con cupo para los primeros que lleguen a la meta.
+  `
+  CREATE TABLE campaigns (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE campaign_prizes (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id),
+    name TEXT NOT NULL,
+    goal INTEGER NOT NULL CHECK (goal > 0),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    tiebreak TEXT NOT NULL CHECK (tiebreak IN ('faciales','productos','ninguno')),
+    sort INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE TABLE campaign_awards (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id),
+    prize_id TEXT NOT NULL REFERENCES campaign_prizes(id),
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    delivered_by TEXT NOT NULL REFERENCES users(id),
+    delivered_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX campaign_awards_one ON campaign_awards(campaign_id, customer_id);
+  `,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */
