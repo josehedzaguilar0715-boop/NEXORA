@@ -74,4 +74,28 @@ describe('rifa de sellos (Barbería Fénix)', () => {
     expect((await s.call('GET', `/public/loyalty/${ana.code}/campaign`)).json.campaign).toBeNull()
     void o
   })
+
+  it('la rifa cierra en su fecha: después ya no cuenta quien llegue', async () => {
+    const { s, T, open } = await negocioListo()
+    s.setGiro('barberia')
+    await s.call('PUT', '/modules', { token: T, body: { active: ['fidelidad'] } })
+    await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'todos', dailyCap: 3 } })
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(Date.now()))
+    const r = await s.call('POST', '/campaigns', { token: T, body: { name: 'Rifa corta', endDate: today, prizes: [{ name: 'Kit de peinado', goal: 2, quantity: 2, tiebreak: 'ninguno' }] } })
+    expect(r.json.campaign.endsAt).toBeTruthy()
+    await open(0)
+    const corte = (await s.call('POST', '/services', { token: T, body: { name: 'Corte', price: 15000, durationMin: 30 } })).json.service
+    const a = (await s.call('POST', '/customers', { token: T, body: { name: 'Ana' } })).json.customer
+    const b = (await s.call('POST', '/customers', { token: T, body: { name: 'Beto' } })).json.customer
+    const pay = (c: any) => s.call('POST', '/sales', { token: T, body: { id: s.uuid(), paymentMethod: 'efectivo', customerId: c.id, items: [{ serviceId: corte.id, quantity: 1 }] } })
+    await pay(a); await pay(a) // Ana llega a 2 antes del cierre
+    s.advance(2 * 86_400_000); s.longLived()
+    await pay(b); await pay(b) // Beto llega después del cierre: no cuenta
+    const st = (await s.call('GET', '/campaigns', { token: T })).json.campaigns[0]
+    expect(st.prizes[0].standings.map((x: any) => x.name)).toEqual(['Ana'])
+    // Se puede mover la fecha de cierre.
+    const later = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(Date.now() + 5 * 86_400_000))
+    const p = await s.call('PATCH', `/campaigns/${st.id}`, { token: T, body: { endDate: later } })
+    expect(p.json.campaign.prizes[0].standings.map((x: any) => x.name)).toEqual(['Ana', 'Beto'])
+  })
 })

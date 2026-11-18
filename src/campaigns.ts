@@ -15,11 +15,11 @@ import { bad, conflict, iso, localDate, newId, notFound } from './util.js'
  */
 
 export type Tiebreak = 'faciales' | 'productos' | 'ninguno'
-interface Campaign { id: string; business_id: string; name: string; starts_at: string; active: number; created_at: string }
+interface Campaign { id: string; business_id: string; name: string; starts_at: string; ends_at: string | null; active: number; created_at: string }
 interface Prize { id: string; campaign_id: string; name: string; goal: number; quantity: number; tiebreak: Tiebreak; sort: number }
 
 /** Momento en que cada cliente juntó por primera vez `goal` sellos desde el inicio de la rifa (con su saldo corriendo). */
-function reachedAt(db: Db, businessId: string, startsAt: string, goals: number[]): Map<string, Map<number, string>> {
+function reachedAt(db: Db, businessId: string, startsAt: string, endsAt: string | null, goals: number[]): Map<string, Map<number, string>> {
   const rows = db.prepare('SELECT customer_id, delta, created_at FROM loyalty_ledger WHERE business_id = ? ORDER BY created_at, rowid').all(businessId) as { customer_id: string; delta: number; created_at: string }[]
   const bal = new Map<string, number>()
   const out = new Map<string, Map<number, string>>()
@@ -34,6 +34,7 @@ function reachedAt(db: Db, businessId: string, startsAt: string, goals: number[]
   }
   let started = false
   for (const r of rows) {
+    if (endsAt && r.created_at >= endsAt) break // lo que llega después del cierre ya no cuenta
     // Lo que ya traían antes de la rifa cuenta como si lo hubieran juntado el día que empezó.
     if (!started && r.created_at >= startsAt) { started = true; for (const cid of bal.keys()) mark(cid, startsAt) }
     bal.set(r.customer_id, (bal.get(r.customer_id) ?? 0) + r.delta)
@@ -63,7 +64,7 @@ export function standings(db: Db, campaignId: string) {
     .filter((x) => p?.scope !== 'por_persona' || x.loyalty_enrolled).map((x) => [x.id, x.name]))
   const awards = db.prepare('SELECT prize_id, customer_id, delivered_at FROM campaign_awards WHERE campaign_id = ?').all(c.id) as { prize_id: string; customer_id: string; delivered_at: string }[]
   const awarded = new Set(awards.map((a) => a.customer_id))
-  const reached = reachedAt(db, c.business_id, c.starts_at, [...new Set(prizes.map((x) => x.goal))])
+  const reached = reachedAt(db, c.business_id, c.starts_at, c.ends_at, [...new Set(prizes.map((x) => x.goal))])
   const m = metrics(db, c.business_id)
   const taken = new Set<string>() // ya ganan un premio más alto en esta rifa
   const result = prizes.map((pr) => {
@@ -87,12 +88,16 @@ export function standings(db: Db, campaignId: string) {
   // Se muestran en el orden en que se capturaron (no por meta).
   const order = (db.prepare('SELECT id FROM campaign_prizes WHERE campaign_id = ? ORDER BY sort').all(c.id) as { id: string }[]).map((x) => x.id)
   result.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
-  return { id: c.id, name: c.name, startsAt: c.starts_at, active: !!c.active, prizes: result }
+  return { id: c.id, name: c.name, startsAt: c.starts_at, endsAt: c.ends_at, active: !!c.active, prizes: result }
 }
 
 const activeCampaign = (db: Db, businessId: string) => db.prepare('SELECT id FROM campaigns WHERE business_id = ? AND active = 1 ORDER BY created_at DESC LIMIT 1').get(businessId) as { id: string } | undefined
 
 export const campaigns = new Hono<Env>()
+
+/** Fecha de cierre: el día completo, hora de México (UTC-6). */
+const endDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
+const endOfDay = (date: string) => new Date(Date.parse(`${date}T06:00:00.000Z`) + 86_400_000).toISOString()
 
 const prizeSchema = z.object({ name: z.string().trim().min(2).max(100), goal: z.number().int().min(1).max(1000), quantity: z.number().int().min(1).max(100), tiebreak: z.enum(['faciales', 'productos', 'ninguno']) })
 
@@ -105,16 +110,27 @@ campaigns.get('/campaigns', requireModule('fidelidad'), (c) => {
 campaigns.post('/campaigns', requireModule('fidelidad'), ownerOnly, async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
-  const d = parse(z.object({ name: z.string().trim().min(2).max(100), startsAt: z.string().datetime().optional(), prizes: z.array(prizeSchema).min(1).max(10) }), await body(c))
+  const d = parse(z.object({ name: z.string().trim().min(2).max(100), startsAt: z.string().datetime().optional(), endDate: endDate.optional(), prizes: z.array(prizeSchema).min(1).max(10) }), await body(c))
   if (!db.prepare('SELECT 1 FROM loyalty_program WHERE business_id = ?').get(u.business_id)) throw bad('Primero configura la tarjeta de sellos.')
   if (activeCampaign(db, u.business_id)) throw conflict('Ya hay una rifa activa. Termínala antes de empezar otra.', 'rifa_activa')
   const id = newId()
   db.transaction(() => {
-    db.prepare('INSERT INTO campaigns (id, business_id, name, starts_at, active, created_by, created_at) VALUES (?,?,?,?,1,?,?)').run(id, u.business_id, d.name, d.startsAt ?? iso(now()), u.id, iso(now()))
+    db.prepare('INSERT INTO campaigns (id, business_id, name, starts_at, ends_at, active, created_by, created_at) VALUES (?,?,?,?,?,1,?,?)').run(id, u.business_id, d.name, d.startsAt ?? iso(now()), d.endDate ? endOfDay(d.endDate) : null, u.id, iso(now()))
     d.prizes.forEach((p, i) => db.prepare('INSERT INTO campaign_prizes (id, campaign_id, name, goal, quantity, tiebreak, sort) VALUES (?,?,?,?,?,?,?)').run(newId(), id, p.name, p.goal, p.quantity, p.tiebreak, i))
     audit(db, now, { businessId: u.business_id, userId: u.id, action: 'rifa.alta', entity: 'campaign', entityId: id, newValue: d })
   })()
   return c.json({ campaign: standings(db, id) }, 201)
+})
+
+/** Cambiar la fecha de cierre (o quitarla). */
+campaigns.patch('/campaigns/:id', requireModule('fidelidad'), ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ endDate: endDate.nullable() }), await body(c))
+  const r = db.prepare('UPDATE campaigns SET ends_at = ? WHERE id = ? AND business_id = ?').run(d.endDate ? endOfDay(d.endDate) : null, c.req.param('id'), u.business_id)
+  if (!r.changes) throw notFound()
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'rifa.cierre', entity: 'campaign', entityId: c.req.param('id'), newValue: d })
+  return c.json({ campaign: standings(db, c.req.param('id')) })
 })
 
 campaigns.post('/campaigns/:id/end', requireModule('fidelidad'), ownerOnly, (c) => {
@@ -152,6 +168,7 @@ export function campaignForCustomer(db: Db, businessId: string, customerId: stri
   const s = standings(db, a.id)
   return {
     name: s.name,
+    endsAt: s.endsAt,
     prizes: s.prizes.map((p) => {
       const i = p.standings.findIndex((x) => x.customerId === customerId)
       const me = i >= 0 ? p.standings[i]! : null

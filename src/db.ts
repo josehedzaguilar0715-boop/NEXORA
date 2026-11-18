@@ -1401,6 +1401,8 @@ const MIGRATIONS: Migration[] = [
   );
   CREATE UNIQUE INDEX campaign_awards_one ON campaign_awards(campaign_id, customer_id);
   `,
+  // Fecha de cierre de la rifa: después ya no cuenta quien llegue a la meta.
+  `ALTER TABLE campaigns ADD COLUMN ends_at TEXT;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

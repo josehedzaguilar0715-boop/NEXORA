@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { closeDay } from './Lealtad'
 
 const REASON: Record<string, string> = { rifa: 'Premio de rifa', importado: 'Sellos anteriores', manual: 'Sello', venta: 'Compra', visita: 'Visita', canje: 'Canjeó', cancelacion: 'Compra cancelada' }
 
@@ -41,11 +42,12 @@ export function MiTarjeta({ code }: { code: string }) {
       {camp && (
         <section className="card">
           <h2>{camp.name}</h2>
+          {camp.endsAt && <p className="muted small">{Date.now() >= Date.parse(camp.endsAt) ? `La rifa cerró el ${closeDay(camp.endsAt)}.` : `Cierra el ${closeDay(camp.endsAt)}: cuentan los sellos que juntes hasta ese día.`}</p>}
           {camp.prizes.map((p: any) => (
             <div key={p.name} className="stamp-reward">
               <div className="info-row"><span>{p.name}</span><b>{p.goal} sellos</b></div>
               <small className="muted">
-                {p.status === 'entregado' ? '¡Ya lo ganaste!' : p.status === 'ganador' ? `¡Vas ganando! Lugar ${p.place}. Pídelo en tu próxima visita.` : p.status === 'en_espera' ? `Llegaste: lugar ${p.place} (hay ${p.quantity}).` : p.remaining > 0 ? `Te faltan ${Math.max(0, p.goal - d.balance)} ${word(Math.max(0, p.goal - d.balance))} · quedan ${p.remaining} de ${p.quantity}.` : 'Ya se entregaron todos.'}
+                {p.status === 'entregado' ? '¡Ya lo ganaste!' : p.status === 'ganador' ? `¡Vas ganando! Lugar ${p.place}. Pídelo en tu próxima visita.` : p.status === 'en_espera' ? `Llegaste: lugar ${p.place} (hay ${p.quantity}).` : camp.endsAt && Date.now() >= Date.parse(camp.endsAt) ? 'La rifa ya cerró.' : p.remaining > 0 ? `Te faltan ${Math.max(0, p.goal - d.balance)} ${word(Math.max(0, p.goal - d.balance))} · quedan ${p.remaining} de ${p.quantity}.` : 'Ya se entregaron todos.'}
                 {p.tiebreak !== 'ninguno' && !p.status ? ` Si varios llegan el mismo día, gana quien tenga más ${p.tiebreak === 'faciales' ? 'faciales pagados' : 'productos comprados'}.` : ''}
               </small>
               <div className="bar-track"><div className="bar-fill in" style={{ width: `${Math.min(100, (d.balance / p.goal) * 100)}%` }} /></div>
