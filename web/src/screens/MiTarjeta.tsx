@@ -10,7 +10,7 @@ export function cardWhatsApp(c: { name: string; phone?: string | null; code: str
   return `https://wa.me/${digits.length === 10 ? `52${digits}` : ''}?text=${encodeURIComponent(text)}`
 }
 
-const REASON: Record<string, string> = { escaneo: 'Sello (QR)', rifa: 'Premio de rifa', importado: 'Sellos anteriores', manual: 'Sello', venta: 'Compra', visita: 'Visita', canje: 'Canjeó', cancelacion: 'Compra cancelada' }
+const REASON: Record<string, string> = { ajuste: 'Ajuste de sellos', escaneo: 'Sello (QR)', rifa: 'Premio de rifa', importado: 'Sellos anteriores', manual: 'Sello', venta: 'Compra', visita: 'Visita', canje: 'Canjeó', cancelacion: 'Compra cancelada' }
 
 /** Página pública: el cliente ve su tarjeta de sellos o puntos en su teléfono con su link (solo lectura). */
 export function MiTarjeta({ code }: { code: string }) {

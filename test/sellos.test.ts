@@ -119,4 +119,36 @@ describe('tarjeta de sellos (barbería)', () => {
     // Un código de otro negocio no sirve.
     expect((await s.call('POST', '/scan', { token: T, body: { code: 'NXNOEXISTE1234', action: 'sello' } })).status).toBe(404)
   })
+
+  it('ajustar sellos en la ficha del cliente: agregar los que faltaron o quitar, con motivo y sin tope del día', async () => {
+    const { s, T, o } = await negocioListo()
+    s.setGiro('barberia')
+    await s.call('PUT', '/modules', { token: T, body: { active: ['fidelidad'] } })
+    await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'todos', dailyCap: 3 } })
+    const cli = (await s.call('POST', '/customers', { token: T, body: { name: 'Raúl' } })).json.customer
+    const adj = (body: object, tok = T) => s.call('POST', `/customers/${cli.id}/stamps/adjust`, { token: tok, body })
+    // Motivo obligatorio y la cantidad no puede ser 0.
+    expect((await adj({ delta: 4 })).status).toBe(400)
+    expect((await adj({ delta: 0, reason: 'nada' })).status).toBe(400)
+    // El dueño agrega 4 de golpe (más que el máximo de 3 al día).
+    expect((await adj({ delta: 4, reason: 'Sellos que no se registraron' })).json.balance).toBe(4)
+    // Quitar más de lo que tiene no se puede; quitar 1 sí.
+    expect((await adj({ delta: -5, reason: 'Error' })).json.error.code).toBe('saldo_insuficiente')
+    expect((await adj({ delta: -1, reason: 'Se dio de más' })).json.balance).toBe(3)
+    // El ajuste no gasta el máximo del día: escanear todavía suma.
+    expect((await s.call('POST', '/scan', { token: T, body: { code: cli.code, action: 'sello' } })).json.loyalty).toMatchObject({ earned: 1, balance: 4 })
+    // Queda en su historial con el motivo y en la bitácora.
+    const led = (await s.call('GET', `/customers/${cli.id}/loyalty`, { token: T })).json.ledger
+    expect(led.find((l: any) => l.reason === 'ajuste' && l.delta === -1)).toMatchObject({ note: 'Se dio de más' })
+    expect(s.db.prepare("SELECT COUNT(*) n FROM audit_log WHERE action = 'fidelidad.ajuste'").get()).toMatchObject({ n: 2 })
+    // La nota es interna: no se muestra en la tarjeta del cliente.
+    expect(JSON.stringify((await s.call('GET', `/public/loyalty/${cli.code}`)).json)).not.toContain('Se dio de más')
+    // Un empleado con permiso necesita el código del dueño; sin permiso, no puede.
+    const caj = await s.createStaff(T, o.business.code, 'cajero9', 'cajero')
+    expect((await adj({ delta: 1, reason: 'Faltó' }, caj.token)).status).toBe(403)
+    const perms = (await s.call('GET', '/users', { token: T })).json.users.find((x: any) => x.id === caj.id).permissions
+    await s.call('PATCH', `/users/${caj.id}`, { token: T, body: { permissions: [...perms, 'give_stamps'] } })
+    expect((await adj({ delta: 1, reason: 'Faltó' }, caj.token)).json.error.code).toBe('codigo_requerido')
+    expect((await adj({ delta: 1, reason: 'Faltó', authCode: '4321' }, caj.token)).json.balance).toBe(5)
+  })
 })

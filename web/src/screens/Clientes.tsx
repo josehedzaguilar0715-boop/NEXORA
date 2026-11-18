@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import { can, FIADO_GIROS, hasGiro, type Me } from '../App'
-import { loyaltyText } from './Caja'
 import { cardWhatsApp } from './MiTarjeta'
 
 const KIND: Record<string, string> = { cargo: 'Compra fiada', abono: 'Abono', cancelacion: 'Cancelación' }
@@ -188,29 +187,64 @@ function Membresias({ c }: { c: any }) {
   )
 }
 
+const LREASON: Record<string, string> = { venta: 'Compra', visita: 'Visita', escaneo: 'Sello (QR)', manual: 'Sello a mano', ajuste: 'Ajuste', importado: 'Sellos anteriores', canje: 'Canje', rifa: 'Premio de rifa', cancelacion: 'Compra cancelada' }
+
 function Puntos({ me, c }: { me: Me; c: any }) {
   const canGive = can(me, 'give_stamps')
-  const [give, setGive] = useState('1')
+  const owner = me.user.role === 'owner'
+  const [adj, setAdj] = useState({ qty: '1', reason: '', code: '' })
   const [data, setData] = useState<any>(null)
   const [rewards, setRewards] = useState<any[]>([])
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = async () => { setData(await api('GET', `/customers/${c.id}/loyalty`)); setRewards((await api<any>('GET', '/loyalty')).rewards.filter((r: any) => r.active !== 0)) }
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [c.id])
   if (!data) return <p className="muted">Cargando…</p>
+  const qty = Math.floor(Number(adj.qty))
+  const ready = qty > 0 && adj.reason.trim().length >= 3 && (owner || adj.code.length > 0)
+  const adjust = async (sign: 1 | -1) => {
+    try {
+      const r = await api<any>('POST', `/customers/${c.id}/stamps/adjust`, { delta: sign * qty, reason: adj.reason, ...(owner ? {} : { authCode: adj.code }) })
+      setMsg({ ok: `${sign > 0 ? 'Se agregaron' : 'Se quitaron'} ${qty}. Ahora tiene ${r.balance}.` })
+      setAdj({ qty: '1', reason: '', code: '' })
+      await load()
+    } catch (e) { setMsg({ err: (e as Error).message }) }
+  }
   return (
     <div>
-      <div className="kpis mini"><div><span className="muted">Puntos o sellos</span><b>{data.balance}</b></div></div>
+      <div className="kpis mini"><div><span className="muted">Sellos o puntos</span><b>{data.balance}</b></div></div>
+      {canGive && (
+        <div className="danger-zone">
+          <h3>Agregar o quitar sellos</h3>
+          <p className="muted small">Para corregir: sumar los que no se registraron o quitar los que se dieron de más. No cuenta para el máximo del día y queda en la bitácora.</p>
+          <div className="row" style={{ alignItems: 'end' }}>
+            <label>Cuántos<span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+              <button type="button" aria-label="Uno menos" onClick={() => setAdj({ ...adj, qty: String(Math.max(1, qty - 1 || 1)) })}>−</button>
+              <input inputMode="numeric" aria-label="Cuántos sellos" style={{ textAlign: 'center', minWidth: 0 }} value={adj.qty} onChange={(e) => setAdj({ ...adj, qty: e.target.value.replace(/\D/g, '') })} />
+              <button type="button" aria-label="Uno más" onClick={() => setAdj({ ...adj, qty: String((qty || 0) + 1) })}>+</button>
+            </span></label>
+            <label>Motivo<input value={adj.reason} onChange={(e) => setAdj({ ...adj, reason: e.target.value })} placeholder="Sellos que no se registraron" /></label>
+          </div>
+          {!owner && <label>Código del dueño<input type="password" inputMode="numeric" value={adj.code} onChange={(e) => setAdj({ ...adj, code: e.target.value })} /></label>}
+          <p className="row">
+            <button className="primary" disabled={!ready} onClick={() => adjust(1)}>+ Agregar {qty > 0 ? qty : ''}</button>
+            <button className="danger" disabled={!ready || qty > data.balance} onClick={() => { if (confirm(`¿Quitarle ${qty} a ${c.name}?`)) void adjust(-1) }}>− Quitar {qty > 0 ? qty : ''}</button>
+          </p>
+        </div>
+      )}
+      {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
       <h3>Canjear</h3>
       <div className="chips">{rewards.map((r) => <button key={r.id} className="chip" disabled={data.balance < r.cost} onClick={async () => { try { const x = await api<any>('POST', `/customers/${c.id}/redeem`, { rewardId: r.id }); setMsg({ ok: `Canjeado: ${x.reward}.` }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }}>{r.name} · {r.cost}</button>)}</div>
       {rewards.length === 0 && <p className="muted small">Crea premios en «Membresías y promos».</p>}
-      {canGive && (<>
-        <h3>Dar a mano</h3>
-        <div className="row" style={{ alignItems: 'end' }}>
-          <label>Cuántos<input inputMode="numeric" value={give} onChange={(e) => setGive(e.target.value)} /></label>
-          <button className="primary" disabled={!(Number(give) > 0)} onClick={async () => { try { const x = await api<any>('POST', `/customers/${c.id}/stamps`, { quantity: Math.floor(Number(give)) }); setMsg({ ok: x.loyalty ? loyaltyText(x.loyalty) : 'Listo.' }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }}>Dar</button>
-        </div>
-      </>)}
-      {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
+      <h3>Movimientos</h3>
+      <div className="table-wrap"><table className="list"><tbody>
+        {data.ledger.map((l: any, i: number) => (
+          <tr key={i}>
+            <td>{LREASON[l.reason] ?? l.reason}{l.note ? <>: <span className="muted">{l.note}</span></> : null}<br /><small className="muted">{new Date(l.createdAt).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{l.byName ? ` · ${l.byName}` : ''}</small></td>
+            <td className="num"><b className={l.delta > 0 ? 'pos' : 'neg'}>{l.delta > 0 ? '+' : ''}{l.delta}</b></td>
+          </tr>
+        ))}
+        {data.ledger.length === 0 && <tr><td className="muted">Todavía no tiene sellos.</td></tr>}
+      </tbody></table></div>
     </div>
   )
 }

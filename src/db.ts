@@ -1403,6 +1403,8 @@ const MIGRATIONS: Migration[] = [
   `,
   // Fecha de cierre de la rifa: después ya no cuenta quien llegue a la meta.
   `ALTER TABLE campaigns ADD COLUMN ends_at TEXT;`,
+  // Ajustes de sellos con motivo (correcciones del dueño).
+  `ALTER TABLE loyalty_ledger ADD COLUMN note TEXT;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

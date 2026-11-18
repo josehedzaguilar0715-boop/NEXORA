@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto'
 import QRCode from 'qrcode'
 import { z } from 'zod'
 import { audit } from './audit.js'
+import { authorize } from './authcode.js'
 import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Env } from './context.js'
 import type { Db } from './db.js'
 import { activePromotions, bestPromotions } from './promotions.js'
@@ -451,6 +452,26 @@ common.post('/customers/:id/stamps', requireModule('fidelidad'), requirePerm('gi
   return c.json({ loyalty: loyaltyStatus(db, u.business_id, cu.id, given) })
 })
 
+/**
+ * Ajustar sellos o puntos (corrección): sumar los que no se registraron o quitar los que sobran, con motivo.
+ * No cuenta para el máximo del día. Quien tiene el permiso de dar sellos; si no es el dueño, con código del dueño.
+ */
+common.post('/customers/:id/stamps/adjust', requireModule('fidelidad'), requirePerm('give_stamps'), async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const u = c.get('session').user
+  const cu = loadCustomer(c)
+  const d = parse(z.object({ delta: z.number().int().min(-1000).max(1000).refine((n) => n !== 0, 'La cantidad no puede ser 0'), reason: z.string().trim().min(3, 'Escribe el motivo').max(200), authCode: z.string().optional() }), await body(c))
+  const auth = u.role === 'owner' ? null : authorize(deps, u, d.authCode, 'give_stamps', 'ajuste de sellos', { ownerOnly: true })
+  return db.transaction(() => {
+    const bal = balanceOf(db, cu.id)
+    if (bal + d.delta < 0) throw conflict(`Solo tiene ${bal}; no se le pueden quitar ${-d.delta}.`, 'saldo_insuficiente')
+    db.prepare("INSERT INTO loyalty_ledger (id, business_id, customer_id, delta, reason, note, created_by, created_at) VALUES (?,?,?,?,'ajuste',?,?,?)").run(newId(), u.business_id, cu.id, d.delta, d.reason, u.id, iso(now()))
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fidelidad.ajuste', entity: 'customer', entityId: cu.id, oldValue: { saldo: bal }, newValue: { saldo: bal + d.delta, cambio: d.delta }, reason: d.reason, ...(auth ? { authorizedBy: auth.id } : {}) })
+    return c.json({ balance: bal + d.delta })
+  })()
+})
+
 common.post('/customers/:id/redeem', requireModule('fidelidad'), requirePerm('sell'), async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
@@ -470,7 +491,7 @@ common.post('/customers/:id/redeem', requireModule('fidelidad'), requirePerm('se
 common.get('/customers/:id/loyalty', requirePerm('customers_credit'), (c) => {
   const cu = loadCustomer(c)
   const { db } = c.get('deps')
-  const ledger = db.prepare('SELECT delta, reason, sale_id AS saleId, created_at AS createdAt FROM loyalty_ledger WHERE customer_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 200').all(cu.id)
+  const ledger = db.prepare('SELECT l.delta, l.reason, l.note, l.sale_id AS saleId, l.created_at AS createdAt, u.name AS byName FROM loyalty_ledger l LEFT JOIN users u ON u.id = l.created_by WHERE l.customer_id = ? ORDER BY l.created_at DESC, l.rowid DESC LIMIT 200').all(cu.id)
   const balance = (db.prepare('SELECT COALESCE(SUM(delta),0) p FROM loyalty_ledger WHERE customer_id = ?').get(cu.id) as { p: number }).p
   return c.json({ balance, ledger })
 })
