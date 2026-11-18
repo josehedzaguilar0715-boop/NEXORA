@@ -106,16 +106,19 @@ type Entry = { at: string; type: string; concept: string; method: string; inflow
 export function ledger(db: Db, businessId: string, from: string, to: string): Entry[] {
   const { start, end } = range(from, to)
   const b = businessId
-  return db.prepare(`
-    SELECT * FROM (
-      SELECT s.created_at at, 'Venta' type, 'Ticket #' || s.folio concept, p.method method, p.amount inflow, 0 outflow FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND p.method NOT IN ('fiado','anticipo') AND p.amount > 0 AND s.created_at >= ? AND s.created_at < ?
-      UNION ALL SELECT lp.created_at, CASE lp.kind WHEN 'devolucion' THEN 'Devolución de apartado' ELSE 'Apartado' END, CASE lp.kind WHEN 'anticipo' THEN 'Anticipo' WHEN 'abono' THEN 'Abono' ELSE 'Devolución' END || ' apartado #' || l.folio, lp.method, CASE WHEN lp.amount > 0 THEN lp.amount ELSE 0 END, CASE WHEN lp.amount < 0 THEN -lp.amount ELSE 0 END FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND lp.created_at >= ? AND lp.created_at < ?
-      UNION ALL SELECT l.created_at, 'Cobro de fiado', COALESCE(c.name, 'Cliente'), l.method, -l.delta, 0 FROM credit_ledger l LEFT JOIN customers c ON c.id = l.customer_id WHERE l.business_id = ? AND l.kind = 'abono' AND l.created_at >= ? AND l.created_at < ?
-      UNION ALL SELECT m.created_at, CASE m.type WHEN 'deposito' THEN 'Depósito a caja' ELSE 'Retiro de caja' END, m.reason, 'efectivo', CASE m.type WHEN 'deposito' THEN m.amount ELSE 0 END, CASE m.type WHEN 'retiro' THEN m.amount ELSE 0 END FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? AND m.origin = 'manual' AND m.created_at >= ? AND m.created_at < ?
-      UNION ALL SELECT sp.created_at, 'Pago a proveedor', COALESCE(s.name, 'Proveedor') || COALESCE(' · folio ' || p.ticket_ref, ''), sp.method, 0, sp.amount FROM supplier_payments sp JOIN purchases p ON p.id = sp.purchase_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? AND sp.created_at >= ? AND sp.created_at < ?
-      UNION ALL SELECT e.date || 'T12:00:00.000Z', 'Gasto', e.concept, e.method, 0, e.amount FROM expenses e WHERE e.business_id = ? AND e.date BETWEEN ? AND ?
-      UNION ALL SELECT r.created_at, 'Devolución', r.reason, r.refund_method, 0, r.amount FROM returns r WHERE r.business_id = ? AND r.refund_method <> 'saldo' AND r.created_at >= ? AND r.created_at < ?
-    ) ORDER BY at, type LIMIT 20000`).all(b, start, end, b, start, end, b, start, end, b, start, end, b, start, end, b, from, to, b, start, end) as Entry[]
+  // Una consulta por tipo de movimiento (la base de Cloudflare no une más de 5 en una sola) y luego se ordenan juntos.
+  const parts: [string, unknown[]][] = [
+    [`SELECT s.created_at at, 'Venta' type, 'Ticket #' || s.folio concept, p.method method, p.amount inflow, 0 outflow FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND p.method NOT IN ('fiado','anticipo') AND p.amount > 0 AND s.created_at >= ? AND s.created_at < ?`, [b, start, end]],
+    [`SELECT lp.created_at, CASE lp.kind WHEN 'devolucion' THEN 'Devolución de apartado' ELSE 'Apartado' END, CASE lp.kind WHEN 'anticipo' THEN 'Anticipo' WHEN 'abono' THEN 'Abono' ELSE 'Devolución' END || ' apartado #' || l.folio, lp.method, CASE WHEN lp.amount > 0 THEN lp.amount ELSE 0 END, CASE WHEN lp.amount < 0 THEN -lp.amount ELSE 0 END FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND lp.created_at >= ? AND lp.created_at < ?`, [b, start, end]],
+    [`SELECT l.created_at, 'Cobro de fiado', COALESCE(c.name, 'Cliente'), l.method, -l.delta, 0 FROM credit_ledger l LEFT JOIN customers c ON c.id = l.customer_id WHERE l.business_id = ? AND l.kind = 'abono' AND l.created_at >= ? AND l.created_at < ?`, [b, start, end]],
+    [`SELECT m.created_at, CASE m.type WHEN 'deposito' THEN 'Depósito a caja' ELSE 'Retiro de caja' END, m.reason, 'efectivo', CASE m.type WHEN 'deposito' THEN m.amount ELSE 0 END, CASE m.type WHEN 'retiro' THEN m.amount ELSE 0 END FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? AND m.origin = 'manual' AND m.created_at >= ? AND m.created_at < ?`, [b, start, end]],
+    [`SELECT sp.created_at, 'Pago a proveedor', COALESCE(s.name, 'Proveedor') || COALESCE(' · folio ' || p.ticket_ref, ''), sp.method, 0, sp.amount FROM supplier_payments sp JOIN purchases p ON p.id = sp.purchase_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? AND sp.created_at >= ? AND sp.created_at < ?`, [b, start, end]],
+    [`SELECT e.date || 'T12:00:00.000Z', 'Gasto', e.concept, e.method, 0, e.amount FROM expenses e WHERE e.business_id = ? AND e.date BETWEEN ? AND ?`, [b, from, to]],
+    [`SELECT r.created_at, 'Devolución', r.reason, r.refund_method, 0, r.amount FROM returns r WHERE r.business_id = ? AND r.refund_method <> 'saldo' AND r.created_at >= ? AND r.created_at < ?`, [b, start, end]],
+  ]
+  // La lista de columnas del WITH les pone nombre fijo a todas, aunque cada consulta las calcule distinto.
+  const rows = parts.flatMap(([sql, args]) => db.prepare(`WITH t(at, type, concept, method, inflow, outflow) AS (${sql}) SELECT * FROM t`).all(...args) as Entry[])
+  return rows.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.type < b.type ? -1 : a.type > b.type ? 1 : 0)).slice(0, 20000)
 }
 
 const CATEGORY_LABEL: Record<string, string> = { renta: 'Renta', servicios: 'Luz, agua, gas, internet y teléfono', nomina: 'Sueldos', insumos: 'Insumos y limpieza', transporte: 'Transporte y gasolina', mantenimiento: 'Mantenimiento', publicidad: 'Publicidad', impuestos: 'Impuestos y permisos', comisiones_bancarias: 'Comisiones bancarias', otros: 'Otros' }
