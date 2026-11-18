@@ -95,4 +95,28 @@ describe('tarjeta de sellos (barbería)', () => {
     expect((await s.call('POST', `/customers/${cli.id}/stamps`, { token: b.token, body: { quantity: 2 } })).json.loyalty).toMatchObject({ earned: 1, balance: 3 })
     expect((await s.call('GET', `/public/loyalty/${cli.code}`)).json.history[0]).toMatchObject({ reason: 'manual', delta: 1 })
   })
+
+  it('escanear el QR da un sello por escaneo hasta el máximo del día', async () => {
+    const { s, T, o } = await negocioListo()
+    s.setGiro('barberia')
+    await s.call('PUT', '/modules', { token: T, body: { active: ['fidelidad'] } })
+    await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'todos', dailyCap: 3 } })
+    const cli = (await s.call('POST', '/customers', { token: T, body: { name: 'Hugo' } })).json.customer
+    const scan = (tok: string) => s.call('POST', '/scan', { token: tok, body: { code: cli.code, action: 'sello' } })
+    for (let i = 1; i <= 3; i++) expect((await scan(T)).json.loyalty).toMatchObject({ earned: 1, balance: i })
+    // El cuarto escaneo del día ya no suma.
+    expect((await scan(T)).json.loyalty).toMatchObject({ earned: 0, balance: 3 })
+    // Al día siguiente vuelve a sumar.
+    s.advance(86_400_000); s.longLived()
+    expect((await scan(T)).json.loyalty).toMatchObject({ earned: 1, balance: 4 })
+    expect((await s.call('GET', `/public/loyalty/${cli.code}`)).json.history[0]).toMatchObject({ reason: 'escaneo', delta: 1 })
+    // Un barbero sin el permiso no puede dar sellos con el QR; con el permiso sí.
+    const b = await s.createStaff(T, o.business.code, 'barbero3', 'barbero')
+    expect((await scan(b.token)).status).toBe(403)
+    const perms = (await s.call('GET', '/users', { token: T })).json.users.find((x: any) => x.id === b.id).permissions
+    await s.call('PATCH', `/users/${b.id}`, { token: T, body: { permissions: [...perms, 'give_stamps'] } })
+    expect((await scan(b.token)).json.loyalty).toMatchObject({ earned: 1, balance: 5 })
+    // Un código de otro negocio no sirve.
+    expect((await s.call('POST', '/scan', { token: T, body: { code: 'NXNOEXISTE1234', action: 'sello' } })).status).toBe(404)
+  })
 })

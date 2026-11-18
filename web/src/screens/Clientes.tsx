@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import { can, FIADO_GIROS, hasGiro, type Me } from '../App'
 import { loyaltyText } from './Caja'
+import { cardWhatsApp } from './MiTarjeta'
 
 const KIND: Record<string, string> = { cargo: 'Compra fiada', abono: 'Abono', cancelacion: 'Cancelación' }
 const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta', fiado: 'Fiado' }
@@ -103,7 +104,7 @@ function Cliente({ me, c, fiado, onChanged }: { me: Me; c: any; fiado: boolean; 
           <p className="muted small">Mándale este link: ahí ve sus sellos, cuántos le faltan y sus premios. Solo puede verlos, no cambiarlos.</p>
           <p className="row">
             <a className="button" href={`/tarjeta/${c.code}`} target="_blank" rel="noreferrer">Abrir tarjeta</a>
-            <a className="button primary" href={`https://wa.me/${c.phone ? '52' + String(c.phone).replace(/\D/g, '').slice(-10) : ''}?text=${encodeURIComponent(`Hola ${c.name.split(' ')[0]}, aquí puedes ver tus sellos: ${location.origin}/tarjeta/${c.code}`)}`} target="_blank" rel="noreferrer">Enviar por WhatsApp</a>
+            <a className="button primary" href={cardWhatsApp(c, me.business.name)} target="_blank" rel="noreferrer">Enviar por WhatsApp</a>
           </p>
         </div>
       )}

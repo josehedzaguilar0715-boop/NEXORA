@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { closeDay } from './Lealtad'
 
-const REASON: Record<string, string> = { rifa: 'Premio de rifa', importado: 'Sellos anteriores', manual: 'Sello', venta: 'Compra', visita: 'Visita', canje: 'Canjeó', cancelacion: 'Compra cancelada' }
+/** Mensaje de WhatsApp con el link de su tarjeta (ahí está su QR para que le den su sello). */
+export const cardLink = (code: string) => `${location.origin}/tarjeta/${code}`
+export function cardWhatsApp(c: { name: string; phone?: string | null; code: string }, business: string) {
+  const text = `Hola ${c.name.split(' ')[0]}, esta es tu tarjeta de sellos de ${business}. Ahí ves tus sellos, tus premios y tu código QR: muéstralo cada vez que vengas para que te sumen tu sello.\n${cardLink(c.code)}`
+  const digits = String(c.phone ?? '').replace(/\D/g, '').slice(-10)
+  return `https://wa.me/${digits.length === 10 ? `52${digits}` : ''}?text=${encodeURIComponent(text)}`
+}
+
+const REASON: Record<string, string> = { escaneo: 'Sello (QR)', rifa: 'Premio de rifa', importado: 'Sellos anteriores', manual: 'Sello', venta: 'Compra', visita: 'Visita', canje: 'Canjeó', cancelacion: 'Compra cancelada' }
 
 /** Página pública: el cliente ve su tarjeta de sellos o puntos en su teléfono con su link (solo lectura). */
 export function MiTarjeta({ code }: { code: string }) {

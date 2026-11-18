@@ -239,7 +239,7 @@ common.post('/scan', async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   if (!hasPerm(u, 'sell') && !hasPerm(u, 'attendance')) throw forbidden()
-  const d = parse(z.object({ code: z.string().trim().min(4).max(64), action: z.enum(['consulta', 'entrada', 'membresia']), membershipId: z.string().optional(), at: z.string().datetime().optional() }), await body(c))
+  const d = parse(z.object({ code: z.string().trim().min(4).max(64), action: z.enum(['consulta', 'entrada', 'membresia', 'sello']), membershipId: z.string().optional(), at: z.string().datetime().optional() }), await body(c))
   // El servidor valida cada escaneo: el código debe existir y ser de este negocio.
   const cu = db.prepare('SELECT * FROM customers WHERE code = ? AND business_id = ? AND active = 1').get(d.code.toUpperCase(), u.business_id) as { id: string; name: string; loyalty_enrolled: number } | undefined
   if (!cu) throw new AppError(404, 'codigo_invalido', 'Código no válido para este negocio.')
@@ -254,6 +254,18 @@ common.post('/scan', async (c) => {
     result.visit = { at: iso(t) }
     const earned = earnForVisit(db, now, u.business_id, u.id, cu)
     if (earned) result.loyaltyEarned = earned
+  }
+
+  // Sello por escaneo del QR: los sellos de cada escaneo, hasta el máximo del día que puso el dueño.
+  if (d.action === 'sello') {
+    if (!moduleOn(db, u.business_id, 'fidelidad')) throw new AppError(409, 'modulo_inactivo', 'La tarjeta de sellos no está activada.')
+    if (!hasPerm(u, 'give_stamps')) throw forbidden('Para dar sellos con el QR necesitas el permiso «Dar sellos o puntos a mano». Pídeselo al dueño.')
+    const p = program(db, u.business_id)
+    if (!p) throw bad('Primero configura la tarjeta de sellos.')
+    if (!eligible(p, cu)) throw conflict('Este cliente no está inscrito en la tarjeta de sellos.', 'no_inscrito')
+    const given = underCap(db, () => t, p, cu.id, p.earn_points)
+    if (given > 0) db.prepare("INSERT INTO loyalty_ledger (id, business_id, customer_id, delta, reason, created_by, created_at) VALUES (?,?,?,?,'escaneo',?,?)").run(newId(), u.business_id, cu.id, given, u.id, iso(t))
+    result.loyalty = loyaltyStatus(db, u.business_id, cu.id, given)
   }
 
   if (d.action === 'membresia') {
@@ -337,7 +349,7 @@ const balanceOf = (db: Db, customerId: string) => (db.prepare('SELECT COALESCE(S
 function underCap(db: Db, now: Clock, p: Program, customerId: string, wanted: number): number {
   if (!p.daily_cap) return wanted
   const start = new Date(`${localDate(now())}T06:00:00.000Z`).toISOString()
-  const today = (db.prepare("SELECT COALESCE(SUM(delta),0) n FROM loyalty_ledger WHERE customer_id = ? AND reason IN ('venta','visita','manual') AND created_at >= ?").get(customerId, start) as { n: number }).n
+  const today = (db.prepare("SELECT COALESCE(SUM(delta),0) n FROM loyalty_ledger WHERE customer_id = ? AND reason IN ('venta','visita','manual','escaneo') AND created_at >= ?").get(customerId, start) as { n: number }).n
   return Math.max(0, Math.min(wanted, p.daily_cap - Math.max(0, today)))
 }
 const program = (db: Db, businessId: string) => db.prepare('SELECT * FROM loyalty_program WHERE business_id = ?').get(businessId) as Program | undefined

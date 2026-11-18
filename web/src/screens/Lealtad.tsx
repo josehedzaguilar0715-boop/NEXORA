@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
-import type { Me } from '../App'
+import { can, type Me } from '../App'
+import { loyaltyText } from './Caja'
+import { cardWhatsApp } from './MiTarjeta'
 
 /** Escanear el QR del cliente: entrada (asistencia), usar membresía o consultar. El servidor valida cada escaneo. */
-export function Escanear(_: { me: Me }) {
+export function Escanear({ me }: { me: Me }) {
+  const stamps = !!me.modules?.includes('fidelidad') && can(me, 'give_stamps')
+  const tabs = [...(stamps ? [['sello', 'Dar sello']] : []), ...(me.modules?.includes('asistencia') ? [['entrada', 'Registrar entrada']] : []), ...(me.modules?.includes('membresias') ? [['membresia', 'Usar membresía']] : []), ['consulta', 'Solo consultar']] as [string, string][]
   const [code, setCode] = useState('')
-  const [action, setAction] = useState('entrada')
+  const [action, setAction] = useState(tabs[0]![0])
   const [res, setRes] = useState<any>(null)
   const [err, setErr] = useState('')
   const scan = async (c = code) => {
@@ -15,7 +19,8 @@ export function Escanear(_: { me: Me }) {
   }
   return (
     <div className="card login" style={{ maxWidth: 680 }}>
-      <div className="tabs">{[['entrada', 'Registrar entrada'], ['membresia', 'Usar membresía'], ['consulta', 'Solo consultar']].map(([k, v]) => <button key={k} className={action === k ? 'on' : ''} onClick={() => setAction(k!)}>{v}</button>)}</div>
+      <div className="tabs">{tabs.map(([k, v]) => <button key={k} className={action === k ? 'on' : ''} onClick={() => setAction(k)}>{v}</button>)}</div>
+      {action === 'sello' && <p className="muted small">Cada escaneo le da sus sellos, hasta el máximo del día que puso el dueño.</p>}
       <label>Escanea el QR o código de barras del cliente</label>
       <div className="row"><input aria-label="Código del cliente" autoFocus value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && code && scan()} /><ScanButton onCode={(c) => scan(c)} /></div>
       {err && <h2 className="error">✘ {err}</h2>}
@@ -24,6 +29,7 @@ export function Escanear(_: { me: Me }) {
           <h2 className="okmsg">✔ {res.customer.name}</h2>
           {res.membership && <p>Membresía: quedan <b>{res.membership.remaining}</b> de {res.membership.usesPerPeriod} en este periodo.</p>}
           {res.loyaltyEarned ? <p>Ganó {res.loyaltyEarned} puntos/sellos.</p> : null}
+          {res.loyalty && <p className={res.loyalty.earned > 0 ? 'okmsg' : 'error'} style={{ fontSize: '1.15rem' }}>{loyaltyText(res.loyalty)}</p>}
           <p className="muted">Saldo de puntos: {res.loyaltyBalance}{res.lastVisit ? ` · última visita ${new Date(res.lastVisit).toLocaleString('es-MX')}` : ''}</p>
           {res.memberships.map((m: any) => <p key={m.id} className="muted">{m.name}: vence {m.endsAt.slice(0, 10)}, quedan {m.remaining}</p>)}
         </div>
@@ -33,7 +39,7 @@ export function Escanear(_: { me: Me }) {
 }
 
 /** Configuración del dueño: membresías y paquetes, promociones y programa de puntos o sellos. */
-export function Lealtad(_: { me: Me }) {
+export function Lealtad({ me }: { me: Me }) {
   const [mods, setMods] = useState<string[]>([])
   const [plans, setPlans] = useState<any[]>([])
   const [promos, setPromos] = useState<any[]>([])
@@ -78,7 +84,7 @@ export function Lealtad(_: { me: Me }) {
           <p><button className="primary" disabled={!pr.name || !pr.value || !pr.from || !pr.to} onClick={run(() => api('POST', '/promotions', { name: pr.name, kind: pr.kind, value: pr.kind === 'porcentaje' ? Math.round(Number(pr.value) * 100) : toCents(pr.value), startsAt: new Date(`${pr.from}T00:00:00-06:00`).toISOString(), endsAt: new Date(`${pr.to}T23:59:59-06:00`).toISOString(), appliesTo: { all: true }, minQuantity: Number(pr.minQuantity) || 0, combinable: pr.combinable }))}>Agregar</button></p>
         </section>
       )}
-      {mods.includes('fidelidad') && <Fidelidad />}
+      {mods.includes('fidelidad') && <Fidelidad me={me} />}
       {mods.includes('fidelidad') && <Rifa />}
       {(msg.err || msg.ok) && <p className={msg.err ? 'error' : 'okmsg'}>{msg.err ?? msg.ok}</p>}
     </div>
@@ -88,7 +94,8 @@ export function Lealtad(_: { me: Me }) {
 const EARN: Record<string, string> = { venta: 'Cada cobro', visita: 'Cada visita (QR)', monto: 'Por monto' }
 
 /** Tarjeta de sellos o puntos: cómo se ganan, tope por día y premios. El cliente la ve en su teléfono. */
-function Fidelidad() {
+function Fidelidad({ me }: { me: Me }) {
+  const [sending, setSending] = useState(false)
   const [lp, setLp] = useState({ unit: 'sellos', earnBy: 'venta', earnAmount: '100', earnPoints: '1', scope: 'todos', dailyCap: '' })
   const [rewards, setRewards] = useState<any[]>([])
   const [nr, setNr] = useState({ id: '', name: '', cost: '' })
@@ -118,6 +125,10 @@ function Fidelidad() {
       </div>
       <label>Para<select value={lp.scope} onChange={(e) => setLp({ ...lp, scope: e.target.value })}><option value="todos">Todos los clientes</option><option value="por_persona">Solo los inscritos</option></select></label>
       <p><button className="primary" onClick={run(() => api('PUT', '/loyalty', { unit: lp.unit, earnBy: lp.earnBy, earnAmount: lp.earnBy === 'monto' ? toCents(lp.earnAmount) : undefined, earnPoints: Number(lp.earnPoints) || 1, scope: lp.scope, dailyCap: Number(lp.dailyCap) > 0 ? Number(lp.dailyCap) : null }), 'Tarjeta guardada.')}>Guardar tarjeta</button></p>
+      <h3>Mandar la tarjeta a tus clientes</h3>
+      <p className="muted small">Cada cliente recibe por WhatsApp el link de su tarjeta. Ahí ve sus sellos y su código QR; en caja se lo escanean en «Escanear QR → Dar sello».</p>
+      <p><button onClick={() => setSending(true)}>Mandar tarjetas por WhatsApp</button></p>
+      {sending && <MandarTarjetas me={me} onClose={() => setSending(false)} />}
       <h3>Premios</h3>
       <p className="muted small">Tú decides cuántos {word} debe juntar el cliente para cada premio. Toca uno para cambiarlo.</p>
       <div className="table-wrap"><table className="list"><tbody>
@@ -221,5 +232,38 @@ function Rifa() {
       )}
       {(msg.err || msg.ok) && <p className={msg.err ? 'error' : 'okmsg'}>{msg.err ?? msg.ok}</p>}
     </section>
+  )
+}
+
+/** Lista de clientes para mandarle a cada uno su tarjeta (con su QR) por WhatsApp; recuerda en este equipo a quién ya se le mandó. */
+function MandarTarjetas({ me, onClose }: { me: Me; onClose: () => void }) {
+  const [list, setList] = useState<any[]>([])
+  const [q, setQ] = useState('')
+  const [err, setErr] = useState('')
+  const KEY = 'nx_tarjetas_enviadas'
+  const [sent, setSent] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(KEY) ?? '[]') } catch { return [] } })
+  useEffect(() => { api<any>('GET', '/customers').then((r) => setList(r.customers.filter((c: any) => c.active !== 0 && c.code))).catch((e) => setErr(e.message)) }, [])
+  const mark = (code: string) => { const next = [...new Set([...sent, code])]; setSent(next); try { localStorage.setItem(KEY, JSON.stringify(next)) } catch { /* sin almacenamiento */ } }
+  const shown = list.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="card wide" onClick={(e) => e.stopPropagation()}>
+        <div className="card-head"><h2>Mandar tarjetas</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
+        <p className="muted small">Toca «WhatsApp» en cada cliente: se abre su chat con el mensaje listo y solo das enviar. Enviadas: {list.filter((c) => sent.includes(c.code)).length} de {list.length}.</p>
+        <input aria-label="Buscar cliente" placeholder="Buscar cliente…" value={q} onChange={(e) => setQ(e.target.value)} />
+        {err && <p className="error">{err}</p>}
+        <div className="table-wrap"><table className="list"><tbody>
+          {shown.map((c) => (
+            <tr key={c.id}>
+              <td><b>{c.name}</b><br /><small className="muted">{c.phone ?? 'sin teléfono: elige el contacto en WhatsApp'}</small></td>
+              <td className="num">
+                <a className={`button ${sent.includes(c.code) ? '' : 'primary'}`} style={{ minHeight: 44 }} href={cardWhatsApp(c, me.business.name)} target="_blank" rel="noreferrer" onClick={() => mark(c.code)}>{sent.includes(c.code) ? '✓ Enviada' : 'WhatsApp'}</a>
+              </td>
+            </tr>
+          ))}
+          {shown.length === 0 && <tr><td className="muted">Sin clientes.</td></tr>}
+        </tbody></table></div>
+      </div>
+    </div>
   )
 }
