@@ -113,11 +113,13 @@ importer.post('/import/customers', ownerOnly, async (c) => {
     if (cu && d.onExisting === 'omitir') return { status: 'omitido', message: 'Ya existe' }
     if (cu) {
       db.prepare('UPDATE customers SET name = ?, phone = COALESCE(?, phone), notes = COALESCE(?, notes), credit_limit = COALESCE(?, credit_limit) WHERE id = ?').run(r.name, phone, r.notes ?? null, r.creditLimit ?? null, cu.id)
+      if (r.stamps != null) db.prepare('UPDATE customers SET loyalty_enrolled = 1 WHERE id = ?').run(cu.id)
       // El saldo solo se carga al crear al cliente, para que repetir la importación no lo duplique.
       return { status: 'actualizado', ...(r.balance || r.stamps ? { message: 'Ya existía: su saldo y sus sellos no se cambiaron' } : {}) }
     }
     const id = newId()
-    db.prepare('INSERT INTO customers (id, business_id, name, phone, notes, code, credit_limit, created_at) VALUES (?,?,?,?,?,?,?,?)').run(id, u.business_id, r.name, phone, r.notes ?? null, customerCode(), r.creditLimit ?? Math.max(r.balance ?? 0, 0), iso(now()))
+    // Quien trae columna de sellos (aunque sea 0) ya estaba en el programa de fidelidad: queda inscrito.
+    db.prepare('INSERT INTO customers (id, business_id, name, phone, notes, code, credit_limit, loyalty_enrolled, created_at) VALUES (?,?,?,?,?,?,?,?,?)').run(id, u.business_id, r.name, phone, r.notes ?? null, customerCode(), r.creditLimit ?? Math.max(r.balance ?? 0, 0), r.stamps != null ? 1 : 0, iso(now()))
     // Sellos o puntos que ya traía de su sistema anterior (solo al crear, para no duplicarlos).
     if (r.stamps) db.prepare("INSERT INTO loyalty_ledger (id, business_id, customer_id, delta, reason, created_by, created_at) VALUES (?,?,?,?,'importado',?,?)").run(newId(), u.business_id, id, r.stamps, u.id, iso(now()))
     if (r.balance) db.prepare("INSERT INTO credit_ledger (id, business_id, customer_id, delta, kind, note, created_by, created_at) VALUES (?,?,?,?,'cargo',?,?,?)").run(newId(), u.business_id, id, r.balance, 'Saldo inicial (importado)', u.id, iso(now()))

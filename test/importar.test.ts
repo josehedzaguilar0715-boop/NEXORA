@@ -48,15 +48,20 @@ describe('importar datos de otro sistema', () => {
     s.setGiro('barberia')
     await s.call('PUT', '/modules', { token: T, body: { active: ['fidelidad'] } })
     await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'todos', dailyCap: 3 } })
-    const rows = [{ name: 'Yosmar Zamorano', phone: '529631725190', stamps: 2 }, { name: 'Alexis Zamorano', phone: '9631366514', stamps: 3 }]
-    expect((await s.call('POST', '/import/customers', { token: T, body: { rows } })).json).toMatchObject({ created: 2 })
-    expect((await s.call('POST', '/import/customers', { token: T, body: { rows } })).json).toMatchObject({ updated: 2 })
+    // Solo los inscritos: los importados con sellos (aunque sean 0) quedan inscritos.
+    await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'por_persona', dailyCap: 3 } })
+    const rows = [{ name: 'Yosmar Zamorano', phone: '529631725190', stamps: 2 }, { name: 'Alexis Zamorano', phone: '9631366514', stamps: 3 }, { name: 'Urizar Vazques', phone: '9632270744', stamps: 0 }]
+    expect((await s.call('POST', '/import/customers', { token: T, body: { rows } })).json).toMatchObject({ created: 3 })
+    expect((await s.call('POST', '/import/customers', { token: T, body: { rows } })).json).toMatchObject({ updated: 3 })
     const list = (await s.call('GET', '/customers', { token: T })).json.customers
     const y = list.find((c: any) => c.name === 'Yosmar Zamorano')
     expect(y.phone).toBe('9631725190')
     const pub = (await s.call('GET', `/public/loyalty/${y.code}`)).json
     expect(pub.balance).toBe(2)
     expect(pub.history[0]).toMatchObject({ reason: 'importado', delta: 2 })
+    const u0 = list.find((c: any) => c.name === 'Urizar Vazques')
+    expect(u0.loyaltyEnrolled).toBe(1)
+    expect((await s.call('GET', `/public/loyalty/${u0.code}`)).json.balance).toBe(0)
     // Los sellos importados no cuentan para el tope del día.
     await s.call('POST', '/shifts/open', { token: T, body: { openingFloat: 0 } })
     const sv = (await s.call('POST', '/services', { token: T, body: { name: 'Corte', price: 15000, durationMin: 30 } })).json.service
