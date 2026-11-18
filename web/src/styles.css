@@ -446,3 +446,11 @@ ol.steps li { margin-bottom: 6px; }
 @media (max-width: 600px) {
   .modal.sheet > .card, .modal.sheet > .sheet-panel { width: 100%; border-radius: 0; border-left: 0; }
 }
+
+/* ---------- Pestañas del portal: pantallas relacionadas a un toque ---------- */
+.portal-tabs { display: flex; gap: 6px; overflow-x: auto; margin: -4px 0 14px; padding-bottom: 2px; scrollbar-width: none; }
+.portal-tabs::-webkit-scrollbar { display: none; }
+.portal-tabs a { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; text-decoration: none; color: var(--muted); font-weight: 600; font-size: 0.88rem; border: 1px solid var(--line); background: var(--card); white-space: nowrap; }
+.portal-tabs a:hover { color: var(--ink); border-color: rgba(34, 211, 238, 0.4); }
+.portal-tabs a.on { color: var(--ink); background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(139, 92, 246, 0.18)); border-color: rgba(34, 211, 238, 0.45); }
+.portal-tabs a.on svg { color: var(--cyan); }

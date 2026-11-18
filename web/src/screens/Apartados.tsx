@@ -100,7 +100,7 @@ function Nuevo({ me, onClose, onDone }: { me: Me; onClose: () => void; onDone: (
     setBusy(false)
   }
   return (
-    <div className="modal" onClick={onClose}>
+    <div className="modal sheet" onClick={onClose}>
       <div className="card wide" onClick={(e) => e.stopPropagation()}>
         <div className="card-head"><h2>Nuevo apartado</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
         <h3>1. Cliente</h3>
@@ -156,7 +156,7 @@ function Detalle({ me, id, onClose, onChanged }: { me: Me; id: string; onClose: 
   const l = d.layaway
   const open = l.status === 'abierto'
   return (
-    <div className="modal" onClick={onClose}>
+    <div className="modal sheet" onClick={onClose}>
       <div className="card wide" onClick={(e) => e.stopPropagation()}>
         <div className="card-head"><h2>Apartado #{l.folio} · {l.customer.name}</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
         <div className="kpis mini">

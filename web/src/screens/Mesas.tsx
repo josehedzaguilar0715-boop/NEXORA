@@ -221,18 +221,20 @@ const RES_STATUS: Record<string, string> = { pendiente: 'Por confirmar', confirm
 
 /** Reservas de mesa por fecha, hora y personas. Las confirma el dueño o el encargado. */
 function Reservas({ me, tables, onClose }: { me: Me; tables: any[]; onClose: () => void }) {
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
-  const [date, setDate] = useState(today)
+  // Propone la siguiente hora de hoy; ya de noche (11 pm en adelante), mañana a las 2 pm.
+  const mx = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(d)
+  const hourNow = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: 'America/Mexico_City' }).format(new Date()))
+  const late = hourNow >= 23
+  const [date, setDate] = useState(late ? mx(new Date(Date.now() + 86_400_000)) : mx(new Date()))
   const [list, setList] = useState<any[]>([])
-  const nextHour = () => { const h = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hour12: false, timeZone: 'America/Mexico_City' }).format(new Date())); return `${String(Math.min(h + 1, 23)).padStart(2, '0')}:00` }
-  const [f, setF] = useState({ name: '', phone: '', people: '4', time: nextHour(), tableId: '' })
+  const [f, setF] = useState({ name: '', phone: '', people: '4', time: late ? '14:00' : `${String(hourNow + 1).padStart(2, '0')}:00`, tableId: '' })
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = async () => setList((await api<any>('GET', `/table-reservations?date=${date}`)).reservations)
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [date])
   const run = async (fn: () => Promise<unknown>, ok: string) => { try { await fn(); setMsg({ ok }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }
   const manager = me.user.role === 'owner' || can(me, 'cancel_discount')
   return (
-    <div className="modal" onClick={onClose}>
+    <div className="modal sheet" onClick={onClose}>
       <div className="card wide" onClick={(e) => e.stopPropagation()}>
         <div className="card-head"><h2>Reservas de mesa</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
         <label>Día<input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
@@ -301,7 +303,7 @@ function RentasFuera({ onClose }: { onClose: () => void }) {
   const load = async () => setList((await api<any>('GET', '/rentals')).rentals)
   useEffect(() => { void load().catch((e) => setMsg(e.message)) }, [])
   return (
-    <div className="modal" onClick={onClose}>
+    <div className="modal sheet" onClick={onClose}>
       <div className="card" onClick={(e) => e.stopPropagation()}>
         <div className="card-head"><h2>Rentas fuera</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
         <div className="table-wrap"><table className="list"><tbody>

@@ -184,6 +184,16 @@ function Privada() {
   const [menu, setMenu] = useState(false)
   const [portal, setPortal] = useState<{ group: string; top: number } | null>(null)
   useEffect(() => { setPortal(null) }, [hash])
+  // Esc cierra el panel lateral que esté abierto (el de más arriba).
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const sheets = document.querySelectorAll<HTMLElement>('.modal.sheet')
+      sheets[sheets.length - 1]?.click()
+    }
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [])
   useEffect(() => {
     if (!portal) return
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && setPortal(null)
@@ -274,6 +284,16 @@ function Privada() {
       })()}
       <main>
         {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
+        {/* Pantallas del mismo portal a un toque, sin abrir el menú. */}
+        {current && current.group && (() => {
+          const sib = allowed.filter((s) => s.group === current.group)
+          if (sib.length < 2) return null
+          return (
+            <nav className="portal-tabs" aria-label={portalOf(current.group)}>
+              {sib.map((s) => <a key={s.key} href={`#/${s.key}`} className={s.key === current.key ? 'on' : ''} aria-current={s.key === current.key ? 'page' : undefined}><s.icon size={16} strokeWidth={2} aria-hidden />{s.label}</a>)}
+            </nav>
+          )
+        })()}
         {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <p className="muted">{portalOf(current.group)}</p>}</div></header>}
         {current ? <current.C me={me} /> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}
       </main>

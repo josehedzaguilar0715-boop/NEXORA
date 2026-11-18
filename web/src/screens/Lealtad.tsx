@@ -246,7 +246,7 @@ function MandarTarjetas({ me, onClose }: { me: Me; onClose: () => void }) {
   const mark = (code: string) => { const next = [...new Set([...sent, code])]; setSent(next); try { localStorage.setItem(KEY, JSON.stringify(next)) } catch { /* sin almacenamiento */ } }
   const shown = list.filter((c) => c.name.toLowerCase().includes(q.toLowerCase()))
   return (
-    <div className="modal" onClick={onClose}>
+    <div className="modal sheet" onClick={onClose}>
       <div className="card wide" onClick={(e) => e.stopPropagation()}>
         <div className="card-head"><h2>Mandar tarjetas</h2><button className="mini" onClick={onClose}>Cerrar</button></div>
         <p className="muted small">Toca «WhatsApp» en cada cliente: se abre su chat con el mensaje listo y solo das enviar. Enviadas: {list.filter((c) => sent.includes(c.code)).length} de {list.length}.</p>

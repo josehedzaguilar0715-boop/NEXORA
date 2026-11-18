@@ -86,7 +86,7 @@ function NuevaCita({ walkIn, date, staff, services, onClose, onSaved }: { walkIn
     } catch (e) { setErr((e as Error).message) }
   }
   return (
-    <div className="modal" onClick={onClose}>
+    <div className="modal sheet" onClick={onClose}>
       <div className="card" onClick={(e) => e.stopPropagation()}>
         <h2>{walkIn ? 'Cliente sin cita' : 'Nueva cita'}</h2>
         <label>¿Quién atiende?<select value={f.staffId} onChange={(e) => setF({ ...f, staffId: e.target.value, time: '' })}>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
