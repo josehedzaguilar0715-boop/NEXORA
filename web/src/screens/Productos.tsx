@@ -123,7 +123,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
   const [f, setF] = useState({
     name: p?.name ?? '', barcode: p?.barcode ?? '', unit: p?.unit ?? 'pieza', price: p ? String(p.price / 100) : '', minStock: String(p?.minStock ?? 0), categoryId: p?.categoryId ?? '',
     authCode: '', brand: p?.attrs?.brand ?? '', fragrance: p?.attrs?.fragrance ?? '', sizeMl: p?.attrs?.sizeMl ? String(p.attrs.sizeMl) : '', presentation: p?.attrs?.presentation ?? 'regular',
-    trackStock: p ? p.trackStock !== false : true, trackExpiry: !!p?.trackExpiry, stock: '', cost: '',
+    trackStock: p ? p.trackStock !== false : true, trackExpiry: !!p?.trackExpiry, stock: '', cost: p?.lastCost ? String(Math.round(p.lastCost) / 100) : '', margin: (p as any)?.marginBp != null ? String((p as any).marginBp / 100) : '',
     wholesale: p?.tiers?.length === 1 ? String(p.tiers[0]!.price / 100) : '', wholesaleMin: p?.tiers?.length === 1 ? String(p.tiers[0]!.minQuantity) : '',
   })
   const multiTier = (p?.tiers?.length ?? 0) > 1
@@ -136,7 +136,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
     try {
       if (!f.name.trim()) throw new Error('Escribe el nombre del producto.')
       if (f.price.trim() === '' || Number.isNaN(toCents(f.price))) throw new Error('Escribe el precio de venta.')
-      const common = { name: f.name, barcode: f.barcode || null, price: toCents(f.price), minStock: Number(f.minStock) || 0, categoryId: f.categoryId || null, trackExpiry: f.trackExpiry, ...(attrs ? { attrs } : {}) }
+      const common = { name: f.name, barcode: f.barcode || null, price: toCents(f.price), minStock: Number(f.minStock) || 0, categoryId: f.categoryId || null, trackExpiry: f.trackExpiry, ...(attrs ? { attrs } : {}), ...(f.trackStock && f.cost.trim() !== '' ? { cost: toCents(f.cost) } : {}), marginBp: f.margin.trim() === '' ? null : Math.round(Number(f.margin) * 100) }
       const wantTier = f.wholesale.trim() !== '' || f.wholesaleMin.trim() !== ''
       if (wantTier && (!(toCents(f.wholesale) > 0) || !(Number(f.wholesaleMin) > 1))) throw new Error('Para el mayoreo escribe el precio y desde cuántas piezas aplica (2 o más).')
       if (wantTier && toCents(f.wholesale) >= toCents(f.price)) throw new Error('El precio de mayoreo debe ser menor que el de menudeo.')
@@ -184,7 +184,15 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
           : <label>Categoría<select value={f.categoryId} onChange={set('categoryId')} disabled={!canEdit}><option value="">Sin categoría</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
       </div>
       {!p && <label>Categoría<select value={f.categoryId} onChange={set('categoryId')}><option value="">Sin categoría</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
-      {p?.suggestedPrice != null && <p className="muted small">Precio sugerido por margen: {mxn(p.suggestedPrice)}</p>}
+      {f.trackStock ? (
+        <div className="profit-box">
+          <div className="row">
+            <label>Costo por {UNIT[f.unit] ?? 'unidad'}<input inputMode="decimal" value={f.cost} onChange={set('cost')} placeholder="$0.00" disabled={!canEdit} /></label>
+            <label>% de ganancia que quieres<input inputMode="decimal" value={f.margin} onChange={set('margin')} placeholder="Ej. 30" disabled={!canEdit} /></label>
+          </div>
+          <ProfitLine price={toCents(f.price)} cost={toCents(f.cost)} margin={Number(f.margin)} onUse={canEdit ? (v) => setF({ ...f, price: String(v / 100) }) : undefined} />
+        </div>
+      ) : <p className="muted small">El costo de este platillo sale de su receta (pestaña «Receta»).</p>}
       {multiTier ? <p className="muted small">Tiene {p!.tiers!.length} precios por volumen; se editan en «Precio por volumen».</p> : (
         <div className="row">
           <label>Precio de mayoreo (opcional)<input inputMode="decimal" value={f.wholesale} onChange={set('wholesale')} placeholder="$0.00" disabled={!canEdit} /></label>
@@ -199,7 +207,6 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
           {!p && <label>Existencia inicial (opcional)<input inputMode="decimal" value={f.stock} onChange={set('stock')} placeholder="0" /></label>}
         </div>
       )}
-      {!p && f.trackStock && Number(f.stock) > 0 && <label>Costo por unidad (opcional)<input inputMode="decimal" value={f.cost} onChange={set('cost')} placeholder="$0.00" /></label>}
       {f.trackStock && <label className="check"><input type="checkbox" checked={f.trackExpiry} onChange={(e) => setF({ ...f, trackExpiry: e.target.checked })} disabled={!canEdit} />Tiene caducidad (se pide la fecha al comprar)</label>}
       {err && <p className="error">{err}</p>}
       {canEdit && <p className="row"><button className="primary" onClick={save}>{p ? 'Guardar cambios' : 'Agregar producto'}</button></p>}
@@ -306,6 +313,21 @@ function Presentaciones({ p, onSaved }: { p: P; onSaved: () => void }) {
       {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
       <p><button className="primary" disabled={!f.name.trim() || !(Number(f.factor) > 0) || f.price.trim() === ''} onClick={() => go(async () => { await api('POST', `/products/${p.id}/presentations`, { name: f.name, factor: Number(f.factor), price: toCents(f.price), ...(f.barcode.trim().length >= 3 ? { barcode: f.barcode.trim() } : {}) }); setF({ name: '', factor: '', price: '', barcode: '' }) }, 'Presentación agregada.')}>Agregar presentación</button></p>
     </div>
+  )
+}
+
+/** Ganancia por unidad con el precio y el costo, y el precio sugerido con el % de ganancia que quiere el dueño. */
+export function ProfitLine({ price, cost, margin, onUse }: { price: number; cost: number; margin: number; onUse?: (price: number) => void }) {
+  if (!(cost > 0)) return <p className="muted small">Pon el costo para ver cuánto ganas en cada venta.</p>
+  const gain = price - cost
+  const pct = Math.round((gain / cost) * 1000) / 10
+  const suggested = margin > 0 ? Math.round(cost * (1 + margin / 100)) : null
+  return (
+    <p className="small profit-line">
+      Ganas <b className={gain < 0 ? 'neg' : 'pos'}>{mxn(gain)}</b> por unidad ({pct}% sobre el costo).
+      {suggested != null && suggested !== price && <> Con {margin}% el precio sería <b>{mxn(suggested)}</b>{onUse && <> <button type="button" className="mini" onClick={() => onUse(suggested)}>Usar este precio</button></>}</>}
+      {gain < 0 && <> <span className="neg">Estás vendiendo abajo del costo.</span></>}
+    </p>
   )
 }
 

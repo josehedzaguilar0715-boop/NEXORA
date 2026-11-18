@@ -1,4 +1,5 @@
 import { TimeSelect } from '../TimeSelect'
+import { ProfitLine } from './Productos'
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import { hasGiro, type Me } from '../App'
@@ -55,7 +56,7 @@ function Servicios({ me }: { me: Me }) {
   const agenda = hasGiro(me, ...AGENDA)
   const papel = hasGiro(me, 'papeleria')
   const unas = hasGiro(me, 'unas')
-  const empty = { id: '', name: '', price: '', orig: -1, authCode: '', durationMin: agenda ? '30' : '', extraBlockMin: '', category: '', machineId: '', sheetsPerUnit: '1' }
+  const empty = { id: '', name: '', price: '', orig: -1, authCode: '', durationMin: agenda ? '30' : '', extraBlockMin: '', category: '', machineId: '', sheetsPerUnit: '1', cost: '' }
   const [list, setList] = useState<any[]>([])
   const [machines, setMachines] = useState<any[]>([])
   const [f, setF] = useState(empty)
@@ -69,7 +70,7 @@ function Servicios({ me }: { me: Me }) {
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   const save = run(async () => {
     const body = {
-      name: f.name, price: toCents(f.price), category: f.category || null,
+      name: f.name, price: toCents(f.price), category: f.category || null, cost: f.cost.trim() ? toCents(f.cost) : 0,
       ...(f.id && toCents(f.price) !== f.orig ? { authCode: f.authCode } : {}),
       durationMin: f.durationMin ? Number(f.durationMin) : null,
       ...(unas ? { attrs: { extraBlockMin: Number(f.extraBlockMin) || 0 } } : {}),
@@ -79,7 +80,7 @@ function Servicios({ me }: { me: Me }) {
     else await api('POST', '/services', body)
     setF(empty); await load()
   }, f.id ? 'Servicio actualizado.' : 'Servicio agregado.')
-  const edit = (s: any) => setF({ id: s.id, name: s.name, price: String(s.price / 100), orig: s.price, authCode: '', durationMin: s.durationMin ? String(s.durationMin) : '', extraBlockMin: s.attrs?.extraBlockMin ? String(s.attrs.extraBlockMin) : '', category: s.category ?? '', machineId: s.machineId ?? '', sheetsPerUnit: String(s.sheetsPerUnit || 1) })
+  const edit = (s: any) => setF({ id: s.id, name: s.name, price: String(s.price / 100), orig: s.price, authCode: '', durationMin: s.durationMin ? String(s.durationMin) : '', extraBlockMin: s.attrs?.extraBlockMin ? String(s.attrs.extraBlockMin) : '', category: s.category ?? '', machineId: s.machineId ?? '', sheetsPerUnit: String(s.sheetsPerUnit || 1), cost: s.cost ? String(s.cost / 100) : '' })
   const shown = list.filter((s) => showOff || s.active)
   const noun = agenda || papel ? 'servicio' : 'tarifa'
   return (
@@ -109,6 +110,9 @@ function Servicios({ me }: { me: Me }) {
             <label>Precio<input inputMode="decimal" value={f.price} onChange={set('price')} placeholder="$0.00" /></label>
             {agenda && <label>Duración (min)<input inputMode="numeric" value={f.durationMin} onChange={set('durationMin')} /></label>}
           </div>
+          <label>{agenda ? 'Costo por servicio (material: cera, gel, navajas…)' : papel ? 'Costo por unidad (hoja, tinta, luz)' : 'Costo por servicio (insumos)'} — opcional<input inputMode="decimal" value={f.cost} onChange={set('cost')} placeholder="$0.00" /></label>
+          {f.cost.trim() !== '' && <ProfitLine price={toCents(f.price)} cost={toCents(f.cost)} margin={0} />}
+          <p className="muted small" style={{ marginTop: -4 }}>Lo que gaste por receta (insumos del inventario) se suma solo. Las comisiones del personal se restan aparte.</p>
           {unas && <label>Tiempo de secado que bloquea la agenda (min)<input inputMode="numeric" value={f.extraBlockMin} onChange={set('extraBlockMin')} placeholder="0" /></label>}
           <label>{unas ? 'Técnica' : papel ? 'Tipo (copias, impresión, engargolado…)' : 'Categoría (opcional)'}<input value={f.category} onChange={set('category')} /></label>
           {f.id && toCents(f.price) !== f.orig && <label>Código de autorización (cambio de precio)<input type="password" value={f.authCode} onChange={set('authCode')} /></label>}

@@ -36,8 +36,8 @@ async function download(kind: string, from: string, to: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
-type Tab = 'resumen' | 'resultados' | 'flujo' | 'balance' | 'gastos' | 'movimientos'
-const TABS: [Tab, string][] = [['resumen', 'Resumen'], ['resultados', 'Estado de resultados'], ['flujo', 'Flujo de efectivo'], ['balance', 'Balance'], ['gastos', 'Gastos'], ['movimientos', 'Movimientos']]
+type Tab = 'resumen' | 'plan' | 'resultados' | 'flujo' | 'balance' | 'gastos' | 'movimientos'
+const TABS: [Tab, string][] = [['resumen', 'Resumen'], ['plan', 'Plan 50/30/20'], ['resultados', 'Estado de resultados'], ['flujo', 'Flujo de efectivo'], ['balance', 'Balance'], ['gastos', 'Gastos'], ['movimientos', 'Movimientos']]
 
 export function Finanzas({ me }: { me: Me }) {
   const [tab, setTab] = useState<Tab>('resumen')
@@ -63,6 +63,7 @@ export function Finanzas({ me }: { me: Me }) {
       <nav className="subtabs" aria-label="Secciones de finanzas">{TABS.map(([k, v]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{v}</button>)}</nav>
       {err && <p className="error">{err}</p>}
       {tab === 'resumen' && <Resumen from={from} to={to} onErr={setErr} go={setTab} />}
+      {tab === 'plan' && (me.user.role === 'owner' ? <PlanFinanciero from={from} to={to} /> : <p className="card muted">El plan 50/30/20 y el retiro sugerido los ve el dueño.</p>)}
       {tab === 'resultados' && <Resultados from={from} to={to} onErr={setErr} />}
       {tab === 'flujo' && <Flujo from={from} to={to} onErr={setErr} />}
       {tab === 'balance' && <Balance onErr={setErr} />}
@@ -330,3 +331,80 @@ function Movimientos({ from, to, onErr }: { from: string; to: string; onErr: (e:
   )
 }
 
+
+const BUCKET_TONE = { ops: '#fbbf24', owner: '#34d399', savings: '#22d3ee' } as const
+
+/** Plan 50/30/20: cómo repartir la utilidad bruta y cuánto puede retirar el dueño sin dejar el negocio en 0. */
+export function PlanFinanciero({ from, to, compact = false }: { from: string; to: string; compact?: boolean }) {
+  const [d, setD] = useState<any>(null)
+  const [rule, setRule] = useState({ ops: '50', owner: '30', savings: '20' })
+  const [edit, setEdit] = useState(false)
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  const load = async () => { const r = await api<any>('GET', `/finance/plan?from=${from}&to=${to}`); setD(r); setRule({ ops: String(r.rule.ops), owner: String(r.rule.owner), savings: String(r.rule.savings) }) }
+  useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [from, to])
+  if (!d) return <p className="muted">{msg.err ?? 'Calculando…'}</p>
+  const sum = Number(rule.ops) + Number(rule.owner) + Number(rule.savings)
+  const B = d.buckets
+  const bar = (actual: number, target: number) => <div className="bar-track"><div className={`bar-fill ${actual > target ? 'loss' : 'profit'}`} style={{ width: `${target > 0 ? Math.min(100, (actual / target) * 100) : actual > 0 ? 100 : 0}%` }} /></div>
+  return (
+    <div className="plan">
+      <section className="card plan-hero">
+        <div>
+          <span className="muted">Puedes retirar</span>
+          <div className="plan-amount">{mxn(d.suggested)}</div>
+          <p className="muted small">{d.profit > 0 ? <>De una utilidad de <b>{mxn(d.profit)}</b>, el negocio se queda con <b>{mxn(d.keeps)}</b> para seguir operando y ahorrar.</> : 'Cuando el negocio deje ganancia, aquí verás cuánto puedes sacar.'}</p>
+        </div>
+        {d.reasons.length > 0 && <ul className="plan-reasons">{d.reasons.map((r: string) => <li key={r}>{r}</li>)}</ul>}
+      </section>
+      <div className="plan-buckets">
+        <section className="card plan-bucket" style={{ '--tone': BUCKET_TONE.ops } as React.CSSProperties}>
+          <div className="plan-pct">{B.ops.pct}%</div><b>Para operar el negocio</b>
+          <p className="muted small">Gastos fijos y del día, comisiones y mermas.</p>
+          <div className="info-row"><span>Llevas</span><b className={B.ops.actual > B.ops.target ? 'neg' : ''}>{mxn(B.ops.actual)}</b></div>
+          <div className="info-row"><span>Tope sano</span><b>{mxn(B.ops.target)}</b></div>
+          {bar(B.ops.actual, B.ops.target)}
+        </section>
+        <section className="card plan-bucket" style={{ '--tone': BUCKET_TONE.owner } as React.CSSProperties}>
+          <div className="plan-pct">{B.owner.pct}%</div><b>Para ti (dueño)</b>
+          <p className="muted small">Tu sueldo o retiro del periodo.</p>
+          <div className="info-row"><span>Te toca hasta</span><b>{mxn(B.owner.target)}</b></div>
+          <div className="info-row"><span>Sugerido hoy</span><b className="pos">{mxn(d.suggested)}</b></div>
+        </section>
+        <section className="card plan-bucket" style={{ '--tone': BUCKET_TONE.savings } as React.CSSProperties}>
+          <div className="plan-pct">{B.savings.pct}%</div><b>Ahorro e imprevistos</b>
+          <p className="muted small">Guárdalo aparte para emergencias, equipo o crecer.</p>
+          <div className="info-row"><span>Aparta</span><b>{mxn(B.savings.target)}</b></div>
+        </section>
+      </div>
+      {!compact && (
+        <section className="card">
+          <h3>De dónde sale</h3>
+          <div className="table-wrap"><table className="list statement"><tbody>
+            <tr><td>Ventas</td><td className="num">{mxn(d.sales)}</td></tr>
+            <tr><td>Lo que costó lo vendido (productos, material, recetas)</td><td className="num">{mxn(d.costOfSales ? -d.costOfSales : 0)}</td></tr>
+            <tr className="total"><td>Utilidad bruta (lo que se reparte)</td><td className="num">{mxn(d.grossProfit)}</td></tr>
+            <tr><td>Gastos de operación</td><td className="num">{mxn(B.ops.actual ? -B.ops.actual : 0)}</td></tr>
+            <tr className={`total ${d.profit < 0 ? 'neg' : ''}`}><td>Utilidad</td><td className="num">{mxn(d.profit)}</td></tr>
+            <tr><td>Reserva: {d.reserveDays} días de gastos fijos ({mxn(d.monthlyFixed)} al mes){d.reserveDaysSet ? '' : ' · ajústala en «Ventas y retiro»'}</td><td className="num">{mxn(d.reserve ? -d.reserve : 0)}</td></tr>
+            <tr><td>Reponer inventario al mínimo</td><td className="num">{mxn(d.restock ? -d.restock : 0)}</td></tr>
+            <tr className="total"><td>Lo más que puedes sacar sin descapitalizar</td><td className="num">{mxn(d.safeMax)}</td></tr>
+            <tr className="muted"><td>Dinero en caja ahora</td><td className="num">{mxn(d.cash)}</td></tr>
+          </tbody></table></div>
+          {!edit ? <p><button onClick={() => setEdit(true)}>Cambiar porcentajes</button></p> : (
+            <div className="danger-zone">
+              <div className="row">
+                <label>Operar %<input inputMode="numeric" value={rule.ops} onChange={(e) => setRule({ ...rule, ops: e.target.value })} /></label>
+                <label>Dueño %<input inputMode="numeric" value={rule.owner} onChange={(e) => setRule({ ...rule, owner: e.target.value })} /></label>
+                <label>Ahorro %<input inputMode="numeric" value={rule.savings} onChange={(e) => setRule({ ...rule, savings: e.target.value })} /></label>
+              </div>
+              <p className={`small ${sum === 100 ? 'muted' : 'error'}`}>Suman {sum}% (deben sumar 100).</p>
+              <p className="row"><button onClick={() => { setEdit(false); setRule({ ops: String(d.rule.ops), owner: String(d.rule.owner), savings: String(d.rule.savings) }) }}>Cancelar</button>
+                <button className="primary" disabled={sum !== 100} onClick={async () => { try { await api('PUT', '/finance/plan/rule', { ops: Number(rule.ops), owner: Number(rule.owner), savings: Number(rule.savings) }); setEdit(false); setMsg({ ok: 'Porcentajes guardados.' }); await load() } catch (e) { setMsg({ err: (e as Error).message }) } }}>Guardar</button></p>
+            </div>
+          )}
+          {(msg.ok || msg.err) && <p className={msg.err ? 'error' : 'okmsg'}>{msg.err ?? msg.ok}</p>}
+        </section>
+      )}
+    </div>
+  )
+}

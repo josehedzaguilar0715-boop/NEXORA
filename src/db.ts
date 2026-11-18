@@ -1407,6 +1407,8 @@ const MIGRATIONS: Migration[] = [
   `ALTER TABLE loyalty_ledger ADD COLUMN note TEXT;`,
   // Folio del sello en el sistema anterior (para importar el historial sin duplicar).
   `ALTER TABLE loyalty_ledger ADD COLUMN ext_ref TEXT;`,
+  // Costo directo de un servicio (material, insumos que no van por receta): cuenta como costo de lo vendido.
+  `ALTER TABLE services ADD COLUMN cost INTEGER NOT NULL DEFAULT 0;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

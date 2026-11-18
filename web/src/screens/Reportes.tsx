@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
 import type { Me } from '../App'
+import { PlanFinanciero } from './Finanzas'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 
@@ -8,7 +9,6 @@ export function Reportes({ me }: { me: Me }) {
   const [from, setFrom] = useState(today())
   const [to, setTo] = useState(today())
   const [r, setR] = useState<any>(null)
-  const [w, setW] = useState<any>(null)
   const [fixed, setFixed] = useState<any>(null)
   const [f, setF] = useState({ concept: '', amount: '', days: '' })
   const [err, setErr] = useState('')
@@ -17,7 +17,6 @@ export function Reportes({ me }: { me: Me }) {
     try {
       setR(await api('GET', `/reports/summary?from=${from}&to=${to}`))
       if (owner) {
-        setW(await api('GET', `/reports/suggested-withdrawal?from=${from.slice(0, 8)}01&to=${to}`))
         setFixed(await api('GET', '/fixed-expenses'))
       }
     } catch (e) { setErr((e as Error).message) }
@@ -55,18 +54,10 @@ export function Reportes({ me }: { me: Me }) {
       {owner && (
         <section className="card">
           <h2>Retiro sugerido del mes</h2>
-          <p className="muted small">Cuánto puedes sacar sin descapitalizar el negocio: utilidad − reserva para gastos fijos − lo que cuesta reponer el inventario.</p>
-          {w && w.suggested != null && <Cascada profit={w.profit} reserve={w.reserve} restock={w.restock} suggested={w.suggested} />}
-          {w && w.suggested != null && (
-            <div className="table-wrap"><table className="list statement"><tbody>
-              <tr><td>Utilidad del mes</td><td className="num">{mxn(w.profit)}</td></tr>
-              <tr><td>Reserva ({w.reserveDays} días de gastos fijos)</td><td className="num">{minus(w.reserve)}</td></tr>
-              <tr><td>Reponer inventario al mínimo</td><td className="num">{minus(w.restock)}</td></tr>
-              <tr className="total"><td>Puedes retirar</td><td className="num">{mxn(w.suggested)}</td></tr>
-            </tbody></table></div>
-          )}
+          <p className="muted small">Lo que puedes sacar este mes sin dejar el negocio en 0: tu parte del plan 50/30/20, cuidando la reserva de gastos fijos y lo que hace falta para reponer inventario. El detalle está en <a href="#/finanzas">Finanzas → Plan 50/30/20</a>.</p>
+          <PlanFinanciero key={`${from}${to}${fixed?.reserveDays}${fixed?.fixedExpenses?.length}`} from={`${to.slice(0, 8)}01`} to={to} compact />
           <h3 style={{ marginTop: 18 }}>Días de reserva</h3>
-          <p className="muted small">Cuántos días de gastos fijos quieres tener guardados siempre.{fixed?.reserveDays != null ? ` Hoy: ${fixed.reserveDays} días.` : ''}</p>
+          <p className="muted small">Cuántos días de gastos fijos quieres tener guardados siempre. {fixed?.reserveDays != null ? `Hoy: ${fixed.reserveDays} días.` : 'Si no lo cambias, se guardan 30 días.'}</p>
           <div className="row"><input aria-label="Días de reserva" inputMode="numeric" placeholder={fixed?.reserveDays != null ? String(fixed.reserveDays) : 'Ej. 30'} value={f.days} onChange={(e) => setF({ ...f, days: e.target.value })} /><button style={{ flex: '0 0 auto' }} disabled={f.days.trim() === ''} onClick={run(async () => { await api('PUT', '/reserve-days', { days: Number(f.days) }); setF({ ...f, days: '' }) })}>Guardar días</button></div>
           <h3 style={{ marginTop: 18 }}>Gastos fijos al mes</h3>
           <div className="table-wrap"><table className="list"><tbody>
@@ -78,34 +69,5 @@ export function Reportes({ me }: { me: Me }) {
         </section>
       )}
     </div>
-  )
-}
-
-/** Cascada del retiro sugerido: utilidad − reserva − reposición = lo que puedes retirar. */
-function Cascada({ profit, reserve, restock, suggested }: { profit: number; reserve: number; restock: number; suggested: number }) {
-  const steps = [
-    { label: 'Utilidad', from: 0, to: profit, color: '#22D3EE' },
-    { label: 'Reserva', from: profit, to: profit - reserve, color: '#F87171' },
-    { label: 'Reposición', from: profit - reserve, to: profit - reserve - restock, color: '#F87171' },
-    { label: 'Retirar', from: 0, to: suggested, color: '#34D399' },
-  ]
-  const vals = steps.flatMap((s) => [s.from, s.to])
-  const hi = Math.max(1, ...vals), lo = Math.min(0, ...vals)
-  const W = 520, H = 220, pad = 20, bw = (W - pad * 2) / steps.length
-  const y = (v: number) => pad + ((hi - v) * (H - pad * 2)) / (hi - lo || 1)
-  return (
-    <svg className="chart" viewBox={`0 0 ${W} ${H + 40}`} role="img" aria-label={`Retiro sugerido: ${mxn(suggested)}`} style={{ marginBottom: 12 }}>
-      <line x1={pad} x2={W - pad} y1={y(0)} y2={y(0)} stroke="#232A3A" />
-      {steps.map((s, i) => {
-        const top = y(Math.max(s.from, s.to)), h = Math.max(2, Math.abs(y(s.from) - y(s.to)))
-        return (
-          <g key={s.label}>
-            <rect x={pad + i * bw + bw * 0.15} y={top} width={bw * 0.7} height={h} rx={8} fill={s.color} opacity={0.9} />
-            <text x={pad + i * bw + bw / 2} y={top - 6} textAnchor="middle" fill="#F1F5F9" fontSize="14" fontWeight="700">{(i === 1 || i === 2) && s.to !== s.from ? '−' : ''}{mxn(Math.abs(s.to - s.from))}</text>
-            <text x={pad + i * bw + bw / 2} y={H + 26} textAnchor="middle" fill="#7C8799" fontSize="14">{s.label}</text>
-          </g>
-        )
-      })}
-    </svg>
   )
 }

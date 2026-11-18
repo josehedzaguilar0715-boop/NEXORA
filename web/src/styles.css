@@ -518,3 +518,45 @@ details[open] > summary::before { content: '－ '; }
 }
 .appt-actions { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
 .appt-actions > button, .appt-actions > a.button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Personal: equipo como lista (sin tabla apretada) ---------- */
+.team { display: flex; flex-direction: column; gap: 8px; }
+.team-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--input); }
+.team-row.clickable { cursor: pointer; }
+.team-row.clickable:hover { border-color: var(--selected-line); }
+.team-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.team-who b, .team-who small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-row .pill { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 420px) { .team-row .pill { display: none; } }
+
+/* ---------- Productos en celular: cada producto en su renglón, con el nombre completo ---------- */
+@media (max-width: 600px) {
+  table.list.products thead { display: none; }
+  table.list.products tbody tr { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  table.list.products tbody td { border: 0; padding: 0; }
+  table.list.products tbody td:first-child { grid-column: 1 / -1; }
+  table.list.products tbody td:first-child b { font-size: 1.02rem; }
+  table.list.products tbody td.num { text-align: left; }
+  table.list.products tbody td:last-child { text-align: right; }
+}
+.profit-box { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px 4px; margin: 6px 0 10px; background: var(--input); }
+.profit-line { margin: 4px 0 8px; line-height: 1.6; }
+
+/* ---------- Plan 50/30/20 y retiro sugerido ---------- */
+.plan { display: flex; flex-direction: column; gap: 14px; }
+.plan-hero { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between; border-left: 4px solid var(--ok); }
+.plan-amount { font-size: 2.4rem; font-weight: 800; color: var(--ok); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.plan-reasons { margin: 0; padding-left: 18px; color: var(--muted); font-size: 0.9rem; max-width: 520px; }
+.plan-reasons li { margin-bottom: 4px; }
+.plan-buckets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 14px; }
+.plan-bucket { border-top: 4px solid var(--tone, var(--cyan)); display: flex; flex-direction: column; gap: 6px; }
+.plan-bucket .plan-pct { font-size: 1.8rem; font-weight: 800; color: var(--tone, var(--cyan)); line-height: 1; }
+.plan-bucket p { margin: 0 0 4px; }
+@media (max-width: 600px) {
+  table.list.products, table.list.products tbody { display: block; width: 100%; }
+  table.list.products tbody tr { width: 100%; }
+  table.list.products tbody td:last-child .mini { padding: 6px 10px; }
+}
+.team-role { color: var(--ink); font-weight: 600; }
+.pay.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.pay.two button { min-width: 0; white-space: normal; }

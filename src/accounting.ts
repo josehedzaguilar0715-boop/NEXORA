@@ -1,8 +1,10 @@
 import { Hono } from 'hono'
-import { requirePerm, type Env } from './context.js'
+import { z } from 'zod'
+import { audit } from './audit.js'
+import { body, ownerOnly, parse, requirePerm, type Env } from './context.js'
 import type { Db } from './db.js'
 import { shiftTotals, type ShiftRow } from './cash.js'
-import { periodSummary, range } from './finance.js'
+import { periodSummary, range, restockNeeded } from './finance.js'
 import { bad, localDate } from './util.js'
 
 /**
@@ -176,4 +178,71 @@ accounting.get('/accounting/export', requirePerm('view_reports'), (c) => {
   } else throw bad('Tipo de exportación no válido.')
   const csv = '﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n')
   return c.body(csv, 200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="nexora-${kind}-${from}-a-${to}.csv"` })
+})
+
+// ---------- Plan 50/30/20 y retiro sugerido ----------
+
+export const DEFAULT_RULE = { ops: 50, owner: 30, savings: 20 }
+export function budgetRule(db: Db, businessId: string): typeof DEFAULT_RULE {
+  const r = db.prepare("SELECT value FROM business_settings WHERE business_id = ? AND key = 'budgetRule'").get(businessId) as { value: string } | undefined
+  return r ? { ...DEFAULT_RULE, ...JSON.parse(r.value) } : DEFAULT_RULE
+}
+
+/**
+ * Reparto de la utilidad bruta (ventas − lo que costó lo vendido) con la regla 50/30/20 (editable):
+ * 50% para operar (gastos fijos y variables, comisiones, mermas), 30% para el dueño y 20% de ahorro e imprevistos.
+ * El retiro sugerido nunca pasa del 30% ni deja al negocio sin su reserva de gastos fijos y sin para reponer inventario.
+ */
+export function financialPlan(db: Db, businessId: string, from: string, to: string) {
+  const rule = budgetRule(db, businessId)
+  const s = periodSummary(db, businessId, from, to)
+  const gross = Math.max(0, s.grossProfit)
+  const opsActual = s.expenses + s.commissions + s.waste
+  const pct = (p: number) => Math.round((gross * p) / 100)
+  const biz = db.prepare('SELECT reserve_days FROM businesses WHERE id = ?').get(businessId) as { reserve_days: number | null }
+  const reserveDays = biz.reserve_days ?? 30
+  const monthlyFixed = (db.prepare('SELECT COALESCE(SUM(monthly_amount),0) m FROM fixed_expenses WHERE business_id = ? AND active = 1').get(businessId) as { m: number }).m
+  const reserve = Math.round((monthlyFixed * reserveDays) / 30)
+  const restock = restockNeeded(db, businessId)
+  const cash = balanceSheet(db, businessId).cashInRegisters
+  const ownerTarget = pct(rule.owner)
+  // Lo más que se puede sacar sin descapitalizar: la utilidad menos la reserva y lo que falta para reponer inventario.
+  const safeMax = Math.max(0, s.profit - reserve - restock.total)
+  const suggested = Math.max(0, Math.min(ownerTarget, safeMax))
+  const reasons: string[] = []
+  if (s.profit <= 0) reasons.push('En este periodo el negocio todavía no deja ganancia: mejor no retirar.')
+  else if (suggested < ownerTarget) reasons.push(`Se sugiere menos que tu ${rule.owner}% para que el negocio conserve ${reserve > 0 ? `su reserva de ${reserveDays} días de gastos fijos` : 'su dinero para operar'}${restock.total > 0 ? ' y pueda reponer el inventario' : ''}.`)
+  if (opsActual > pct(rule.ops) && gross > 0) reasons.push(`Los gastos de operación ya pasan del ${rule.ops}% (llevas ${Math.round((opsActual / gross) * 100)}%). Revisa gastos fijos y mermas.`)
+  if (suggested > cash) reasons.push('Parte de este dinero no está en la caja: puede estar en transferencias o tarjeta.')
+  return {
+    from, to, rule,
+    sales: (s.sales.total ?? 0) - s.refunds, costOfSales: s.costOfSales, grossProfit: s.grossProfit, profit: s.profit,
+    buckets: {
+      ops: { pct: rule.ops, target: pct(rule.ops), actual: opsActual, detail: { expenses: s.expenses, commissions: s.commissions, waste: s.waste } },
+      owner: { pct: rule.owner, target: ownerTarget },
+      savings: { pct: rule.savings, target: pct(rule.savings) },
+    },
+    reserveDays, reserveDaysSet: biz.reserve_days != null, monthlyFixed, reserve, restock: restock.total, restockItems: restock.items.slice(0, 10), cash,
+    safeMax, suggested, reasons,
+    keeps: Math.max(0, s.profit - suggested),
+  }
+}
+
+accounting.get('/finance/plan', ownerOnly, (c) => {
+  const { db, now } = c.get('deps')
+  const t = localDate(now())
+  const from = c.req.query('from') ?? `${t.slice(0, 8)}01`
+  const to = c.req.query('to') ?? t
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) throw bad('Periodo no válido.')
+  return c.json(financialPlan(db, c.get('session').user.business_id, from, to))
+})
+
+accounting.put('/finance/plan/rule', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ ops: z.number().int().min(0).max(100), owner: z.number().int().min(0).max(100), savings: z.number().int().min(0).max(100) }).refine((r) => r.ops + r.owner + r.savings === 100, 'Los tres porcentajes deben sumar 100.'), await body(c))
+  const old = budgetRule(db, u.business_id)
+  db.prepare("INSERT INTO business_settings (business_id, key, value) VALUES (?, 'budgetRule', ?) ON CONFLICT(business_id, key) DO UPDATE SET value = excluded.value").run(u.business_id, JSON.stringify(d))
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'finanzas.regla_reparto', oldValue: old, newValue: d })
+  return c.json({ rule: d })
 })

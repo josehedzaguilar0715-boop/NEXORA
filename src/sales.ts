@@ -266,7 +266,7 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
     for (const l of lines) {
       if (l.productId && l.qtyMilli) l.cost = consumeProduct(ctx, l.productId, l.qtyMilli, d.id)
       // Receta del servicio: lo que gasta (tinta, papel, insumos), como inventario de uso.
-      if (l.serviceId) l.cost += consumeRecipe(ctx, l.serviceId, l.quantity, d.id)
+      if (l.serviceId) l.cost += consumeRecipe(ctx, l.serviceId, l.quantity, d.id) + Math.round(l.quantity * ((db.prepare('SELECT cost FROM services WHERE id = ?').get(l.serviceId) as { cost: number } | undefined)?.cost ?? 0))
       ins.run(l.itemId, d.id, l.description, l.quantity, l.unitPrice, l.total, l.ref, l.category, l.productId, l.presentationId, l.qtyMilli, l.cost)
       if (l.serviceId) db.prepare('UPDATE sale_items SET service_id = ? WHERE id = ?').run(l.serviceId, l.itemId)
       if (l.priceChanged) audit(db, now, { businessId: u.business_id, userId: u.id, action: 'venta.cambio_precio', entity: 'sale', entityId: d.id, newValue: { description: l.description, unitPrice: l.unitPrice }, authorizedBy: priceAuth })

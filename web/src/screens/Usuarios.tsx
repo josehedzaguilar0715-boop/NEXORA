@@ -4,6 +4,15 @@ import { api } from '../api'
 import { hasGiro, type Me } from '../App'
 
 const TEMPLATE_LABEL: Record<string, string> = { cajero: 'Cajero', encargado: 'Encargado', barbero: 'Barbero', empleado_piso: 'Empleado de piso' }
+/** El puesto «que atiende» se llama según el giro; en tiendas sin agenda ni comisiones no aparece. */
+function templateLabel(me: Me, key: string): string | null {
+  if (key !== 'barbero') return TEMPLATE_LABEL[key] ?? key
+  if (hasGiro(me, 'barberia')) return 'Barbero'
+  if (hasGiro(me, 'unas')) return 'Técnica de uñas'
+  if (hasGiro(me, 'perfumeria')) return 'Asesora de ventas'
+  if (hasGiro(me, 'restaurante', 'palapa', 'taqueria', 'comedor')) return 'Mesero'
+  return null
+}
 
 /** Personal: quién trabaja aquí, cómo entra y qué puede hacer. */
 export function Usuarios({ me }: { me: Me }) {
@@ -21,7 +30,7 @@ export function Usuarios({ me }: { me: Me }) {
   const roleOf = (u: any) => {
     if (u.role === 'owner') return 'Dueño'
     const t = catalog.templates.find((t) => t.permissions.length === u.permissions.length && t.permissions.every((p) => u.permissions.includes(p)))
-    return t ? t.label : 'Permisos a la medida'
+    return t ? templateLabel(me, t.key) ?? t.label : 'Permisos a la medida'
   }
   const ownerRow = users.find((u) => u.role === 'owner')
   return (
@@ -34,20 +43,16 @@ export function Usuarios({ me }: { me: Me }) {
       <div className="grid2 config">
         <section className="card">
           <h2>Equipo</h2>
-          <div className="table-wrap"><table className="list">
-            <thead><tr><th>Nombre</th><th className="hide-sm">Usuario</th><th>Puesto</th><th /></tr></thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className={u.role === 'owner' ? '' : 'clickable'} onClick={() => u.role !== 'owner' && setSel({ ...u })}>
-                  <td><b>{u.name}</b>{!u.active && <><br /><small className="neg">desactivado</small></>}</td>
-                  <td className="hide-sm muted">{u.username ?? 'entra con su teléfono'}</td>
-                  <td>{roleOf(u)}</td>
-                  <td className="num">{u.role !== 'owner' && <button className="mini" onClick={(e) => { e.stopPropagation(); setSel({ ...u }) }}>Abrir</button>}</td>
-                </tr>
-              ))}
-              {users.length <= 1 && <tr><td colSpan={4} className="empty">Todavía no hay empleados. Agrega al primero con «+ Nuevo empleado».</td></tr>}
-            </tbody>
-          </table></div>
+          <div className="team">
+            {users.map((u) => (
+              <div key={u.id} className={`team-row ${u.role === 'owner' ? '' : 'clickable'}`} onClick={() => u.role !== 'owner' && setSel({ ...u })}>
+                <span className="avatar" aria-hidden>{u.name.trim().charAt(0).toUpperCase()}</span>
+                <span className="team-who"><b>{u.name}</b><small className="muted"><span className="team-role">{roleOf(u)}</span> · {u.username ? `usuario: ${u.username}` : 'entra con su teléfono'}{!u.active ? ' · desactivado' : ''}</small></span>
+                {u.role !== 'owner' && <button className="mini" onClick={(e) => { e.stopPropagation(); setSel({ ...u }) }}>Abrir</button>}
+              </div>
+            ))}
+            {users.length <= 1 && <p className="muted">Todavía no hay empleados. Agrega al primero con «+ Nuevo empleado».</p>}
+          </div>
         </section>
         <div className="stack">
           <Asistencia />
@@ -61,13 +66,13 @@ export function Usuarios({ me }: { me: Me }) {
           )}
         </div>
       </div>
-      {adding && <NuevoEmpleado templates={catalog.templates} onClose={() => setAdding(false)} onDone={(u) => { setAdding(false); setMsg({ ok: `Listo: ${u} ya puede entrar con su usuario y contraseña.` }); void load() }} />}
+      {adding && <NuevoEmpleado me={me} templates={catalog.templates} onClose={() => setAdding(false)} onDone={(u) => { setAdding(false); setMsg({ ok: `Listo: ${u} ya puede entrar con su usuario y contraseña.` }); void load() }} />}
       {sel && <Empleado me={me} u={sel} catalog={catalog} onClose={() => setSel(null)} onChanged={() => void load()} />}
     </div>
   )
 }
 
-function NuevoEmpleado({ templates, onClose, onDone }: { templates: { key: string; label: string }[]; onClose: () => void; onDone: (name: string) => void }) {
+function NuevoEmpleado({ me, templates, onClose, onDone }: { me: Me; templates: { key: string; label: string }[]; onClose: () => void; onDone: (name: string) => void }) {
   const [f, setF] = useState({ name: '', username: '', password: '', template: 'cajero' })
   const [err, setErr] = useState('')
   const suggest = (name: string) => name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')
@@ -81,7 +86,7 @@ function NuevoEmpleado({ templates, onClose, onDone }: { templates: { key: strin
           <label>Contraseña inicial<input value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} placeholder="mínimo 8" /></label>
         </div>
         <p className="muted small">El usuario no se puede repetir con otro negocio. En su primer ingreso le pedirá cambiar la contraseña.</p>
-        <label>Puesto<select value={f.template} onChange={(e) => setF({ ...f, template: e.target.value })}>{templates.map((t) => <option key={t.key} value={t.key}>{TEMPLATE_LABEL[t.key] ?? t.label}</option>)}</select></label>
+        <label>Puesto<select value={f.template} onChange={(e) => setF({ ...f, template: e.target.value })}>{templates.filter((t) => templateLabel(me, t.key)).map((t) => <option key={t.key} value={t.key}>{templateLabel(me, t.key)}</option>)}</select></label>
         <p className="muted small">El puesto pone permisos de inicio; después puedes ajustarlos uno por uno.</p>
         {err && <p className="error">{err}</p>}
         <p className="row"><button type="button" onClick={onClose}>Cancelar</button><button className="primary" disabled={f.name.trim().length < 2 || f.username.trim().length < 3 || f.password.length < 8}>Crear empleado</button></p>
@@ -183,7 +188,7 @@ function Asistencia() {
   return (
     <section className="card">
       <h2>Asistencia de hoy</h2>
-      <div className="pay"><button className="big" onClick={() => clock('entrada')}>Registrar mi entrada</button><button className="big" onClick={() => clock('salida')}>Registrar mi salida</button></div>
+      <div className="pay two"><button className="big" onClick={() => clock('entrada')}>Registrar mi entrada</button><button className="big" onClick={() => clock('salida')}>Registrar mi salida</button></div>
       {msg && <p className="error">{msg}</p>}
       <div className="table-wrap"><table className="list"><tbody>{rows.map((r, i) => <tr key={i}><td>{r.name}</td><td>{r.type === 'entrada' ? 'Entrada' : 'Salida'}</td><td className="num">{new Date(r.at).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</td></tr>)}</tbody></table></div>
       {rows.length === 0 && <p className="muted">Nadie ha registrado hoy.</p>}

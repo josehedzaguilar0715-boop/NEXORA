@@ -258,6 +258,24 @@ finance.get('/reports/recent', requirePerm('view_reports'), (c) => {
  * Retiro sugerido del dueño = utilidad del periodo − reserva (días de gastos fijos) − reposición de inventario.
  * Sin porcentajes. La reposición es lo que cuesta llevar al mínimo los productos que están por debajo.
  */
+/** Lo que cuesta reponer el inventario que está debajo del mínimo (en todas las sucursales). */
+export function restockNeeded(db: Db, businessId: string) {
+  const branches = db.prepare('SELECT id FROM branches WHERE business_id = ? AND active = 1').all(businessId) as { id: string }[]
+  const products = db.prepare('SELECT * FROM products WHERE business_id = ? AND active = 1 AND min_stock_milli > 0').all(businessId) as ProductRow[]
+  let total = 0
+  const items: { name: string; missing: number; cost: number }[] = []
+  for (const br of branches)
+    for (const p of products) {
+      const missing = p.min_stock_milli - stockOf(db, br.id, p.id)
+      if (missing > 0) {
+        const cost = Math.round((missing * p.last_cost) / 1000)
+        total += cost
+        items.push({ name: p.name, missing: fromMilli(missing), cost })
+      }
+    }
+  return { total, items }
+}
+
 finance.get('/reports/suggested-withdrawal', ownerOnly, (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user

@@ -197,6 +197,8 @@ const productBody = z.object({
   /** false: platillo o bebida preparada; no lleva existencia propia, descuenta su receta. */
   trackStock: z.boolean().optional(),
   presentations: z.array(z.object({ name: z.string().trim().min(1).max(60), factor: z.number().positive(), price: z.number().int().min(0), barcode: z.string().trim().min(3).max(50).optional() })).max(20).optional(),
+  /** Costo por unidad (centavos), si no se capturó con una compra: sirve para la ganancia y el precio sugerido. */
+  cost: z.number().int().min(0).optional(),
 })
 
 function checkBarcode(db: Db, businessId: string, code: string | null | undefined, exceptProduct?: string) {
@@ -213,8 +215,8 @@ export function createProduct(db: Db, now: Clock, businessId: string, userId: st
   for (const pr of d.presentations ?? []) checkBarcode(db, businessId, pr.barcode)
   const id = newId()
   const t = iso(now())
-  db.prepare('INSERT INTO products (id, business_id, name, category_id, barcode, unit, price, margin_bp, min_stock_milli, track_expiry, sellable, attrs, track_stock, updated_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
-    id, businessId, d.name, d.categoryId ?? null, d.barcode ?? null, d.unit, d.price, d.marginBp ?? null, toMilli(d.minStock ?? 0), d.trackExpiry ? 1 : 0, d.sellable === false ? 0 : 1, JSON.stringify(d.attrs ?? {}), d.trackStock === false ? 0 : 1, t, t,
+  db.prepare('INSERT INTO products (id, business_id, name, category_id, barcode, unit, price, margin_bp, min_stock_milli, track_expiry, sellable, attrs, track_stock, last_cost, updated_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+    id, businessId, d.name, d.categoryId ?? null, d.barcode ?? null, d.unit, d.price, d.marginBp ?? null, toMilli(d.minStock ?? 0), d.trackExpiry ? 1 : 0, d.sellable === false ? 0 : 1, JSON.stringify(d.attrs ?? {}), d.trackStock === false ? 0 : 1, d.cost ?? 0, t, t,
   )
   for (const pr of d.presentations ?? []) db.prepare('INSERT INTO presentations (id, product_id, name, factor_milli, price, barcode) VALUES (?,?,?,?,?,?)').run(newId(), id, pr.name, toMilli(pr.factor), pr.price, pr.barcode ?? null)
   audit(db, now, { businessId, userId, action: 'producto.alta', entity: 'product', entityId: id, newValue: d })
@@ -306,6 +308,10 @@ inventory.patch('/products/:id', requirePerm('configure_catalog'), async (c) => 
       fields.name, fields.category_id, fields.barcode, fields.price, fields.margin_bp, fields.min_stock_milli, fields.track_expiry, fields.active, fields.sellable, fields.attrs, changedAt, d.deviceId ?? null, p.id,
     )
     if (d.price !== undefined && d.price !== p.price) db.prepare('UPDATE lots SET price = ? WHERE product_id = ? AND qty_remaining_milli > 0').run(d.price, p.id)
+    if (d.cost !== undefined && d.cost !== p.last_cost) {
+      db.prepare('UPDATE products SET last_cost = ? WHERE id = ?').run(d.cost, p.id)
+      audit(db, now, { businessId: u.business_id, userId: u.id, action: 'producto.costo', entity: 'product', entityId: p.id, oldValue: { cost: p.last_cost }, newValue: { cost: d.cost } })
+    }
     audit(db, now, {
       businessId: u.business_id, userId: u.id, action: d.price !== undefined && d.price !== p.price ? 'producto.cambio_precio' : 'producto.cambio', entity: 'product', entityId: p.id,
       oldValue: { name: p.name, price: p.price, barcode: p.barcode, active: p.active }, newValue: { ...d, authCode: undefined }, authorizedBy: priceAuth,

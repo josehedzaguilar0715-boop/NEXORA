@@ -23,10 +23,12 @@ const serviceBody = z.object({
   machineId: z.string().nullable().optional(),
   sheetsPerUnit: z.number().int().min(0).max(1000).optional(),
   active: z.boolean().optional(),
+  /** Costo directo por servicio (centavos): material, insumos… Lo de la receta se suma aparte. */
+  cost: z.number().int().min(0).optional(),
 })
 
-export interface ServiceRow { id: string; business_id: string; name: string; category: string | null; price: number; duration_min: number | null; attrs: string; machine_id: string | null; sheets_per_unit: number; active: number }
-export const serviceView = (s: ServiceRow) => ({ id: s.id, name: s.name, category: s.category, price: s.price, durationMin: s.duration_min, attrs: JSON.parse(s.attrs), machineId: s.machine_id, sheetsPerUnit: s.sheets_per_unit, active: !!s.active })
+export interface ServiceRow { id: string; business_id: string; name: string; category: string | null; price: number; duration_min: number | null; attrs: string; machine_id: string | null; sheets_per_unit: number; active: number; cost?: number }
+export const serviceView = (s: ServiceRow) => ({ id: s.id, name: s.name, category: s.category, price: s.price, durationMin: s.duration_min, attrs: JSON.parse(s.attrs), machineId: s.machine_id, sheetsPerUnit: s.sheets_per_unit, active: !!s.active, cost: s.cost ?? 0 })
 
 export function loadService(db: Db, businessId: string, id: string): ServiceRow {
   const s = db.prepare('SELECT * FROM services WHERE id = ? AND business_id = ?').get(id, businessId) as ServiceRow | undefined
@@ -45,8 +47,8 @@ services.post('/services', requirePerm('configure_catalog'), async (c) => {
   const d = parse(serviceBody, await body(c))
   if (d.machineId && !db.prepare('SELECT 1 FROM machines WHERE id = ? AND business_id = ?').get(d.machineId, u.business_id)) throw bad('Ese equipo no existe.')
   const id = newId()
-  db.prepare('INSERT INTO services (id, business_id, name, category, price, duration_min, attrs, machine_id, sheets_per_unit, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
-    id, u.business_id, d.name, d.category ?? null, d.price, d.durationMin ?? null, JSON.stringify(d.attrs ?? {}), d.machineId ?? null, d.sheetsPerUnit ?? 0, iso(now()),
+  db.prepare('INSERT INTO services (id, business_id, name, category, price, duration_min, attrs, machine_id, sheets_per_unit, cost, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(
+    id, u.business_id, d.name, d.category ?? null, d.price, d.durationMin ?? null, JSON.stringify(d.attrs ?? {}), d.machineId ?? null, d.sheetsPerUnit ?? 0, d.cost ?? 0, iso(now()),
   )
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'servicio.alta', entity: 'service', entityId: id, newValue: d })
   return c.json({ service: serviceView(loadService(db, u.business_id, id)) }, 201)
@@ -60,9 +62,9 @@ services.patch('/services/:id', requirePerm('configure_catalog'), async (c) => {
   // Cambiar el precio de un servicio también pide código.
   let auth: string | null = null
   if (d.price !== undefined && d.price !== s.price) auth = authorize(c.get('deps'), u, d.authCode, 'change_prices', 'precio de servicio').id
-  db.prepare('UPDATE services SET name=?, category=?, price=?, duration_min=?, attrs=?, machine_id=?, sheets_per_unit=?, active=? WHERE id=?').run(
+  db.prepare('UPDATE services SET name=?, category=?, price=?, duration_min=?, attrs=?, machine_id=?, sheets_per_unit=?, active=?, cost=? WHERE id=?').run(
     d.name ?? s.name, d.category === undefined ? s.category : d.category, d.price ?? s.price, d.durationMin === undefined ? s.duration_min : d.durationMin,
-    d.attrs ? JSON.stringify(d.attrs) : s.attrs, d.machineId === undefined ? s.machine_id : d.machineId, d.sheetsPerUnit ?? s.sheets_per_unit, d.active === undefined ? s.active : d.active ? 1 : 0, s.id,
+    d.attrs ? JSON.stringify(d.attrs) : s.attrs, d.machineId === undefined ? s.machine_id : d.machineId, d.sheetsPerUnit ?? s.sheets_per_unit, d.active === undefined ? s.active : d.active ? 1 : 0, d.cost ?? s.cost ?? 0, s.id,
   )
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'servicio.cambio', entity: 'service', entityId: s.id, oldValue: serviceView(s), newValue: { ...d, authCode: undefined }, authorizedBy: auth })
   return c.json({ service: serviceView(loadService(db, u.business_id, s.id)) })

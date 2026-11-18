@@ -80,6 +80,10 @@ export async function seedDemo(app: Hono<Env>, deps: Deps, giro: string) {
   const ctx = new Ctx(call, past)
   try {
     await SEEDS[giro]!(ctx, { ownerId, staffId: staff.id, t })
+    // Gastos fijos para que el plan 50/30/20 y el retiro sugerido tengan números reales.
+    await call('POST', '/fixed-expenses', { concept: 'Renta del local', monthlyAmount: 350000 })
+    await call('POST', '/fixed-expenses', { concept: 'Luz y agua', monthlyAmount: 90000 })
+    await call('PUT', '/reserve-days', { days: 15 })
   } catch (e) {
     // Si algo falla a medias, la demo queda apartada (no se borra nada) y se puede volver a crear.
     db.prepare("UPDATE users SET phone = 'x' || substr(id, 1, 9), username = CASE WHEN username IS NULL THEN NULL ELSE 'x.' || id END, active = 0 WHERE business_id = ?").run(bizId)
@@ -200,10 +204,10 @@ const SEEDS: Record<string, Seed> = {
     const gel = await c.product({ name: 'Gel fijación extrema', unit: 'pieza', price: 9500, minStock: 5 })
     const aceite = await c.product({ name: 'Aceite para barba', unit: 'pieza', price: 22000, minStock: 3 })
     await c.buy(sup, [{ productId: cera.id, quantity: 12, cost: 96000 }, { productId: gel.id, quantity: 4, cost: 18000 }, { productId: aceite.id, quantity: 6, cost: 66000 }])
-    const corte = await c.service({ name: 'Corte clásico', price: 15000, durationMin: 30, category: 'cortes' })
-    const fade = await c.service({ name: 'Corte fade', price: 18000, durationMin: 40, category: 'cortes' })
-    const barba = await c.service({ name: 'Arreglo de barba', price: 10000, durationMin: 20, category: 'barba' })
-    const facial = await c.service({ name: 'Facial', price: 25000, durationMin: 30, category: 'facial' })
+    const corte = await c.service({ name: 'Corte clásico', price: 15000, durationMin: 30, category: 'cortes', cost: 1500 })
+    const fade = await c.service({ name: 'Corte fade', price: 18000, durationMin: 40, category: 'cortes', cost: 1500 })
+    const barba = await c.service({ name: 'Arreglo de barba', price: 10000, durationMin: 20, category: 'barba', cost: 1000 })
+    const facial = await c.service({ name: 'Facial', price: 25000, durationMin: 30, category: 'facial', cost: 4000 })
     const all = [0, 1, 2, 3, 4, 5, 6].filter((w) => w !== 0).map((w) => ({ weekday: w, start: '09:00', end: '20:00' }))
     for (const id of [ownerId, staffId]) await c.call('PUT', `/staff/${id}/agenda`, { inAgenda: true, schedule: all })
     await c.call('PUT', '/commission-rules', { rules: [{ targetType: 'all', rateBp: 4000 }] })
@@ -228,8 +232,8 @@ const SEEDS: Record<string, Seed> = {
     const crema = await c.product({ name: 'Crema de manos', unit: 'pieza', price: 12000, minStock: 3 })
     await c.buy(sup, [{ productId: gel.id, quantity: 10, cost: 150000 }, { productId: esmalte.id, quantity: 10, cost: 40000 }, { productId: crema.id, quantity: 2, cost: 12000 }])
     const mani = await c.service({ name: 'Manicure gel', price: 30000, durationMin: 60, attrs: { technique: 'Gel', dryMin: 15 } })
-    const acri = await c.service({ name: 'Uñas acrílicas', price: 45000, durationMin: 90, attrs: { technique: 'Acrílico', dryMin: 10 } })
-    const pedi = await c.service({ name: 'Pedicure spa', price: 35000, durationMin: 60, attrs: { technique: 'Pedicure' } })
+    const acri = await c.service({ name: 'Uñas acrílicas', price: 45000, durationMin: 90, cost: 8000, attrs: { technique: 'Acrílico', dryMin: 10 } })
+    const pedi = await c.service({ name: 'Pedicure spa', price: 35000, durationMin: 60, cost: 5000, attrs: { technique: 'Pedicure' } })
     await c.call('PUT', `/recipes/${mani.id}`, { items: [{ productId: gel.id, quantity: 0.1 }] })
     const all = [1, 2, 3, 4, 5, 6].map((w) => ({ weekday: w, start: '10:00', end: '19:00' }))
     for (const id of [ownerId, staffId]) await c.call('PUT', `/staff/${id}/agenda`, { inAgenda: true, schedule: all })
