@@ -68,4 +68,39 @@ describe('importar datos de otro sistema', () => {
     const r = await s.call('POST', '/sales', { token: T, body: { id: s.uuid(), paymentMethod: 'efectivo', customerId: y.id, items: [{ serviceId: sv.id, quantity: 1 }] } })
     expect(r.json.loyalty).toMatchObject({ earned: 1, balance: 3 })
   })
+
+  it('historial de sellos con fechas originales: reemplaza el saldo cargado de golpe y no duplica', async () => {
+    const { s, T } = await negocioListo()
+    s.setGiro('barberia')
+    await s.call('PUT', '/modules', { token: T, body: { active: ['fidelidad'] } })
+    await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'por_persona', dailyCap: 3 } })
+    // Antes se importaron con su saldo de golpe: Miguel 2, Yosmar 1.
+    await s.call('POST', '/import/customers', { token: T, body: { rows: [{ name: 'Miguel Zamorano', phone: '9631745279', stamps: 2 }, { name: 'Yosmar Zamorano', phone: '9631725190', stamps: 1 }] } })
+    const rows = [
+      { ref: 'S-1', name: 'Miguel Zamorano', phone: '529631745279', date: '2026-10-28T16:49:35.707Z', stamps: 1, note: 'Saldo anterior' },
+      { ref: 'S-2', name: 'Miguel Zamorano', phone: '529631745279', date: '2026-10-28T16:49:35.707Z', stamps: 1, note: 'Saldo anterior' },
+      { ref: 'S-3', name: 'Yosmar Zamorano', phone: '9631725190', date: '25/10/2026', stamps: 1, note: 'Servicio' },
+      { ref: 'S-4', name: 'Cliente Nuevo', phone: '9630001111', date: '2026-11-05', stamps: 1, note: 'Compra de productos' },
+      { ref: 'S-5', name: 'Mal Fecha', date: 'ayer', stamps: 1 },
+    ]
+    const r = (await s.call('POST', '/import/stamps', { token: T, body: { rows } })).json
+    expect(r).toMatchObject({ created: 4, failed: 1 })
+    const bal = async (name: string) => {
+      const c = (await s.call('GET', '/customers', { token: T })).json.customers.find((x: any) => x.name === name)
+      return (await s.call('GET', `/public/loyalty/${c.code}`)).json
+    }
+    // Los mismos totales, ahora con detalle y fechas (no 2 + 2).
+    const mig = await bal('Miguel Zamorano')
+    expect(mig.balance).toBe(2)
+    expect(mig.history.map((h: any) => h.at.slice(0, 10))).toEqual(['2026-10-28', '2026-10-28'])
+    expect((await bal('Yosmar Zamorano')).history[0].at.slice(0, 10)).toBe('2026-10-25')
+    // Un cliente que no existía se crea inscrito.
+    expect((await bal('Cliente Nuevo')).balance).toBe(1)
+    // Repetir el archivo no duplica.
+    expect((await s.call('POST', '/import/stamps', { token: T, body: { rows: rows.slice(0, 4) } })).json).toMatchObject({ created: 0, skipped: 4 })
+    expect((await bal('Miguel Zamorano')).balance).toBe(2)
+    // Los sellos del historial no cuentan para el máximo de hoy.
+    const cid = (await s.call('GET', '/customers', { token: T })).json.customers.find((x: any) => x.name === 'Miguel Zamorano').code
+    expect((await s.call('POST', '/scan', { token: T, body: { code: cid, action: 'sello' } })).json.loyalty).toMatchObject({ earned: 1, balance: 3 })
+  })
 })

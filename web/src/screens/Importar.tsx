@@ -7,7 +7,7 @@ import type { Me } from '../App'
  * Lee CSV o Excel (.xlsx), reconoce las columnas por su nombre y deja corregirlas antes de importar.
  */
 
-type Kind = 'productos' | 'clientes' | 'proveedores'
+type Kind = 'productos' | 'clientes' | 'proveedores' | 'sellos'
 type Field = { key: string; label: string; required?: boolean; type?: 'money' | 'number' | 'unit' | 'text'; synonyms: string[]; example: string }
 
 const FIELDS: Record<Kind, Field[]> = {
@@ -34,9 +34,17 @@ const FIELDS: Record<Kind, Field[]> = {
     { key: 'phone', label: 'Teléfono', synonyms: ['telefono', 'tel', 'celular', 'whatsapp', 'contacto'], example: '9631234567' },
     { key: 'notes', label: 'Notas', synonyms: ['notas', 'comentarios', 'observaciones', 'dias de visita', 'vendedor'], example: 'Viene los martes' },
   ],
+  sellos: [
+    { key: 'name', label: 'Cliente', required: true, synonyms: ['cliente', 'nombre', 'nombre del cliente'], example: 'Joel Zamorano' },
+    { key: 'phone', label: 'Teléfono', synonyms: ['telefono', 'tel', 'celular', 'whatsapp'], example: '9632369624' },
+    { key: 'date', label: 'Fecha', required: true, synonyms: ['fecha', 'fecha utc', 'hora utc', 'fecha y hora', 'dia', 'fecha local'], example: '2026-10-29' },
+    { key: 'stamps', label: 'Sellos', required: true, type: 'number', synonyms: ['sellos', 'sello', 'cantidad', 'puntos'], example: '1' },
+    { key: 'note', label: 'Motivo', synonyms: ['motivo', 'nota', 'concepto', 'descripcion'], example: 'Corte' },
+    { key: 'ref', label: 'Folio', synonyms: ['folio', 'id', 'referencia', 'id sello', 'clave'], example: 'S-001' },
+  ],
 }
-const ENDPOINT: Record<Kind, string> = { productos: '/import/products', clientes: '/import/customers', proveedores: '/import/suppliers' }
-const KIND_LABEL: Record<Kind, string> = { productos: 'Productos e inventario', clientes: 'Clientes y fiado', proveedores: 'Proveedores' }
+const ENDPOINT: Record<Kind, string> = { productos: '/import/products', clientes: '/import/customers', proveedores: '/import/suppliers', sellos: '/import/stamps' }
+const KIND_LABEL: Record<Kind, string> = { productos: 'Productos e inventario', clientes: 'Clientes y fiado', proveedores: 'Proveedores', sellos: 'Historial de sellos' }
 
 const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
@@ -197,6 +205,7 @@ export function Importar(_: { me: Me }) {
         </label>
         {err && <p className="error">{err}</p>}
         {kind === 'productos' && <p className="muted small">La existencia queda igual a la del archivo (como un conteo), con el costo que traiga. Si importas otra vez, se actualiza y no se duplica.</p>}
+        {kind === 'sellos' && <p className="muted small">Un renglón por sello, con su fecha original. Si el cliente ya tenía su saldo cargado de golpe, se cambia por este detalle (no se cuenta doble). Si no existe, se crea. Repetir el archivo no duplica.</p>}
         {kind === 'clientes' && <p className="muted small">El saldo que debe cada cliente entra como «saldo inicial» de su fiado, solo al crearlo; repetir la importación no lo duplica.</p>}
       </section>
 

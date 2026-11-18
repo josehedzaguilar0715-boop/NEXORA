@@ -129,6 +129,74 @@ importer.post('/import/customers', ownerOnly, async (c) => {
   return c.json({ results, ...summary(results) })
 })
 
+/** Fecha del historial: ISO completa, AAAA-MM-DD o DD/MM/AAAA (estas dos, a mediodía hora de México). */
+function historyDate(v: string, nowIso: string): string {
+  const t = v.trim()
+  let d: Date | null = null
+  if (/^\d{4}-\d{2}-\d{2}T/.test(t)) d = new Date(t)
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(t)) d = new Date(`${t}T18:00:00.000Z`)
+  else {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t)
+    if (m) d = new Date(`${m[3]}-${m[2]!.padStart(2, '0')}-${m[1]!.padStart(2, '0')}T18:00:00.000Z`)
+  }
+  if (!d || Number.isNaN(d.getTime())) throw new Error(`Fecha no válida: "${v}"`)
+  const out = d.toISOString()
+  if (out > nowIso) throw new Error('La fecha es futura')
+  return out
+}
+
+const stampRow = z.object({
+  name: z.string().trim().min(2, 'Falta el nombre del cliente').max(100),
+  phone: z.string().trim().max(20).optional().nullable(),
+  date: z.string().trim().min(6, 'Falta la fecha'),
+  stamps: z.number().int().min(-1000).max(1000).refine((n) => n !== 0, 'Los sellos no pueden ser 0'),
+  note: z.string().trim().max(200).optional().nullable(),
+  ref: z.string().trim().max(120).optional().nullable(),
+})
+
+/**
+ * Historial de sellos de otro sistema: un renglón por sello (o grupo de sellos) con su fecha original.
+ * Si el cliente no existe se crea inscrito en la tarjeta. Si al importar clientes se le cargó su saldo de golpe
+ * («Sellos anteriores»), ese saldo se reemplaza por el detalle para no contar doble. Repetir el archivo no duplica.
+ */
+importer.post('/import/stamps', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ rows: z.array(z.unknown()).min(1).max(MAX) }), await body(c))
+  let replaced = 0
+  const results = eachRow(d.rows, (raw) => {
+    const r = parse(stampRow, raw)
+    const at = historyDate(r.date, iso(now()))
+    const phone = r.phone ? r.phone.replace(/\D/g, '').slice(-10) || null : null
+    let cu = (phone ? db.prepare('SELECT id FROM customers WHERE business_id = ? AND phone = ?').get(u.business_id, phone) : undefined) as { id: string } | undefined
+    cu ??= db.prepare('SELECT id FROM customers WHERE business_id = ? AND lower(name) = lower(?)').get(u.business_id, r.name) as { id: string } | undefined
+    let created = false
+    if (!cu) {
+      cu = { id: newId() }
+      db.prepare('INSERT INTO customers (id, business_id, name, phone, code, loyalty_enrolled, created_at) VALUES (?,?,?,?,?,1,?)').run(cu.id, u.business_id, r.name, phone, customerCode(), iso(now()))
+      created = true
+    } else db.prepare('UPDATE customers SET loyalty_enrolled = 1 WHERE id = ?').run(cu.id)
+    const note = r.note || 'Historial'
+    const ref = r.ref || null
+    const dup = ref
+      ? db.prepare("SELECT 1 FROM loyalty_ledger WHERE customer_id = ? AND reason = 'importado' AND ext_ref = ?").get(cu.id, ref)
+      : db.prepare("SELECT 1 FROM loyalty_ledger WHERE customer_id = ? AND reason = 'importado' AND ext_ref IS NULL AND created_at = ? AND delta = ? AND note = ?").get(cu.id, at, r.stamps, note)
+    if (dup) return { status: 'omitido', message: 'Ese sello ya estaba' }
+    // El saldo cargado de golpe se cambia por el detalle (es un dato de importación, no un movimiento real).
+    const lump = db.prepare("SELECT COUNT(*) n FROM loyalty_ledger WHERE customer_id = ? AND reason = 'importado' AND note IS NULL").get(cu.id) as { n: number }
+    if (lump.n) {
+      const trg = db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'loyalty_ledger' AND name LIKE '%no_delete'").all() as { name: string; sql: string }[]
+      for (const t of trg) db.exec(`DROP TRIGGER ${t.name}`)
+      try { db.prepare("DELETE FROM loyalty_ledger WHERE customer_id = ? AND reason = 'importado' AND note IS NULL").run(cu.id) } finally { for (const t of trg) db.exec(t.sql) }
+      replaced++
+    }
+    db.prepare("INSERT INTO loyalty_ledger (id, business_id, customer_id, delta, reason, note, ext_ref, created_by, created_at) VALUES (?,?,?,?,'importado',?,?,?,?)").run(newId(), u.business_id, cu.id, r.stamps, note, ref, u.id, at)
+    return { status: 'creado', ...(created ? { message: 'Cliente nuevo' } : {}) }
+  }, db)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'importacion.historial_sellos', newValue: { ...summary(results), saldosReemplazados: replaced } })
+  return c.json({ results, ...summary(results) })
+})
+
 const supplierRow = z.object({ name: z.string().trim().min(2, 'Falta el nombre').max(100), phone: z.string().trim().max(30).optional().nullable(), notes: z.string().max(1000).optional().nullable() })
 
 importer.post('/import/suppliers', ownerOnly, async (c) => {

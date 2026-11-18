@@ -1405,6 +1405,8 @@ const MIGRATIONS: Migration[] = [
   `ALTER TABLE campaigns ADD COLUMN ends_at TEXT;`,
   // Ajustes de sellos con motivo (correcciones del dueño).
   `ALTER TABLE loyalty_ledger ADD COLUMN note TEXT;`,
+  // Folio del sello en el sistema anterior (para importar el historial sin duplicar).
+  `ALTER TABLE loyalty_ledger ADD COLUMN ext_ref TEXT;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */
