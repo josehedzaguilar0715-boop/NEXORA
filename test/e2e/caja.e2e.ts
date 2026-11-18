@@ -176,7 +176,7 @@ try {
   check(true, 'ferretería: cotización guardada')
   page.removeAllListeners('dialog')
   page.on('dialog', (d: any) => void d.accept('transferencia'))
-  await page.getByRole('button', { name: 'Vender' }).click()
+  await page.locator('main').getByRole('button', { name: 'Vender' }).click()
   await page.getByText(/Vendida: folio 3/).waitFor()
   check(true, 'ferretería: la cotización se convierte en venta')
   await page.screenshot({ path: `${shots}/7-cotizaciones.png` })
