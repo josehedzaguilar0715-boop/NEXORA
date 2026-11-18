@@ -111,7 +111,7 @@ function businessView(db: Deps['db'], b: BusinessRow, now: Date = new Date()) {
     id: b.id, code: b.code, name: b.name, giro: (b as BusinessRow & { giro: string }).giro, giros: businessGiros(db, b.id), status: b.status, owner, createdAt: b.created_at,
     trialDays: b.trial_days, trialEndsAt: b.trial_ends_at, paidUntil: b.paid_until, overdueSince: b.overdue_since, overdueDays,
     suspendedReason: b.suspended_reason,
-    plan: cfg, pendingPlan: b.pending_plan ? JSON.parse(b.pending_plan) : null, monthlyFee: monthlyFee(cfg), limits: limits(cfg),
+    free: !!b.free, plan: cfg, pendingPlan: b.pending_plan ? JSON.parse(b.pending_plan) : null, monthlyFee: b.free ? 0 : monthlyFee(cfg), limits: limits(cfg),
     usage: { users, branches }, unreadTickets: unread, addons: JSON.parse((db.prepare('SELECT addons FROM businesses WHERE id = ?').get(b.id) as { addons: string }).addons),
     oneTimeCharges: db.prepare('SELECT concept, amount, created_at AS createdAt FROM one_time_charges WHERE business_id = ? ORDER BY created_at').all(b.id),
   }
@@ -128,7 +128,7 @@ admin.get('/admin/businesses', (c) => {
   const ids = db.prepare('SELECT id FROM businesses ORDER BY created_at DESC').all() as { id: string }[]
   const list = ids.map(({ id }) => businessView(db, refreshStatus(db, now, id), now()))
   const status = c.req.query('status')
-  return c.json({ businesses: status ? list.filter((b) => b.status === status) : list })
+  return c.json({ businesses: status === 'gratis' ? list.filter((b) => b.free) : status ? list.filter((b) => b.status === status && !b.free) : list })
 })
 
 admin.get('/admin/businesses/:id', (c) => c.json({ business: businessView(c.get('deps').db, loadBusiness(c), c.get('deps').now()) }))
@@ -141,7 +141,7 @@ admin.post('/admin/businesses', async (c) => {
     z.object({
       businessName: z.string().trim().min(2).max(100), ownerName: z.string().trim().min(2).max(100), phone: z.string(), tempPassword: z.string(),
       trialDays: z.number().int().min(0).max(365).optional(), plan: z.enum(PLAN_KEYS).optional(), giro: z.enum(GIROS).optional(),
-      extraGiros: z.array(z.enum(GIROS)).max(GIROS.length).optional(),
+      extraGiros: z.array(z.enum(GIROS)).max(GIROS.length).optional(), free: z.boolean().optional(),
     }),
     await body(c),
   )
@@ -157,12 +157,13 @@ admin.post('/admin/businesses', async (c) => {
     db.prepare('INSERT INTO businesses (id, code, name, phone, trial_days, trial_ends_at, plan, giro, extra_giros, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
       bizId, code, d.businessName, phone, trialDays, iso(new Date(t.getTime() + trialDays * 86_400_000)), d.plan ?? 'inicial', giro, JSON.stringify([...new Set(d.extraGiros ?? [])].filter((g) => g !== giro)), iso(t),
     )
+    if (d.free) db.prepare("UPDATE businesses SET free = 1, status = 'activo' WHERE id = ?").run(bizId)
     db.prepare('INSERT INTO branches (id, business_id, name, created_at) VALUES (?,?,?,?)').run(branchId, bizId, 'Principal', iso(t))
     // El teléfono lo verificó el super panel; el dueño cambia la contraseña temporal al entrar.
     db.prepare(
       "INSERT INTO users (id, business_id, branch_id, role, name, phone, phone_verified, password_hash, must_change_password, created_at) VALUES (?,?,?,'owner',?,?,1,?,1,?)",
     ).run(ownerId, bizId, branchId, d.ownerName, phone, hashSecret(d.tempPassword), iso(t))
-    audit(db, now, { businessId: bizId, userId: a.id, action: 'negocio.alta_asistida', entity: 'business', entityId: bizId, newValue: { name: d.businessName, trialDays } })
+    audit(db, now, { businessId: bizId, userId: a.id, action: 'negocio.alta_asistida', entity: 'business', entityId: bizId, newValue: { name: d.businessName, trialDays, free: !!d.free } })
   })()
   return c.json({ business: businessView(db, refreshStatus(db, now, bizId)) }, 201)
 })
@@ -220,6 +221,7 @@ admin.post('/admin/businesses/:id/payments', async (c) => {
   const a = c.get('admin')
   const b = loadBusiness(c)
   const d = parse(z.object({ months: z.number().int().min(1).max(24), amount: z.number().int().min(0).optional(), note: z.string().max(300).optional() }), await body(c))
+  if (b.free) throw conflict('Este negocio es gratis. Para cobrarle, primero cámbialo a «Cobrar mensualidad».', 'cuenta_gratis')
   const t = iso(now())
   const pending = b.pending_plan ? (JSON.parse(b.pending_plan) as { plan: Plan; extraBranches: number; extraUserPacks: number }) : null
   const cfg = pending ?? { plan: b.plan, extraBranches: b.extra_branches, extraUserPacks: b.extra_user_packs }
@@ -279,6 +281,22 @@ admin.post('/admin/businesses/:id/users/:userId/reset-password', async (c) => {
   forgetDevices(c.get('deps'), u.id)
   audit(db, now, { businessId: b.id, userId: a.id, action: 'admin.restablecer_acceso', entity: 'user', entityId: u.id, reason: d.reason })
   return c.json({ ok: true })
+})
+
+/** Gratis o con mensualidad. Al quitar lo gratis, el negocio tiene unos días (por defecto 30) para hacer su primer pago. */
+admin.post('/admin/businesses/:id/free', async (c) => {
+  const { db, now } = c.get('deps')
+  const b = loadBusiness(c)
+  const d = parse(z.object({ free: z.boolean(), reason: z.string().trim().min(3).max(300), graceDays: z.number().int().min(0).max(365).optional() }), await body(c))
+  if (!!b.free === d.free) throw conflict(d.free ? 'Ya es gratis.' : 'Ya paga mensualidad.')
+  if (d.free) {
+    db.prepare("UPDATE businesses SET free = 1, status = 'activo', paid_until = NULL, overdue_since = NULL, suspended_reason = NULL WHERE id = ?").run(b.id)
+  } else {
+    const until = new Date(now().getTime() + (d.graceDays ?? 30) * 86_400_000)
+    db.prepare("UPDATE businesses SET free = 0, status = 'activo', paid_until = ?, overdue_since = NULL WHERE id = ?").run(iso(until), b.id)
+  }
+  audit(db, now, { businessId: b.id, userId: c.get('admin').id, action: d.free ? 'admin.cuenta_gratis' : 'admin.cuenta_con_mensualidad', entity: 'business', entityId: b.id, oldValue: { status: b.status, paidUntil: b.paid_until }, reason: d.reason })
+  return c.json({ business: businessView(db, refreshStatus(db, now, b.id), now()) })
 })
 
 /** Empezar de cero: borrar las ventas y movimientos de prueba de una cuenta asistida (se escribe BORRAR y un motivo). */

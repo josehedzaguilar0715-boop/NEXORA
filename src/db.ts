@@ -1369,6 +1369,8 @@ const MIGRATIONS: Migration[] = [
   ALTER TABLE loyalty_program_new RENAME TO loyalty_program;
   `,
   },
+  // Cuentas gratis (cortesía): no vencen ni pagan mensualidad. Las elige el super panel.
+  `ALTER TABLE businesses ADD COLUMN free INTEGER NOT NULL DEFAULT 0;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

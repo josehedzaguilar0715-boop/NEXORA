@@ -70,25 +70,28 @@ function Negocios() {
   return (
     <div className="grid2">
       <section className="card">
-        <div className="tabs">{['', 'prueba', 'activo', 'vencido', 'suspendido'].map((s) => <button key={s} className={filter === s ? 'on' : ''} onClick={() => setFilter(s)}>{s ? STATUS[s] : 'Todos'}</button>)}</div>
+        <div className="tabs">{['', 'prueba', 'activo', 'vencido', 'suspendido', 'gratis'].map((s) => <button key={s} className={filter === s ? 'on' : ''} onClick={() => setFilter(s)}>{s === 'gratis' ? 'Gratis' : s ? STATUS[s] : 'Todos'}</button>)}</div>
         <div className="table-wrap"><table className="list"><tbody>{list.map((b) => (
           <tr key={b.id} onClick={() => setSel(b)} style={{ cursor: 'pointer' }}>
             <td><b>{b.name}</b> <small className="muted">{b.code} · {(b.giros ?? [b.giro]).map(giroLabel).join(' + ')}</small><br /><small className="muted">{b.owner?.name} · {b.owner?.phone}{b.unreadTickets ? ` · ✉ ${b.unreadTickets}` : ''}</small></td>
-            <td style={{ color: COLOR[b.status], fontWeight: 700 }}>{STATUS[b.status]}{b.overdueDays != null ? ` (${b.overdueDays} d)` : ''}</td>
-            <td className="num">{mxn(b.monthlyFee)}</td>
+            <td style={{ color: b.free ? 'var(--cyan)' : COLOR[b.status], fontWeight: 700 }}>{b.free ? 'Gratis' : STATUS[b.status]}{!b.free && b.overdueDays != null ? ` (${b.overdueDays} d)` : ''}</td>
+            <td className="num">{b.free ? '—' : mxn(b.monthlyFee)}</td>
           </tr>
         ))}</tbody></table></div>
       </section>
       {sel && (
         <section className="card">
           <h2>{sel.name}</h2>
-          <p className="muted">{STATUS[sel.status]} · {sel.status === 'prueba' ? `prueba hasta ${sel.trialEndsAt?.slice(0, 10)}` : sel.paidUntil ? `pagado hasta ${sel.paidUntil.slice(0, 10)}` : ''}</p>
-          <p>Plan {sel.plan.plan} · {sel.plan.extraBranches} sucursales extra · {sel.plan.extraUserPacks} paquetes de usuarios · <b>{mxn(sel.monthlyFee)}/mes</b></p>
+          <p className="muted">{sel.free ? 'Gratis: no paga mensualidad y no vence' : `${STATUS[sel.status]} · ${sel.status === 'prueba' ? `prueba hasta ${sel.trialEndsAt?.slice(0, 10)}` : sel.paidUntil ? `pagado hasta ${sel.paidUntil.slice(0, 10)}` : ''}`}</p>
+          <p>Plan {sel.plan.plan} · {sel.plan.extraBranches} sucursales extra · {sel.plan.extraUserPacks} paquetes de usuarios · <b>{sel.free ? 'Gratis' : `${mxn(sel.monthlyFee)}/mes`}</b></p>
           <p className="muted">Uso: {sel.usage.users}/{sel.limits.users} usuarios · {sel.usage.branches}/{sel.limits.branches} sucursales{sel.pendingPlan ? ` · cambio pendiente: ${sel.pendingPlan.plan}` : ''}</p>
           {msg.err && <p className="error">{msg.err}</p>}
           {msg.ok && <p className="okmsg">{msg.ok}</p>}
           <div className="pay">
-            <button className="primary big" onClick={() => { const m = Number(prompt('¿Cuántos meses pagó?', '1')); if (m) void run(() => adm('POST', `/admin/businesses/${sel.id}/payments`, { months: m }), 'Pago registrado: el negocio queda activo.')() }}>Registrar pago</button>
+            {!sel.free && <button className="primary big" onClick={() => { const m = Number(prompt('¿Cuántos meses pagó?', '1')); if (m) void run(() => adm('POST', `/admin/businesses/${sel.id}/payments`, { months: m }), 'Pago registrado: el negocio queda activo.')() }}>Registrar pago</button>}
+            {sel.free
+              ? <button className="big" onClick={() => { const g = prompt('Desde hoy pagará mensualidad. ¿Cuántos días le das para su primer pago?', '30'); if (g === null) return; const r = prompt('Motivo:', 'Termina la cortesía'); if (r) void run(() => adm('POST', `/admin/businesses/${sel.id}/free`, { free: false, reason: r, graceDays: Number(g) || 0 }), 'Listo: ahora paga mensualidad.')() }}>Cobrar mensualidad</button>
+              : <button className="big" onClick={() => { const r = prompt(`${sel.name} usará el sistema gratis, sin mensualidad ni vencimiento. Motivo:`, 'Cortesía'); if (r) void run(() => adm('POST', `/admin/businesses/${sel.id}/free`, { free: true, reason: r }), 'Listo: este negocio usa el sistema gratis.')() }}>Hacer gratis</button>}
             {['prueba', 'vencido'].includes(sel.status) && !sel.paidUntil && <button className="big" onClick={() => { const d = Number(prompt('Días de prueba (desde el alta):', String(sel.trialDays ?? 14))); if (d >= 0) void run(() => adm('PATCH', `/admin/businesses/${sel.id}`, { trialDays: d }), 'Días de prueba cambiados.')() }}>Días de prueba</button>}
             <button className="danger" onClick={() => { if (prompt(`Esto borra TODAS las ventas y movimientos de ${sel.name}. Escribe BORRAR para confirmar:`)?.trim().toUpperCase() !== 'BORRAR') return; const r = prompt('Motivo (ej. terminó la demostración):'); if (r) void run(async () => { const x = await adm('POST', `/admin/businesses/${sel.id}/reset-demo`, { confirm: 'BORRAR', reason: r }); return x }, 'Listo: datos de prueba borrados. El negocio empieza de cero.')() }}>Borrar datos de prueba</button>
             {sel.status === 'vencido' && <button className="danger big" onClick={() => { const r = prompt('Motivo de la suspensión:'); if (r) void run(() => adm('POST', `/admin/businesses/${sel.id}/suspend`, { reason: r }), 'Suspendido. Sus datos quedan intactos.')() }}>Suspender</button>}
@@ -173,7 +176,7 @@ function Giros({ b, onSave }: { b: any; onSave: (body: { giro: string; extraGiro
 }
 
 function Alta({ onDone }: { onDone: () => void }) {
-  const [f, setF] = useState({ businessName: '', ownerName: '', phone: '', tempPassword: '', trialDays: '', giro: 'abarrotes', extraGiros: [] as string[] })
+  const [f, setF] = useState({ businessName: '', ownerName: '', phone: '', tempPassword: '', trialDays: '', giro: 'abarrotes', extraGiros: [] as string[], free: false })
   const [err, setErr] = useState('')
   const [done, setDone] = useState<any>(null)
   if (done) return <div className="card login"><h2>Negocio creado</h2><p>Entrégale al dueño: teléfono <b>{f.phone}</b>, contraseña temporal <b>{f.tempPassword}</b>. Sus empleados entrarán con el usuario y la contraseña que el dueño les cree.</p><button className="primary" onClick={onDone}>Listo</button></div>
@@ -187,7 +190,8 @@ function Alta({ onDone }: { onDone: () => void }) {
       <label>Nombre del dueño<input value={f.ownerName} onChange={(e) => setF({ ...f, ownerName: e.target.value })} /></label>
       <label>Teléfono del dueño<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
       <label>Contraseña temporal<input value={f.tempPassword} onChange={(e) => setF({ ...f, tempPassword: e.target.value })} /></label>
-      <label>Días de prueba (vacío = el valor por defecto)<input inputMode="numeric" value={f.trialDays} onChange={(e) => setF({ ...f, trialDays: e.target.value })} /></label>
+      <label className="check"><input type="checkbox" checked={f.free} onChange={(e) => setF({ ...f, free: e.target.checked })} />Gratis (sin mensualidad ni vencimiento)</label>
+      {!f.free && <label>Días de prueba (vacío = el valor por defecto)<input inputMode="numeric" value={f.trialDays} onChange={(e) => setF({ ...f, trialDays: e.target.value })} /></label>}
       {err && <p className="error">{err}</p>}
       <p><button className="primary big" style={{ width: '100%' }} onClick={async () => { try { const r = await adm('POST', '/admin/businesses', { ...f, trialDays: f.trialDays ? Number(f.trialDays) : undefined }); setDone(r.business) } catch (e) { setErr((e as Error).message) } }}>Crear negocio</button></p>
     </div>

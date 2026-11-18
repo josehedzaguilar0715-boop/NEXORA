@@ -27,6 +27,7 @@ export interface BusinessRow {
   id: string; code: string; name: string; phone: string | null; status: 'prueba' | 'activo' | 'vencido' | 'suspendido'
   trial_days: number | null; trial_ends_at: string | null; paid_until: string | null; overdue_since: string | null
   suspended_reason: string | null; plan: Plan; extra_branches: number; extra_user_packs: number; pending_plan: string | null; created_at: string
+  free?: number
 }
 
 export function setting(db: Db, key: string): number {
@@ -40,7 +41,8 @@ export function setting(db: Db, key: string): number {
 export function refreshStatus(db: Db, now: Clock, businessId: string): BusinessRow {
   const b = db.prepare('SELECT * FROM businesses WHERE id = ?').get(businessId) as BusinessRow
   const t = iso(now())
-  const endsAt = b.status === 'prueba' ? b.trial_ends_at : b.status === 'activo' ? b.paid_until : null
+  // Las cuentas gratis no vencen.
+  const endsAt = b.free ? null : b.status === 'prueba' ? b.trial_ends_at : b.status === 'activo' ? b.paid_until : null
   if (endsAt && endsAt <= t) {
     db.prepare("UPDATE businesses SET status = 'vencido', overdue_since = ? WHERE id = ?").run(endsAt, b.id)
     audit(db, now, { businessId: b.id, userId: null, action: 'negocio.vencido', entity: 'business', entityId: b.id, oldValue: { status: b.status }, newValue: { status: 'vencido', desde: endsAt } })
