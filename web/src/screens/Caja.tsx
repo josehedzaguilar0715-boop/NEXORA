@@ -8,6 +8,8 @@ export interface Product {
   presentations: { id: string; name: string; factorMilli: number; price: number; barcode: string | null }[]
   /** Precio de mayoreo o escalas por volumen (desde cierta cantidad). */
   tiers?: { minQuantity: number; price: number }[]
+  /** A granel por pieza: se compra por bolsa/caja de `size` piezas. */
+  pack?: { name: string; size: number } | null
 }
 export interface Service { id: string; name: string; price: number; category: string | null; durationMin: number | null; machineId: string | null; active: boolean }
 interface Line { key: string; serviceId?: string; productId?: string; presentationId?: string; name: string; quantity: number; amount?: number; unitPrice: number; total: number; unit: string; free?: boolean; tiers?: { minQuantity: number; price: number }[] }

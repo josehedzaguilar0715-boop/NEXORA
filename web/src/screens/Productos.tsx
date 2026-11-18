@@ -6,7 +6,17 @@ import { Sheet } from '../Sheet'
 import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
 
-type P = Product & { combo?: { productId: string; name: string; quantity: number }[]; tiers?: { minQuantity: number; price: number }[]; attrs?: Record<string, any>; sellable?: boolean; minStock: number; lastCost: number; suggestedPrice: number | null; categoryId: string | null; version: number; active?: boolean; trackStock?: boolean; trackExpiry?: boolean }
+type P = Product & { combo?: { productId: string; name: string; quantity: number }[]; tiers?: { minQuantity: number; price: number }[]; attrs?: Record<string, any>; sellable?: boolean; minStock: number; lastCost: number; suggestedPrice: number | null; categoryId: string | null; version: number; active?: boolean; trackStock?: boolean; trackExpiry?: boolean; pack?: { name: string; size: number } | null }
+
+/** Nombres comunes de cómo llega la mercancía que se vende suelta. */
+const PACKS = ['Bolsa', 'Caja', 'Paquete', 'Tira', 'Exhibidor', 'Frasco', 'Costal', 'Rollo']
+export const packWord = (name: string, n: number) => (n === 1 ? name.toLowerCase() : `${name.toLowerCase()}${/[aeiou]$/i.test(name) ? 's' : 'es'}`)
+/** «2 cajas y 90 pzas» para mostrar la existencia en paquetes completos. */
+export const inPacks = (stock: number, pack: { name: string; size: number } | null | undefined) => {
+  if (!pack || stock < pack.size) return ''
+  const full = Math.floor(stock / pack.size), rest = Math.round(stock - full * pack.size)
+  return `${full} ${packWord(pack.name, full)}${rest ? ` y ${rest} pzas` : ''}`
+}
 
 const UNIT: Record<string, string> = { pieza: 'pieza', kg: 'kg', litro: 'litro', metro: 'metro' }
 const FOOD = ['palapa', 'restaurante', 'taqueria', 'comedor']
@@ -69,7 +79,7 @@ export function Productos({ me }: { me: Me }) {
                   <tr key={p.id} className="clickable" onClick={() => setEdit({ p })}>
                     <td><b>{p.name}</b><br /><small className="muted">{[catName(p.categoryId), p.barcode ?? 'sin código', UNIT[p.unit] ?? p.unit].filter(Boolean).join(' · ')}{p.sellable === false ? ' · uso interno' : ''}</small></td>
                     <td className="num">{mxn(p.price)}{p.tiers?.length ? <><br /><small className="muted">mayoreo {mxn(p.tiers[0]!.price)} desde {p.tiers[0]!.minQuantity}</small></> : null}</td>
-                    <td className="num">{p.trackStock === false ? <span className="muted">receta</span> : <span className={low ? 'pill bad' : 'pill'}>{p.stock ?? 0}</span>}{(p as P & { reserved?: number }).reserved ? <><br /><small className="muted">{(p as P & { reserved?: number }).reserved} apartados</small></> : null}{expIds.has(p.id) && <><br /><small className="neg">por caducar</small></>}</td>
+                    <td className="num">{p.trackStock === false ? <span className="muted">receta</span> : <span className={low ? 'pill bad' : 'pill'}>{p.stock ?? 0}</span>}{inPacks(p.stock ?? 0, (p as P).pack) && <><br /><small className="muted">{inPacks(p.stock ?? 0, (p as P).pack)}</small></>}{(p as P & { reserved?: number }).reserved ? <><br /><small className="muted">{(p as P & { reserved?: number }).reserved} apartados</small></> : null}{expIds.has(p.id) && <><br /><small className="neg">por caducar</small></>}</td>
                     <td className="num hide-sm">{p.lastCost ? mxn(Math.round(p.lastCost)) : '—'}</td>
                     <td className="num row-actions">
                       {canStock && p.active !== false && p.trackStock !== false && <button className="mini" onClick={(e) => { e.stopPropagation(); setEdit({ p, tab: 'existencia' }) }}>+ Agregar</button>}
@@ -129,6 +139,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
     name: p?.name ?? '', barcode: p?.barcode ?? '', unit: p?.unit ?? 'pieza', price: p ? String(p.price / 100) : '', minStock: String(p?.minStock ?? 0), categoryId: p?.categoryId ?? '',
     authCode: '', brand: p?.attrs?.brand ?? '', fragrance: p?.attrs?.fragrance ?? '', sizeMl: p?.attrs?.sizeMl ? String(p.attrs.sizeMl) : '', presentation: p?.attrs?.presentation ?? 'regular',
     trackStock: p ? p.trackStock !== false : true, trackExpiry: !!p?.trackExpiry, stock: '', cost: p?.lastCost ? String(Math.round(p.lastCost) / 100) : '', margin: (p as any)?.marginBp != null ? String((p as any).marginBp / 100) : '',
+    packOn: !!p?.pack, packName: p?.pack?.name ?? 'Bolsa', packSize: p?.pack ? String(p.pack.size) : '', packCost: p?.pack && p.lastCost ? String(Math.round(p.lastCost * p.pack.size) / 100) : '',
     wholesale: p?.tiers?.length === 1 ? String(p.tiers[0]!.price / 100) : '', wholesaleMin: p?.tiers?.length === 1 ? String(p.tiers[0]!.minQuantity) : '',
   })
   const multiTier = (p?.tiers?.length ?? 0) > 1
@@ -142,6 +153,10 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
       if (!f.name.trim()) throw new Error('Escribe el nombre del producto.')
       if (f.price.trim() === '' || Number.isNaN(toCents(f.price))) throw new Error('Escribe el precio de venta.')
       const common = { name: f.name, barcode: f.barcode || null, price: toCents(f.price), minStock: Number(f.minStock) || 0, categoryId: f.categoryId || null, trackExpiry: f.trackExpiry, ...(attrs ? { attrs } : {}), ...(f.trackStock && f.cost.trim() !== '' ? { cost: toCents(f.cost) } : {}), marginBp: f.margin.trim() === '' ? null : Math.round(Number(f.margin) * 100) }
+      const packSize = Math.round(Number(f.packSize))
+      if (f.packOn && f.unit === 'pieza' && !(packSize >= 2)) throw new Error(`Escribe cuántas piezas trae cada ${f.packName.toLowerCase()} (2 o más).`)
+      const pack = f.packOn && f.unit === 'pieza' ? { name: f.packName, size: packSize } : null
+      Object.assign(common, p ? (JSON.stringify(pack) !== JSON.stringify(p.pack ?? null) ? { pack } : {}) : pack ? { pack } : {})
       const wantTier = f.wholesale.trim() !== '' || f.wholesaleMin.trim() !== ''
       if (wantTier && (!(toCents(f.wholesale) > 0) || !(Number(f.wholesaleMin) > 1))) throw new Error('Para el mayoreo escribe el precio y desde cuántas piezas aplica (2 o más).')
       if (wantTier && toCents(f.wholesale) >= toCents(f.price)) throw new Error('El precio de mayoreo debe ser menor que el de menudeo.')
@@ -198,6 +213,20 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
           <ProfitLine price={toCents(f.price)} cost={toCents(f.cost)} margin={Number(f.margin)} onUse={canEdit ? (v) => setF({ ...f, price: String(v / 100) }) : undefined} />
         </div>
       ) : <p className="muted small">El costo de este platillo sale de su receta (pestaña «Receta»).</p>}
+      {f.trackStock && f.unit === 'pieza' && (
+        <div className="pack-box">
+          <label className="check"><input type="checkbox" checked={f.packOn} onChange={(e) => setF({ ...f, packOn: e.target.checked })} disabled={!canEdit} />A granel: lo compro por bolsa, caja o paquete y lo vendo por pieza</label>
+          {f.packOn && (<>
+            <div className="row">
+              <label>Lo compro por<select value={f.packName} onChange={set('packName')} disabled={!canEdit}>{PACKS.map((x) => <option key={x}>{x}</option>)}</select></label>
+              <label>Piezas que trae<input inputMode="numeric" value={f.packSize} onChange={set('packSize')} placeholder="Ej. 100" disabled={!canEdit} /></label>
+              <label>Costo por {f.packName.toLowerCase()} (opcional)<input inputMode="decimal" value={f.packCost} placeholder="$0.00" disabled={!canEdit}
+                onChange={(e) => { const v = e.target.value; const n = Number(f.packSize); setF({ ...f, packCost: v, ...(n >= 1 && toCents(v) > 0 ? { cost: String(Math.round(toCents(v) / n) / 100) } : {}) }) }} /></label>
+            </div>
+            {Number(f.packSize) >= 2 && <p className="muted small">Al recibir mercancía capturas el número de {packWord(f.packName, 2)} y el sistema suma {f.packSize} piezas por cada una.{toCents(f.packCost) > 0 ? ` Cada pieza te cuesta ${mxn(Math.round(toCents(f.packCost) / Number(f.packSize)))}.` : ''}{toCents(f.price) > 0 ? ` Al vender las ${f.packSize} piezas juntas ${mxn(toCents(f.price) * Number(f.packSize))}.` : ''}</p>}
+          </>)}
+        </div>
+      )}
       {multiTier ? <p className="muted small">Tiene {p!.tiers!.length} precios por volumen; se editan en «Precio por volumen».</p> : (
         <div className="row">
           <label>Precio de mayoreo (opcional)<input inputMode="decimal" value={f.wholesale} onChange={set('wholesale')} placeholder="$0.00" disabled={!canEdit} /></label>
@@ -232,42 +261,56 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
 /** Existencia: agregar mercancía (compra o inventario que ya tenía), ajustar al conteo físico y mermas. */
 function Existencia({ p, onSaved }: { p: P; onSaved: () => void }) {
   const [mode, setMode] = useState<'agregar' | 'ajustar' | 'merma'>('agregar')
-  const [f, setF] = useState({ qty: '', bought: true, unitCost: p.lastCost ? String(Math.round(p.lastCost) / 100) : '', fromCash: false, expiresAt: '', counted: '', reason: '' })
+  const [f, setF] = useState({ qty: '', bought: true, unitCost: p.lastCost ? String(Math.round(p.lastCost * (p.pack?.size ?? 1)) / 100) : '', fromCash: false, expiresAt: '', counted: '', reason: '' })
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const [stock, setStock] = useState<number>(p.stock ?? 0)
+  // A granel por pieza: se captura en bolsas/cajas y se convierte a piezas.
+  const pack = p.pack ?? null
+  const [byPack, setByPack] = useState(!!pack)
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   const refresh = async () => setStock((await api<{ product: P }>('GET', `/products/${p.id}`)).product.stock ?? 0)
   const go = async (fn: () => Promise<unknown>, ok: string) => { try { await fn(); await refresh(); setF({ ...f, qty: '', counted: '', reason: '' }); setMsg({ ok }); onSaved() } catch (e) { setMsg({ err: (e as Error).message }) } }
   const qty = Number(f.qty)
+  const usePack = !!pack && byPack
+  const pieces = usePack ? qty * pack!.size : qty
+  const lineCost = Math.round(qty * toCents(f.unitCost))
+  const unitLabel = usePack ? pack!.name.toLowerCase() : UNIT[p.unit] ?? 'unidad'
   return (
     <div>
-      <div className="info-row" style={{ marginTop: 0 }}><span className="muted">Hay ahora</span><b>{stock} {UNIT[p.unit] ?? p.unit}{stock === 1 || p.unit !== 'pieza' ? '' : 's'}</b></div>
+      <div className="info-row" style={{ marginTop: 0 }}><span className="muted">Hay ahora</span><b>{stock} {UNIT[p.unit] ?? p.unit}{stock === 1 || p.unit !== 'pieza' ? '' : 's'}{inPacks(stock, pack) ? ` · ${inPacks(stock, pack)}` : ''}</b></div>
       <div className="tabs" style={{ marginTop: 12 }}>
         <button className={mode === 'agregar' ? 'on' : ''} onClick={() => setMode('agregar')}>Agregar</button>
         <button className={mode === 'ajustar' ? 'on' : ''} onClick={() => setMode('ajustar')}>Ajustar al conteo</button>
         <button className={mode === 'merma' ? 'on' : ''} onClick={() => setMode('merma')}>{p.sellable === false ? 'Usar (tester o muestra)' : 'Merma'}</button>
       </div>
       {mode === 'agregar' && (<>
-        <label>¿Cuánto agregas?<input inputMode="decimal" value={f.qty} onChange={set('qty')} autoFocus placeholder="Ej. 24" /></label>
+        {pack && (
+          <div className="tabs">
+            <button className={byPack ? 'on' : ''} onClick={() => { setByPack(true); setF({ ...f, unitCost: p.lastCost ? String(Math.round(p.lastCost * pack.size) / 100) : '' }) }}>Por {pack.name.toLowerCase()} ({pack.size} pzas)</button>
+            <button className={!byPack ? 'on' : ''} onClick={() => { setByPack(false); setF({ ...f, unitCost: p.lastCost ? String(Math.round(p.lastCost) / 100) : '' }) }}>Por pieza</button>
+          </div>
+        )}
+        <label>{usePack ? `Número de ${packWord(pack!.name, 2)} que llegaron` : '¿Cuánto agregas?'}<input inputMode="decimal" value={f.qty} onChange={set('qty')} autoFocus placeholder={usePack ? 'Ej. 3' : 'Ej. 24'} /></label>
+        {usePack && qty > 0 && <p className="muted small">= <b>{pieces} piezas</b> que se venden sueltas.</p>}
         <div className="tabs">
           <button className={f.bought ? 'on' : ''} onClick={() => setF({ ...f, bought: true })}>La compré ahora</button>
           <button className={!f.bought ? 'on' : ''} onClick={() => setF({ ...f, bought: false })}>Ya la tenía</button>
         </div>
         {f.bought ? (<>
           <div className="row">
-            <label>Costo por {UNIT[p.unit] ?? 'unidad'}<input inputMode="decimal" value={f.unitCost} onChange={set('unitCost')} placeholder="$0.00" /></label>
+            <label>Costo por {unitLabel}<input inputMode="decimal" value={f.unitCost} onChange={set('unitCost')} placeholder="$0.00" /></label>
             {p.trackExpiry && <label>Caduca el<input type="date" value={f.expiresAt} onChange={set('expiresAt')} /></label>}
           </div>
-          {qty > 0 && toCents(f.unitCost) > 0 && <p className="muted small">Total de la compra: <b>{mxn(Math.round(qty * toCents(f.unitCost)))}</b>. Se registra como compra pagada.</p>}
+          {qty > 0 && toCents(f.unitCost) > 0 && <p className="muted small">Total de la compra: <b>{mxn(lineCost)}</b>{usePack ? ` · cada pieza te cuesta ${mxn(Math.round(lineCost / pieces))}` : ''}. Se registra como compra pagada.</p>}
           <label className="check"><input type="checkbox" checked={f.fromCash} onChange={(e) => setF({ ...f, fromCash: e.target.checked })} />La pagué con dinero de la caja abierta</label>
         </>) : (<>
           <p className="muted small">Se suma a la existencia sin registrar gasto (por ejemplo, el inventario con el que empiezas).</p>
-          <label>Costo por {UNIT[p.unit] ?? 'unidad'} (opcional, para valuar el inventario)<input inputMode="decimal" value={f.unitCost} onChange={set('unitCost')} placeholder="$0.00" /></label>
+          <label>Costo por {unitLabel} (opcional, para valuar el inventario)<input inputMode="decimal" value={f.unitCost} onChange={set('unitCost')} placeholder="$0.00" /></label>
         </>)}
         {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
-        <p><button className="primary" disabled={!(qty > 0) || (f.bought && !(toCents(f.unitCost) >= 0 && f.unitCost.trim()))} onClick={() => go(() => f.bought
-          ? api('POST', '/purchases', { payment: 'contado', paidFromCash: f.fromCash, items: [{ productId: p.id, quantity: qty, cost: Math.round(qty * toCents(f.unitCost)), ...(f.expiresAt ? { expiresAt: f.expiresAt } : {}) }] })
-          : api('POST', '/inventory/count', { productId: p.id, counted: stock + qty, reason: 'Mercancía agregada (ya la tenía)', ...(f.unitCost.trim() ? { unitCost: toCents(f.unitCost) } : {}) }), `Listo: se agregaron ${qty}.`)}>Agregar a la existencia</button></p>
+        <p><button className="primary" disabled={!(qty > 0) || (usePack && !Number.isInteger(qty)) || (f.bought && !(toCents(f.unitCost) >= 0 && f.unitCost.trim()))} onClick={() => go(() => f.bought
+          ? api('POST', '/purchases', { payment: 'contado', paidFromCash: f.fromCash, items: [{ productId: p.id, ...(usePack ? { packs: qty } : { quantity: qty }), cost: lineCost, ...(f.expiresAt ? { expiresAt: f.expiresAt } : {}) }] })
+          : api('POST', '/inventory/count', { productId: p.id, counted: stock + pieces, reason: usePack ? `Mercancía agregada: ${qty} ${packWord(pack!.name, qty)} (ya la tenía)` : 'Mercancía agregada (ya la tenía)', ...(f.unitCost.trim() ? { unitCost: usePack ? Math.round(toCents(f.unitCost) / pack!.size) : toCents(f.unitCost) } : {}) }), `Listo: se agregaron ${pieces}${usePack ? ' piezas' : ''}.`)}>Agregar a la existencia</button></p>
       </>)}
       {mode === 'ajustar' && (<>
         <p className="muted small">Cuenta lo que hay físicamente y escríbelo. La diferencia queda en la bitácora con el motivo.</p>

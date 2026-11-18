@@ -1435,6 +1435,9 @@ const MIGRATIONS: Migration[] = [
   CREATE INDEX push_subscriptions_user ON push_subscriptions(user_id);
   CREATE TABLE app_keys (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `,
+  // A granel por pieza: se compra por bolsa, caja o paquete y se vende suelto (chicles, caramelos, cigarros…).
+  `ALTER TABLE products ADD COLUMN pack_name TEXT;
+  ALTER TABLE products ADD COLUMN pack_size INTEGER;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

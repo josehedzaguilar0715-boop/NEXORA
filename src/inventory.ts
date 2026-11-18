@@ -14,6 +14,7 @@ export interface ProductRow {
   id: string; business_id: string; name: string; category_id: string | null; barcode: string | null; unit: 'pieza' | 'kg' | 'metro' | 'litro'
   price: number; margin_bp: number | null; min_stock_milli: number; track_expiry: number; last_cost: number; version: number
   updated_at: string; updated_device: string | null; active: number; sellable: number; attrs: string
+  pack_name: string | null; pack_size: number | null
 }
 export interface LotRow {
   id: string; branch_id: string; product_id: string; qty_initial_milli: number; qty_remaining_milli: number; unit_cost: number; price: number
@@ -139,6 +140,8 @@ function productView(db: Db, p: ProductRow, branchId: string | null) {
     minStock: fromMilli(p.min_stock_milli), trackExpiry: !!p.track_expiry, sellable: !!p.sellable, attrs: JSON.parse(p.attrs), trackStock: !!(p as ProductRow & { track_stock: number }).track_stock, lastCost: p.last_cost, version: p.version, updatedAt: p.updated_at, active: !!p.active,
     ...(branchId ? { price: currentPrice(db, branchId, p), stock: fromMilli(stockOf(db, branchId, p.id)), reserved: fromMilli((db.prepare("SELECT COALESCE(SUM(i.qty_milli),0) v FROM layaway_items i JOIN layaways l ON l.id = i.layaway_id WHERE l.branch_id = ? AND l.status = 'abierto' AND i.product_id = ?").get(branchId, p.id) as { v: number }).v) } : {}),
     suggestedPrice: suggestedPrice(db, p), presentations, tiers,
+    // A granel por pieza: cómo se compra (bolsa de 100, caja de 60…).
+    pack: p.pack_name && p.pack_size ? { name: p.pack_name, size: p.pack_size } : null,
     // Set o combo: lo que descuenta al venderse (perfumería, papelería).
     combo: (db.prepare('SELECT ci.product_id AS productId, x.name, ci.qty_milli FROM combo_items ci JOIN products x ON x.id = ci.product_id WHERE ci.combo_id = ?').all(p.id) as { productId: string; name: string; qty_milli: number }[]).map(({ qty_milli, ...r }) => ({ ...r, quantity: fromMilli(qty_milli) })),
   }
@@ -199,7 +202,13 @@ const productBody = z.object({
   presentations: z.array(z.object({ name: z.string().trim().min(1).max(60), factor: z.number().positive(), price: z.number().int().min(0), barcode: z.string().trim().min(3).max(50).optional() })).max(20).optional(),
   /** Costo por unidad (centavos), si no se capturó con una compra: sirve para la ganancia y el precio sugerido. */
   cost: z.number().int().min(0).optional(),
+  /** A granel por pieza: se compra por bolsa/caja/paquete de `size` piezas y se vende suelto. */
+  pack: z.object({ name: z.string().trim().min(2).max(30), size: z.number().int().min(2).max(100_000) }).nullable().optional(),
 })
+
+const checkPack = (unit: string, pack: { name: string; size: number } | null | undefined) => {
+  if (pack && unit !== 'pieza') throw bad('Comprar por bolsa o caja aplica a productos que se venden por pieza.')
+}
 
 function checkBarcode(db: Db, businessId: string, code: string | null | undefined, exceptProduct?: string) {
   if (!code) return
@@ -215,8 +224,9 @@ export function createProduct(db: Db, now: Clock, businessId: string, userId: st
   for (const pr of d.presentations ?? []) checkBarcode(db, businessId, pr.barcode)
   const id = newId()
   const t = iso(now())
-  db.prepare('INSERT INTO products (id, business_id, name, category_id, barcode, unit, price, margin_bp, min_stock_milli, track_expiry, sellable, attrs, track_stock, last_cost, updated_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
-    id, businessId, d.name, d.categoryId ?? null, d.barcode ?? null, d.unit, d.price, d.marginBp ?? null, toMilli(d.minStock ?? 0), d.trackExpiry ? 1 : 0, d.sellable === false ? 0 : 1, JSON.stringify(d.attrs ?? {}), d.trackStock === false ? 0 : 1, d.cost ?? 0, t, t,
+  checkPack(d.unit, d.pack)
+  db.prepare('INSERT INTO products (id, business_id, name, category_id, barcode, unit, price, margin_bp, min_stock_milli, track_expiry, sellable, attrs, track_stock, last_cost, pack_name, pack_size, updated_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(
+    id, businessId, d.name, d.categoryId ?? null, d.barcode ?? null, d.unit, d.price, d.marginBp ?? null, toMilli(d.minStock ?? 0), d.trackExpiry ? 1 : 0, d.sellable === false ? 0 : 1, JSON.stringify(d.attrs ?? {}), d.trackStock === false ? 0 : 1, d.cost ?? 0, d.pack?.name ?? null, d.pack?.size ?? null, t, t,
   )
   for (const pr of d.presentations ?? []) db.prepare('INSERT INTO presentations (id, product_id, name, factor_milli, price, barcode) VALUES (?,?,?,?,?,?)').run(newId(), id, pr.name, toMilli(pr.factor), pr.price, pr.barcode ?? null)
   audit(db, now, { businessId, userId, action: 'producto.alta', entity: 'product', entityId: id, newValue: d })
@@ -308,6 +318,10 @@ inventory.patch('/products/:id', requirePerm('configure_catalog'), async (c) => 
       fields.name, fields.category_id, fields.barcode, fields.price, fields.margin_bp, fields.min_stock_milli, fields.track_expiry, fields.active, fields.sellable, fields.attrs, changedAt, d.deviceId ?? null, p.id,
     )
     if (d.price !== undefined && d.price !== p.price) db.prepare('UPDATE lots SET price = ? WHERE product_id = ? AND qty_remaining_milli > 0').run(d.price, p.id)
+    if (d.pack !== undefined) {
+      checkPack(p.unit, d.pack)
+      db.prepare('UPDATE products SET pack_name = ?, pack_size = ? WHERE id = ?').run(d.pack?.name ?? null, d.pack?.size ?? null, p.id)
+    }
     if (d.cost !== undefined && d.cost !== p.last_cost) {
       db.prepare('UPDATE products SET last_cost = ? WHERE id = ?').run(d.cost, p.id)
       audit(db, now, { businessId: u.business_id, userId: u.id, action: 'producto.costo', entity: 'product', entityId: p.id, oldValue: { cost: p.last_cost }, newValue: { cost: d.cost } })
@@ -484,7 +498,9 @@ const purchaseBody = z.object({
     supplierCode: z.string().optional(),
     /** Producto nuevo capturado desde el ticket de compra. */
     newProduct: productBody.optional(),
-    quantity: z.number().positive(),
+    quantity: z.number().positive().optional(),
+    /** A granel por pieza: bolsas o cajas compradas; se convierten a piezas con lo que trae cada una. */
+    packs: z.number().int().positive().optional(),
     /** Costo total del renglón en el ticket (centavos). */
     cost: z.number().int().min(0),
     /** Precio de venta nuevo; entra cuando se agote lo anterior. */
@@ -519,8 +535,11 @@ inventory.post('/purchases', requirePerm('edit_inventory'), async (c) => {
       if (!it.productId && !byCode && !it.newProduct) throw bad('Cada renglón necesita un producto o los datos de uno nuevo.')
       const pid = it.productId ?? byCode ?? createProduct(db, now, u.business_id, u.id, it.newProduct!)
       const p = getProduct(db, u.business_id, pid)
-      if (p.unit === 'pieza' && !Number.isInteger(it.quantity)) throw bad(`${p.name} se compra por pieza.`)
-      return { ...it, p, qtyMilli: toMilli(it.quantity) }
+      if (it.packs && !p.pack_size) throw bad(`${p.name} no tiene definido cuántas piezas trae su bolsa o caja.`)
+      const quantity = it.packs ? it.packs * p.pack_size! : it.quantity
+      if (!quantity) throw bad(`Escribe cuánto compraste de ${p.name}.`)
+      if (p.unit === 'pieza' && !Number.isInteger(quantity)) throw bad(`${p.name} se compra por pieza.`)
+      return { ...it, quantity, p, qtyMilli: toMilli(quantity) }
     })
     // Reparto de fletes: por pieza en productos por pieza, por kilo (unidad) en granel.
     const freightTotal = d.freight.reduce((a, f) => a + f.amount, 0)

@@ -647,3 +647,5 @@ table.list tr.strike td b { text-decoration: line-through; }
 .notice-toast .nt-body span:last-child { display: grid; gap: 2px; }
 .notice-toast small { color: var(--muted); }
 @keyframes nt-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.pack-box { border: 1px dashed var(--selected-line); border-radius: 14px; padding: 10px 12px; margin: 10px 0; } .pack-box .check { margin: 0; } .pack-box .row { margin-top: 8px; }
+@media (max-width: 640px) { table.list.products tbody tr { grid-template-columns: minmax(0, 1fr) auto auto; } table.list.products tbody td.num small { white-space: normal; font-size: 0.72rem; } table.list.products tbody td.row-actions { display: flex; gap: 6px; justify-content: flex-end; } }

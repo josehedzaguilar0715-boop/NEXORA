@@ -98,7 +98,7 @@ class Ctx {
   constructor(readonly call: Api, readonly past: (n: number, h?: number) => string) {}
   async supplier(name: string, phone: string) { return (await this.call('POST', '/suppliers', { name, phone })).id as string }
   async product(p: Record<string, unknown>) { return (await this.call('POST', '/products', p)).product as { id: string; name: string } }
-  async buy(supplierId: string | undefined, items: { productId: string; quantity: number; cost: number; expiresAt?: string }[]) { return this.call('POST', '/purchases', { payment: 'contado', ...(supplierId ? { supplierId } : {}), items }) }
+  async buy(supplierId: string | undefined, items: { productId: string; quantity?: number; packs?: number; cost: number; expiresAt?: string }[]) { return this.call('POST', '/purchases', { payment: 'contado', ...(supplierId ? { supplierId } : {}), items }) }
   async customer(name: string, phone?: string) { return (await this.call('POST', '/customers', { name, ...(phone ? { phone } : {}) })).customer as { id: string } }
   async service(s: Record<string, unknown>) { return (await this.call('POST', '/services', s)).service as { id: string } }
   async open(meal?: string) { await this.call('POST', '/shifts/open', { openingFloat: 50000, ...(meal ? { meal } : {}) }) }
@@ -146,10 +146,15 @@ const SEEDS: Record<string, Seed> = {
     await c.buy(sup, [{ productId: P[0]!.id, quantity: 48, cost: 62400 }, { productId: P[1]!.id, quantity: 30, cost: 33000 }, { productId: P[3]!.id, quantity: 15, cost: 52500 }, { productId: P[4]!.id, quantity: 20, cost: 48000 }, { productId: P[5]!.id, quantity: 15, cost: 42000 }, { productId: P[6]!.id, quantity: 12, cost: 38400 }, { productId: P[7]!.id, quantity: 4, cost: 6000 }, { productId: P[9]!.id, quantity: 40, cost: 36000 }])
     await c.buy(sup2, [{ productId: P[2]!.id, quantity: 24, cost: 48000, expiresAt: futureDate(t, 4) }, { productId: P[8]!.id, quantity: 6, cost: 20400, expiresAt: futureDate(t, 2) }])
     await c.call('PUT', `/products/${P[0]!.id}/price-tiers`, { tiers: [{ minQuantity: 12, price: 1700 }] })
+    // A granel por pieza: llegan en caja o bolsa y se venden sueltos.
+    const chicle = await c.product({ name: 'Chicle de menta (pieza)', unit: 'pieza', price: 100, minStock: 40, pack: { name: 'Caja', size: 100 } })
+    const caramelo = await c.product({ name: 'Caramelo surtido (pieza)', unit: 'pieza', price: 50, minStock: 50, pack: { name: 'Bolsa', size: 150 } })
+    await c.buy(sup, [{ productId: chicle.id, packs: 2, cost: 11000 }, { productId: caramelo.id, packs: 1, cost: 4500 }])
+    P.push(chicle, caramelo)
     const cu = await customers(c, ['Doña Mari López', 'Don Beto Cruz', 'Fonda La Güera', 'Juan Hernández', 'Sofía Ramírez'])
     await fiado(c, cu, [45000, 12000, 0])
     await c.open()
-    await c.history([[{ productId: P[0]!.id, quantity: 3 }, { productId: P[1]!.id, quantity: 2 }], [{ productId: P[2]!.id, quantity: 2 }, { productId: P[3]!.id, quantity: 1 }], [{ productId: P[4]!.id, quantity: 2 }, { productId: P[9]!.id, quantity: 3 }]])
+    await c.history([[{ productId: P[0]!.id, quantity: 3 }, { productId: P[1]!.id, quantity: 2 }, { productId: P[10]!.id, quantity: 5 }], [{ productId: P[2]!.id, quantity: 2 }, { productId: P[3]!.id, quantity: 1 }, { productId: P[11]!.id, quantity: 10 }], [{ productId: P[4]!.id, quantity: 2 }, { productId: P[9]!.id, quantity: 3 }]])
     await c.sell([{ productId: P[0]!.id, quantity: 2 }, { productId: P[6]!.id, quantity: 1 }], 0, { paymentMethod: 'fiado', customerId: cu[2]!.id })
     await c.call('POST', '/layaways', { customerId: cu[3]!.id, items: [{ productId: P[6]!.id, quantity: 2 }], deposit: 3000, method: 'efectivo', dueDate: futureDate(t, 2) })
   },

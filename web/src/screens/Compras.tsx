@@ -3,8 +3,9 @@ import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
 import type { Me } from '../App'
 import type { Product } from './Caja'
+import { packWord } from './Productos'
 
-interface Row { productId: string; name: string; quantity: string; cost: string; newPrice: string; expiresAt: string }
+interface Row { productId: string; name: string; quantity: string; cost: string; newPrice: string; expiresAt: string; pack: { name: string; size: number } | null; byPack: boolean }
 
 /** Captura de una compra desde su ticket: cada renglón es un lote; los fletes se reparten solos. */
 export function Compras(_: { me: Me }) {
@@ -23,8 +24,8 @@ export function Compras(_: { me: Me }) {
   }
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
 
-  const add = (p: Product) => { setRows([...rows, { productId: p.id, name: p.name, quantity: '', cost: '', newPrice: '', expiresAt: '' }]); setFind('') }
-  const upd = (i: number, k: keyof Row, v: string) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)))
+  const add = (p: Product) => { setRows([...rows, { productId: p.id, name: p.name, quantity: '', cost: '', newPrice: '', expiresAt: '', pack: p.pack ?? null, byPack: !!p.pack }]); setFind('') }
+  const upd = (i: number, k: keyof Row, v: string | boolean) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)))
   const total = rows.reduce((a, r) => a + (toCents(r.cost) || 0), 0) + freight.reduce((a, f) => a + (toCents(f.amount) || 0), 0)
 
   const save = async () => {
@@ -33,7 +34,7 @@ export function Compras(_: { me: Me }) {
         id: crypto.randomUUID(), supplierId: head.supplierId || undefined, ticketRef: head.ticketRef || undefined, payment: head.payment,
         paidFromCash: head.payment === 'contado' && head.paidFromCash, dueDate: head.payment === 'credito' && head.dueDate ? head.dueDate : undefined,
         freight: freight.filter((f) => toCents(f.amount) > 0).map((f) => ({ concept: f.concept || 'Flete', amount: toCents(f.amount) })),
-        items: rows.map((r) => ({ productId: r.productId, quantity: Number(r.quantity), cost: toCents(r.cost), ...(r.newPrice ? { newPrice: toCents(r.newPrice) } : {}), ...(r.expiresAt ? { expiresAt: r.expiresAt } : {}) })),
+        items: rows.map((r) => ({ productId: r.productId, ...(r.pack && r.byPack ? { packs: Number(r.quantity) } : { quantity: Number(r.quantity) }), cost: toCents(r.cost), ...(r.newPrice ? { newPrice: toCents(r.newPrice) } : {}), ...(r.expiresAt ? { expiresAt: r.expiresAt } : {}) })),
       })
       setMsg({ ok: 'Compra guardada.', result: r })
       setRows([]); setFreight([])
@@ -74,10 +75,12 @@ export function Compras(_: { me: Me }) {
         {rows.map((r, i) => (
           <div key={i} className="card" style={{ marginTop: 10 }}>
             <b>{r.name}</b>
+            {r.pack && <div className="tabs"><button className={r.byPack ? 'on' : ''} onClick={() => upd(i, 'byPack', true)}>Por {r.pack.name.toLowerCase()} ({r.pack.size} pzas)</button><button className={!r.byPack ? 'on' : ''} onClick={() => upd(i, 'byPack', false)}>Por pieza</button></div>}
             <div className="row">
-              <div><label>Cantidad<input inputMode="decimal" value={r.quantity} onChange={(e) => upd(i, 'quantity', e.target.value)} /></label></div>
+              <div><label>{r.pack && r.byPack ? `Número de ${packWord(r.pack.name, 2)}` : 'Cantidad'}<input inputMode="decimal" value={r.quantity} onChange={(e) => upd(i, 'quantity', e.target.value)} /></label></div>
               <div><label>Costo total<input inputMode="decimal" value={r.cost} onChange={(e) => upd(i, 'cost', e.target.value)} /></label></div>
             </div>
+            {r.pack && r.byPack && Number(r.quantity) > 0 && <p className="muted small">= {Number(r.quantity) * r.pack.size} piezas{toCents(r.cost) > 0 ? ` · ${mxn(Math.round(toCents(r.cost) / (Number(r.quantity) * r.pack.size)))} cada una` : ''}</p>}
             <div className="row">
               <div><label>Precio nuevo (opcional)<input inputMode="decimal" value={r.newPrice} onChange={(e) => upd(i, 'newPrice', e.target.value)} /></label></div>
               <div><label>Caduca (opcional)<input type="date" value={r.expiresAt} onChange={(e) => upd(i, 'expiresAt', e.target.value)} /></label></div>
