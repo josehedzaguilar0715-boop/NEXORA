@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mxn } from '../api'
+import { askCode } from '../Dialog'
 import { hasGiro, type Me } from '../App'
 
 const MEALS: Record<string, string> = { dia: 'Todo el día', desayuno: 'Desayuno', comida: 'Comida', cena: 'Cena' }
@@ -19,7 +20,7 @@ export function MenuDia({ me }: { me: Me }) {
   }
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
   const publish = async () => {
-    const code = prompt('Código de autorización para publicar:')
+    const code = await askCode('Para publicar el menú se necesita el código del dueño o encargado.')
     if (!code) return
     try { await api('POST', '/daily-menu', { meal, productIds: sel, authCode: code }); setMsg({ ok: 'Menú publicado.' }); setSel([]); void load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }

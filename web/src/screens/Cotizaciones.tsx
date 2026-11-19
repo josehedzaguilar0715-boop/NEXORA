@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, mxn } from '../api'
+import { ask } from '../Dialog'
 import type { Me } from '../App'
 import type { Product } from './Caja'
 
@@ -38,7 +39,7 @@ export function Cotizaciones(_: { me: Me }) {
     } catch (e) { setMsg({ err: (e as Error).message }) }
   }
   const convert = async (q: any) => {
-    const method = prompt('Forma de pago (efectivo, transferencia, tarjeta, fiado):', 'efectivo')
+    const method = await ask({ title: 'Convertir en venta', hint: '¿Cómo paga el cliente?', choices: [{ value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' }, { value: 'tarjeta', label: 'Tarjeta' }, ...(q.customerId ? [{ value: 'fiado', label: 'Fiado' }] : [])] })
     if (!method) return
     try {
       const r = await api<any>('POST', `/quotes/${q.id}/convert`, { paymentMethod: method.trim().toLowerCase(), customerId: q.customerId ?? undefined })

@@ -18,7 +18,7 @@ export function Inicio({ me }: { me: Me }) {
     const [a, c, d] = await Promise.all([
       api<any>('GET', '/dashboard/panel'),
       api<any>('GET', '/reports/daily?days=7'),
-      api<any>('GET', '/reports/recent?limit=10'),
+      api<any>('GET', '/reports/recent?limit=8'),
     ])
     setDb(a); setDays(c.days); setMoves(d.movements)
     if (hasGiro(me, ...FIADO_GIROS)) api<any>('GET', '/receivables').then((r) => setRec(r.total)).catch(() => setRec(null))
@@ -44,7 +44,7 @@ export function Inicio({ me }: { me: Me }) {
       {/* Indicadores del día y del mes, comparados contra ayer y contra el mes anterior. */}
       <div className="dash-kpis">
         <div className="card dkpi">
-          <div className="dkpi-top"><span className="dkpi-label">Ventas de hoy</span>{T?.goal ? <GoalRing value={T.sales} goal={T.goal} /> : owner && <button className="mini" onClick={setGoal}>Poner meta</button>}</div>
+          <div className="dkpi-top"><span className="dkpi-label">Ventas de hoy</span>{T?.goal ? <GoalRing value={T.sales} goal={T.goal} /> : owner && <button className="link goal-link" onClick={setGoal}>+ Meta</button>}</div>
           <div className="dkpi-value pos">{T ? mxn(T.sales) : '—'}</div>
           <div className="dkpi-sub">{T ? `${T.tickets} ${T.tickets === 1 ? 'venta' : 'ventas'}` : ''}</div>
           {T && <Trend pct={T.vsYesterday} label="vs ayer" />}
@@ -89,7 +89,7 @@ export function Inicio({ me }: { me: Me }) {
       )}
       <Pendientes />
       <QuickActions me={me} />
-      <div className="grid2">
+      <div className="grid2 dash-grid">
         <section className="card">
           <h2>Lo que más ganancia dejó hoy</h2>
           <div className="table-wrap"><table className="list"><tbody>
@@ -105,7 +105,7 @@ export function Inicio({ me }: { me: Me }) {
           </tbody></table></div>
         </section>
       </div>
-      <div className="grid2" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
+      <div className="grid2 dash-grid" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
         <section className="card">
           <h2>Ventas de la semana</h2>
           <svg className="chart" viewBox={`0 0 ${W} ${H + 30}`} role="img" aria-label="Ventas de los últimos 7 días">

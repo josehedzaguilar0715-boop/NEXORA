@@ -1,6 +1,7 @@
 import { loyaltyText, type Loyalty } from './Caja'
 import { useEffect, useMemo, useState } from 'react'
 import { api, h12, mxn, toCents } from '../api'
+import { ask } from '../Dialog'
 import { can, type Me } from '../App'
 import type { Service } from './Caja'
 
@@ -48,7 +49,7 @@ function Cita({ a, me, wa, act, onCobrar }: { a: any; me: Me; wa: string | null;
           {['confirmada', 'en_atencion'].includes(a.status) && can(me, 'sell') && <button className="primary" onClick={onCobrar}>Cobrar</button>}
           {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'start')}>Atender</button>}
           {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'no-show')}>No vino</button>}
-          {['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && <button onClick={() => { const r = prompt('Motivo de la cancelación:'); if (r) void act(a.id, 'cancel', { reason: r })() }}>Cancelar</button>}
+          {['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && <button onClick={async () => { const r = await ask({ title: 'Cancelar cita', label: 'Motivo', placeholder: 'Ej. el cliente no puede venir', confirmLabel: 'Cancelar cita', danger: true }); if (r) void act(a.id, 'cancel', { reason: r })() }}>Cancelar</button>}
           {wa && <a className="button" href={wa} target="_blank" rel="noreferrer">WhatsApp</a>}
         </div>
       )}

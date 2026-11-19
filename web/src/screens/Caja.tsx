@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, ApiError, cache, flush, mxn, outbox, toCents } from '../api'
+import { ask, askCode } from '../Dialog'
 import { can, FIADO_GIROS, type Me, hasGiro } from '../App'
 
 export interface Product {
@@ -71,7 +72,7 @@ export function Caja({ me }: { me: Me }) {
   const withStaff = hasGiro(me, 'barberia', 'unas', 'perfumeria')
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([])
   const [staffId, setStaffId] = useState('')
-  useEffect(() => { if (withStaff) api<any>('GET', hasGiro(me, 'barberia', 'unas') ? '/agenda/staff' : '/users').then((r) => setStaff((r.staff ?? r.users).filter((x: any) => x.active !== false))).catch(() => {}) }, [])
+  useEffect(() => { if (withStaff) api<any>('GET', hasGiro(me, 'barberia', 'unas') ? '/agenda/staff' : '/staff/sellers').then((r) => setStaff((r.staff ?? r.users).filter((x: any) => x.active !== false))).catch(() => {}) }, [])
   const [msg, setMsg] = useState('')
   const search = useRef<HTMLInputElement>(null)
   const fiadoOk = can(me, 'customers_credit') && hasGiro(me, ...FIADO_GIROS)
@@ -212,7 +213,7 @@ export function Caja({ me }: { me: Me }) {
       } catch (e) {
         const err = e as ApiError
         if (err.code === 'codigo_requerido' && method === 'fiado') {
-          const code = prompt('Este cliente pasa su límite de crédito. Código del dueño:')
+          const code = await askCode('Este cliente pasa su límite de crédito. Pide el código del dueño.')
           if (code) return charge(method, { ...extra, authCode: code })
           return
         }
@@ -336,7 +337,7 @@ export function Caja({ me }: { me: Me }) {
         <div className="pos-chips">
           <button className="chip" onClick={() => setModal({ kind: 'cliente' })}>👤 {customer ? customer.name : 'Público en general'} <K k={KEYS.cliente} /></button>
           {customer && can(me, 'give_stamps') && me.modules?.includes('fidelidad') && <button className="chip" onClick={async () => {
-            const n = Number(prompt(`¿Cuántos sellos le das a ${customer.name}?`, '1'))
+            const n = Number(await ask({ title: 'Dar sello', hint: `¿Cuántos sellos le das a ${customer.name}?`, label: 'Sellos', value: '1', numeric: true, confirmLabel: 'Dar sello' }))
             if (!(n > 0)) return
             try { const r = await api<{ loyalty: Loyalty | null }>('POST', `/customers/${customer.id}/stamps`, { quantity: Math.floor(n) }); setMsg(r.loyalty ? loyaltyText(r.loyalty) : 'Listo.') } catch (e) { setMsg((e as Error).message) }
           }}>⭐ Dar sello</button>}
@@ -351,7 +352,7 @@ export function Caja({ me }: { me: Me }) {
         {msg && <p className={msg.startsWith('Venta puesta') ? 'okmsg' : 'error'}>{msg}</p>}
         <button className="primary big cobrar" disabled={!cart.length} onClick={() => setModal({ kind: 'cobro' })}>Cobrar <K k={KEYS.cobrar} /></button>
         <div className="pos-actions">
-          <button onClick={hold}>{cart.length ? 'Apartar venta' : 'Ventas apartadas'} <K k={KEYS.espera} /></button>
+          <button onClick={hold}>{cart.length ? 'Poner en espera' : 'Ventas en espera'} <K k={KEYS.espera} /></button>
           {can(me, 'cancel_discount') && <button disabled={!cart.length} onClick={() => setModal({ kind: 'descuento' })}>Descuento <K k={KEYS.descuento} /></button>}
           <button onClick={() => setModal({ kind: 'libre' })}>Artículo común <K k={KEYS.libre} /></button>
           <button onClick={() => setModal({ kind: 'ventas' })}>Ventas del turno <K k={KEYS.ventas} /></button>
@@ -654,9 +655,9 @@ function VentasTurno({ shift, me, onClose }: { shift: Shift; me: Me; onClose: ()
   const load = () => api<{ sales: any[] }>('GET', `/sales?shiftId=${shift.id}`).then((r) => setList(r.sales)).catch((e) => setErr(e.message))
   useEffect(() => { void load() }, [])
   const cancel = async (id: string) => {
-    const reason = prompt('¿Por qué se cancela?')
+    const reason = await ask({ title: 'Cancelar venta', label: 'Motivo', placeholder: 'Ej. se cobró dos veces', confirmLabel: 'Continuar', danger: true })
     if (!reason) return
-    const code = prompt('Código de autorización:')
+    const code = await askCode('Para cancelar la venta se necesita el código del dueño o encargado.')
     if (!code) return
     try {
       await api('POST', `/sales/${id}/cancel`, { reason, authCode: code })

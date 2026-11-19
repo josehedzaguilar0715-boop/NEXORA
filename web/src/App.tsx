@@ -206,7 +206,6 @@ export function App() {
 
 /** Pantallas que ve este usuario: según permisos, giro y módulos; con el nombre que corresponde a su negocio. */
 export function screensFor(me: Me): Screen[] {
-  // Comedor: el mapa de mesas es opcional (apagado por defecto).
   const giroOk = (s: Screen) => !s.giros || hasGiro(me, ...s.giros)
   const needsModule: Record<string, string[]> = { escanear: ['membresias', 'asistencia', 'fidelidad'] }
   const moduleOk = (s: Screen) => !needsModule[s.key] || needsModule[s.key]!.some((m) => me.modules?.includes(m))

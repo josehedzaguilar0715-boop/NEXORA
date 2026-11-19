@@ -71,6 +71,19 @@ export class Nexora extends DurableObject<Env> {
   }
 }
 
+/** Los archivos de la app se decodifican una sola vez por instancia (antes, en cada petición: CPU de más). */
+const decodedCache = new Map<string, Uint8Array<ArrayBuffer>>()
+function decoded(key: string, b64: string): Uint8Array<ArrayBuffer> {
+  let bytes = decodedCache.get(key)
+  if (!bytes) {
+    const bin = atob(b64)
+    bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    decodedCache.set(key, bytes)
+  }
+  return bytes
+}
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url)
@@ -80,8 +93,9 @@ export default {
       return env.NEXORA.get(env.NEXORA.idFromName('principal')).fetch(new Request(url, req))
     }
     // Pantallas: archivo exacto o, si no existe, la app (rutas como /admin o /reservar/…).
-    const file = ASSETS[url.pathname] ?? ASSETS['/index.html']!
-    const bytes = Uint8Array.from(atob(file.body), (ch) => ch.charCodeAt(0))
+    const key = ASSETS[url.pathname] ? url.pathname : '/index.html'
+    const file = ASSETS[key]!
+    const bytes = decoded(key, file.body)
     const immutable = url.pathname.startsWith('/assets/')
     return new Response(bytes, { headers: { 'content-type': file.type, 'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache' } })
   },

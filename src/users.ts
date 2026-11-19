@@ -42,6 +42,13 @@ users.get('/users', requirePerm('create_employees'), (c) => {
   return c.json({ users: rows.map(publicUser) })
 })
 
+/** Para «¿Quién atendió?» en la caja: solo nombre del personal activo (sin datos sensibles). */
+users.get('/staff/sellers', requirePerm('sell'), (c) => {
+  const { db } = c.get('deps')
+  const staff = db.prepare("SELECT id, name FROM users WHERE business_id = ? AND active = 1 ORDER BY role DESC, name").all(c.get('session').user.business_id)
+  return c.json({ staff })
+})
+
 users.post('/users', requirePerm('create_employees'), async (c) => {
   const deps = c.get('deps')
   const { db, now } = deps

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
+import { askCode } from '../Dialog'
 import type { Me } from '../App'
 
 /** Precio del día: se actualiza al abrir, en una sola lista, con código. */
@@ -11,7 +12,7 @@ export function PrecioDia(_: { me: Me }) {
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
   const save = async () => {
     const list = Object.entries(prices).filter(([, v]) => v.trim() !== '').map(([productId, v]) => ({ productId, price: toCents(v) }))
-    const code = prompt('Código de autorización:')
+    const code = await askCode('Se necesita el código del dueño o encargado.')
     if (!code) return
     try { const r = await api<any>('POST', '/daily-prices', { prices: list, authCode: code }); setMsg({ ok: `Precios actualizados: ${r.changed.length}.` }); setPrices({}); void load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }
@@ -41,7 +42,7 @@ export function CierreDia(_: { me: Me }) {
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
   const saveWaste = async () => {
     const items = Object.entries(waste).filter(([, v]) => Number(v.q) > 0).map(([productId, v]) => ({ productId, quantity: Number(v.q), reason: v.r || 'Merma del día' }))
-    const code = prompt('Código de autorización:')
+    const code = await askCode('Se necesita el código del dueño o encargado.')
     if (!code) return
     try { const r = await api<any>('POST', '/inventory/waste-batch', { items, authCode: code }); setMsg({ ok: `Merma registrada: ${mxn(r.cost)}.` }); setWaste({}); void load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }
@@ -55,7 +56,7 @@ export function CierreDia(_: { me: Me }) {
     <div className="grid2">
       <section className="card">
         <h2>Merma del día</h2>
-        <div className="table-wrap"><table className="list"><tbody>{products.map((p) => (
+        <div className="table-wrap"><table className="list merma-list"><tbody>{products.map((p) => (
           <tr key={p.id}><td>{p.name}</td>
             <td style={{ width: 110 }}><input aria-label={`Merma ${p.name}`} inputMode="decimal" placeholder={p.unit} value={waste[p.id]?.q ?? ''} onChange={(e) => setWaste({ ...waste, [p.id]: { q: e.target.value, r: waste[p.id]?.r ?? '' } })} /></td>
             <td><input aria-label={`Motivo ${p.name}`} placeholder="Motivo" value={waste[p.id]?.r ?? ''} onChange={(e) => setWaste({ ...waste, [p.id]: { q: waste[p.id]?.q ?? '', r: e.target.value } })} /></td></tr>

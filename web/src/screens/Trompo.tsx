@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { ask, askCode } from '../Dialog'
 import type { Me } from '../App'
 
 /** Taquería: carne del trompo o asada. Lo empezado, lo vendido (por recetas) y el sobrante contado al cierre con código. */
@@ -19,11 +20,11 @@ export function Trompo(_: { me: Me }) {
     try { await api('POST', '/meat/batches', { productId: f.productId, kg: Number(f.kg) }); setF({ ...f, kg: '' }); setMsg({ ok: 'Registrado.' }); void load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }
   const close = async (b: any) => {
-    const left = prompt(`¿Cuántos kilos sobraron de ${b.name}? (se esperan ${b.expectedLeftoverKg})`)
+    const left = (await ask({ title: `Sobrante de ${b.name}`, hint: `Se esperan ${b.expectedLeftoverKg} kg.`, label: 'Kilos que sobraron', placeholder: String(b.expectedLeftoverKg), confirmLabel: 'Continuar' }))?.replace(',', '.') ?? null
     if (left === null) return
     const diff = Math.abs(Number(left) - b.expectedLeftoverKg) > 0.0005
-    const reason = diff ? prompt('Hay diferencia. ¿Por qué?') ?? '' : undefined
-    const code = prompt('Código de autorización:')
+    const reason = diff ? (await ask({ title: 'Hay diferencia', label: '¿Por qué?', placeholder: 'Ej. se quemó un poco', confirmLabel: 'Continuar' })) ?? '' : undefined
+    const code = await askCode('Para cerrar la carne se necesita el código del dueño o encargado.')
     if (!code) return
     try { const r = await api<any>('POST', `/meat/batches/${b.id}/close`, { leftoverKg: Number(left), reason, authCode: code }); setMsg({ ok: `Cerrado. Diferencia: ${r.differenceKg} kg.` }); void load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }

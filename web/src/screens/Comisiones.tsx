@@ -19,8 +19,8 @@ export function Comisiones({ me }: { me: Me }) {
       <div className="row"><label>Desde<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label><label>Hasta<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label></div>
       {err && <p className="error">{err}</p>}
       <div className="table-wrap"><table className="list">
-        <thead><tr><th>Persona</th><th className="num">Vendido</th><th className="num">Comisión</th>{tips && <th className="num">Propinas</th>}</tr></thead>
-        <tbody>{rows.map((r) => <tr key={r.staffId}><td>{r.name}</td><td className="num">{mxn(r.base)}</td><td className="num"><b>{mxn(r.commission)}</b></td>{tips && <td className="num">{mxn(r.tips)}<br /><small className="muted">efectivo {mxn(r.tipsCash)}</small></td>}</tr>)}</tbody>
+        <thead><tr><th>Persona</th><th className="num hide-sm">Vendido</th><th className="num">Comisión</th>{tips && <th className="num">Propinas</th>}</tr></thead>
+        <tbody>{rows.map((r) => <tr key={r.staffId}><td>{r.name}<br /><small className="muted">vendió {mxn(r.base)}</small></td><td className="num hide-sm">{mxn(r.base)}</td><td className="num"><b>{mxn(r.commission)}</b></td>{tips && <td className="num">{mxn(r.tips)}<br /><small className="muted">efectivo {mxn(r.tipsCash)}</small></td>}</tr>)}</tbody>
       </table></div>
       {rows.length === 0 && <p className="muted">Sin comisiones en este periodo.</p>}
     </div>

@@ -82,4 +82,14 @@ describe('perfumería', () => {
     const com = s.db.prepare('SELECT base, amount FROM sale_commissions').all()
     expect(com).toEqual([{ base: 280000, amount: 22400 }]) // Carolina Herrera sin regla: sin comisión
   })
+
+  it('el cajero puede elegir quién atendió (solo nombres del personal)', async () => {
+    const { s, o, T } = await negocioListo()
+    s.setGiro('perfumeria')
+    const v = await s.createStaff(T, o.business.code, 'vendedora1', 'cajero')
+    const r = await s.call('GET', '/staff/sellers', { token: v.token })
+    expect(r.status).toBe(200)
+    expect(r.json.staff.map((x: any) => x.name)).toContain('vendedora1')
+    expect(Object.keys(r.json.staff[0]).sort()).toEqual(['id', 'name'])
+  })
 })

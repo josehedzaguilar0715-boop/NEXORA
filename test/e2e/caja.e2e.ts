@@ -50,6 +50,18 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
 await ctx.addInitScript(() => { if (location.pathname !== '/' || sessionStorage.getItem('nx_e2e_first')) sessionStorage.setItem('nx_intro', '1'); sessionStorage.setItem('nx_e2e_first', '1') })
 const page = await ctx.newPage()
 page.on('dialog', (d: any) => void d.accept(d.type() === 'prompt' ? '4321' : undefined))
+// Las ventanas de NEXORA (código, motivo, cantidad): se contestan solas con `answer`, igual que un usuario.
+let answer = '4321'
+const pump = setInterval(async () => {
+  try {
+    const dlg = page.locator('.dialog-wrap')
+    if (!(await dlg.count())) return
+    const choice = dlg.locator('.dialog-choices button', { hasText: new RegExp(`^${answer}$`, 'i') })
+    if (await dlg.locator('.dialog-choices').count()) { await (await choice.count() ? choice : dlg.locator('.dialog-choices button').first()).click(); return }
+    if (await dlg.locator('input').count()) await dlg.locator('input').fill(answer)
+    await dlg.locator('.dialog-actions button.primary, .dialog-actions button.danger').click()
+  } catch { /* la ventana cambió mientras se contestaba */ }
+}, 250)
 try {
   // Entrar como dueño con verificación en dos pasos.
   await page.goto(base)
@@ -174,8 +186,7 @@ try {
   await page.getByRole('button', { name: 'Guardar cotización' }).click()
   await page.getByText(/Cotización #1 por \$55\.50/).waitFor()
   check(true, 'ferretería: cotización guardada')
-  page.removeAllListeners('dialog')
-  page.on('dialog', (d: any) => void d.accept('transferencia'))
+  answer = 'transferencia'
   await page.locator('main').getByRole('button', { name: 'Vender' }).click()
   await page.getByText(/Vendida: folio 3/).waitFor()
   check(true, 'ferretería: la cotización se convierte en venta')
@@ -246,8 +257,7 @@ try {
   apiDb.prepare("UPDATE businesses SET giro = 'restaurante'").run() // el giro lo cambia soporte
   await call('POST', '/tables', { name: '7', area: 'terraza', seats: 4 }, token)
   await call('POST', '/products', { name: 'Tacos de arrachera', unit: 'pieza', price: 16000, trackStock: false, attrs: { station: 'cocina_caliente' } }, token)
-  page.removeAllListeners('dialog')
-  page.on('dialog', (d: any) => void d.accept('2'))
+  answer = '2'
   await page.goto(`${base}/#/mesas`)
   await page.reload()
   await page.getByRole('button', { name: /Mesa 7/ }).click()
@@ -303,6 +313,7 @@ try {
   await page.getByText('Revisa el cable USB y vuelve a intentar.').waitFor()
   check(true, 'buzón: la respuesta llega al mismo buzón del cliente')
 } finally {
+  clearInterval(pump)
   await browser.close()
   server.close()
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
+import { confirmAsk } from '../Dialog'
 import { can, FIADO_GIROS, hasGiro, type Me } from '../App'
 import { cardWhatsApp } from './MiTarjeta'
 import { Sheet } from '../Sheet'
@@ -238,7 +239,7 @@ function Puntos({ me, c }: { me: Me; c: any }) {
           {!owner && <label>Código del dueño<input type="password" inputMode="numeric" value={adj.code} onChange={(e) => setAdj({ ...adj, code: e.target.value })} /></label>}
           <p className="row">
             <button className="primary" disabled={!ready} onClick={() => adjust(1)}>+ Agregar {qty > 0 ? qty : ''}</button>
-            <button className="danger" disabled={!ready || qty > data.balance} onClick={() => { if (confirm(`¿Quitarle ${qty} a ${c.name}?`)) void adjust(-1) }}>− Quitar {qty > 0 ? qty : ''}</button>
+            <button className="danger" disabled={!ready || qty > data.balance} onClick={async () => { if (await confirmAsk(`¿Quitarle ${qty} a ${c.name}?`, undefined, true)) void adjust(-1) }}>− Quitar {qty > 0 ? qty : ''}</button>
           </p>
         </div>
       )}

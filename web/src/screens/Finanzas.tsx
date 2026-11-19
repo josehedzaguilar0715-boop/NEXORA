@@ -356,7 +356,7 @@ function Movimientos({ from, to, onErr }: { from: string; to: string; onErr: (e:
       </div>
       <div className="table-wrap">
         <table className="list ledger">
-          <thead><tr><th>Fecha</th><th>Movimiento</th><th className="hide-sm">Forma</th><th className="num">Entrada</th><th className="num">Salida</th><th className="num hide-sm">Saldo</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Movimiento</th><th className="hide-sm">Forma</th><th className="num hide-sm">Entrada</th><th className="num hide-sm">Salida</th><th className="num show-sm">Importe</th><th className="num hide-sm">Saldo</th></tr></thead>
           <tbody>{rows.map((e: any, i: number) => {
             running += e.inflow - e.outflow
             const d = new Date(e.at)
@@ -365,15 +365,16 @@ function Movimientos({ from, to, onErr }: { from: string; to: string; onErr: (e:
                 <td className="nowrap">{d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}{e.type !== 'Gasto' && <><br /><small className="muted">{d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</small></>}</td>
                 <td>{e.type}<br /><small className="muted">{e.concept}</small></td>
                 <td className="hide-sm">{METHOD[e.method] ?? e.method}</td>
-                <td className="num pos">{e.inflow ? mxn(e.inflow) : ''}</td>
-                <td className="num neg">{e.outflow ? mxn(e.outflow) : ''}</td>
+                <td className="num pos hide-sm">{e.inflow ? mxn(e.inflow) : ''}</td>
+                <td className="num neg hide-sm">{e.outflow ? mxn(e.outflow) : ''}</td>
+                <td className={`num show-sm ${e.inflow ? 'pos' : 'neg'}`}>{e.inflow ? `+${mxn(e.inflow)}` : `−${mxn(e.outflow)}`}</td>
                 <td className={`num hide-sm ${running < 0 ? 'neg' : ''}`}>{mxn(running)}</td>
               </tr>
             )
           })}
           {lg && rows.length === 0 && <tr><td colSpan={6} className="muted">Sin movimientos en este periodo.</td></tr>}
           </tbody>
-          {lg && <tfoot><tr className="total"><td colSpan={3}>Totales</td><td className="num">{mxn(lg.totalIn)}</td><td className="num">{mxn(lg.totalOut)}</td><td className="num hide-sm">{mxn(lg.totalIn - lg.totalOut)}</td></tr></tfoot>}
+          {lg && <tfoot><tr className="total"><td colSpan={3} className="hide-sm">Totales</td><td colSpan={2} className="show-sm">Neto</td><td className="num hide-sm">{mxn(lg.totalIn)}</td><td className="num hide-sm">{mxn(lg.totalOut)}</td><td className="num">{mxn(lg.totalIn - lg.totalOut)}</td></tr></tfoot>}
         </table>
       </div>
     </section>

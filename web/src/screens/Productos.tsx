@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
+import { confirmAsk } from '../Dialog'
 import { Sheet } from '../Sheet'
 import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
@@ -83,7 +84,7 @@ export function Productos({ me }: { me: Me }) {
                     <td className="num hide-sm">{p.lastCost ? mxn(Math.round(p.lastCost)) : '—'}</td>
                     <td className="num row-actions">
                       {canStock && p.active !== false && p.trackStock !== false && <button className="mini" onClick={(e) => { e.stopPropagation(); setEdit({ p, tab: 'existencia' }) }}>+ Agregar</button>}
-                      {canEdit && p.active !== false && <button className="mini icon-btn" aria-label={`Eliminar ${p.name}`} title="Eliminar" onClick={async (e) => { e.stopPropagation(); if (!confirm(`¿Eliminar «${p.name}»? Ya no aparecerá en la caja ni en la lista. Sus ventas se conservan y puedes restaurarlo desde «Eliminados».`)) return; try { await api('PATCH', `/products/${p.id}`, { active: false, baseVersion: p.version, updatedAt: new Date().toISOString() }); await load() } catch (er) { setErr((er as Error).message) } }}><Trash2 size={16} aria-hidden /></button>}
+                      {canEdit && p.active !== false && <button className="mini icon-btn" aria-label={`Eliminar ${p.name}`} title="Eliminar" onClick={async (e) => { e.stopPropagation(); if (!(await confirmAsk(`¿Eliminar «${p.name}»?`, 'Ya no aparecerá en la caja ni en la lista. Sus ventas se conservan y puedes restaurarlo desde «Eliminados».', true))) return; try { await api('PATCH', `/products/${p.id}`, { active: false, baseVersion: p.version, updatedAt: new Date().toISOString() }); await load() } catch (er) { setErr((er as Error).message) } }}><Trash2 size={16} aria-hidden /></button>}
                       {canEdit && p.active === false && <button className="mini" onClick={async (e) => { e.stopPropagation(); try { await api('PATCH', `/products/${p.id}`, { active: true, baseVersion: p.version, updatedAt: new Date().toISOString() }); await load() } catch (er) { setErr((er as Error).message) } }}>Restaurar</button>}
                     </td>
                   </tr>

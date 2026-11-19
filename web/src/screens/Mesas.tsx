@@ -1,6 +1,7 @@
 import { TimeSelect } from '../TimeSelect'
 import { useEffect, useRef, useState } from 'react'
 import { api, mxn, toCents } from '../api'
+import { ask, askCode } from '../Dialog'
 import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
 
@@ -20,7 +21,7 @@ export function Mesas({ me }: { me: Me }) {
     try {
       if (t.status === 'limpieza') { await api('POST', `/tables/${t.id}/free`); return void load() }
       if (t.tabId) return setTab((await api<any>('GET', `/tabs/${t.tabId}`)).tab)
-      const people = Number(prompt(`¿Cuántas personas en la mesa ${t.name}?`, '2'))
+      const people = Number(await ask({ title: `Abrir mesa ${t.name}`, label: '¿Cuántas personas?', value: '2', numeric: true, confirmLabel: 'Abrir mesa' }))
       if (!people) return
       setTab((await api<any>('POST', '/tabs', { id: crypto.randomUUID(), kind: 'mesa', tableId: t.id, people })).tab)
       void load()
@@ -69,8 +70,9 @@ export function Cuenta({ me, tab: initial, onClose }: { me: Me; tab: any; onClos
   const run = async (fn: () => Promise<any>, ok?: string) => {
     try { const r = await fn(); if (r?.tab) setTab(r.tab); else setTab((await api<any>('GET', `/tabs/${tab.id}`)).tab); setMsg(ok ? { ok } : {}) } catch (e) { setMsg({ err: (e as Error).message }) }
   }
-  const add = (p: P, modifiers: string[] = []) => {
-    const qty = p.unit === 'pieza' ? 1 : Number(prompt(`¿Cuántos kilos de ${p.name}?`, '1'))
+  const add = async (p: P, modifiers: string[] = []) => {
+    const unit = ({ kg: 'kilos', litro: 'litros', metro: 'metros' } as Record<string, string>)[p.unit] ?? 'piezas'
+    const qty = p.unit === 'pieza' ? 1 : Number((await ask({ title: p.name, label: `¿Cuántos ${unit}?`, value: '1', confirmLabel: 'Agregar' }))?.replace(',', '.'))
     if (!qty) return
     void run(() => api('POST', `/tabs/${tab.id}/items`, { items: [{ id: crypto.randomUUID(), productId: p.id, quantity: qty, modifiers, ...(person ? { person } : {}) }] }))
   }
@@ -99,8 +101,8 @@ export function Cuenta({ me, tab: initial, onClose }: { me: Me; tab: any; onClos
             <td className="num">{mxn(i.total)}</td>
             <td>{!['cancelado', 'pagado'].includes(i.status) && (
               <>
-                <button onClick={() => { const r = prompt('Motivo de la cancelación:'); const c = r && prompt('Código del dueño:'); if (c) void run(() => api('POST', `/tab-items/${i.id}/cancel`, { reason: r, authCode: c })) }}>✕</button>
-                <button onClick={() => { const r = prompt('Motivo de la cortesía:'); const c = r && prompt('Código del dueño:'); if (c) void run(() => api('POST', `/tab-items/${i.id}/courtesy`, { reason: r, authCode: c })) }}>🎁</button>
+                <button aria-label={`Cancelar ${i.description}`} title="Cancelar" onClick={async () => { const r = await ask({ title: `Cancelar ${i.description}`, label: 'Motivo', placeholder: 'Ej. el cliente ya no lo quiso', confirmLabel: 'Continuar', danger: true }); const c = r && await askCode('Para cancelar se necesita el código del dueño.'); if (c) void run(() => api('POST', `/tab-items/${i.id}/cancel`, { reason: r, authCode: c })) }}>✕</button>
+                <button aria-label={`Cortesía: ${i.description}`} title="Cortesía" onClick={async () => { const r = await ask({ title: `Cortesía: ${i.description}`, label: 'Motivo', placeholder: 'Ej. cliente frecuente', confirmLabel: 'Continuar' }); const c = r && await askCode('Para dar una cortesía se necesita el código del dueño.'); if (c) void run(() => api('POST', `/tab-items/${i.id}/courtesy`, { reason: r, authCode: c })) }}>🎁</button>
               </>
             )}</td>
           </tr>
@@ -149,6 +151,9 @@ function Cobrar({ tab, person, onClose, onDone }: { tab: any; person?: number; o
   )
 }
 
+const STATION: Record<string, string> = { cocina: 'Cocina', cocina_caliente: 'Cocina caliente', cocina_fria: 'Cocina fría', barra: 'Barra', postres: 'Postres' }
+const stationLabel = (s: string) => STATION[s] ?? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ')
+
 /** Pantalla de cocina por estación: cada una ve solo lo suyo. */
 export function Cocina(_: { me: Me }) {
   const [station, setStation] = useState(localStorage.getItem('nx_station') ?? '')
@@ -162,14 +167,20 @@ export function Cocina(_: { me: Me }) {
     setList(r.comandas)
   }).catch(() => {})
   useEffect(() => { void load(); const t = setInterval(load, 8_000); return () => clearInterval(t) }, [station])
-  const stations = ['', 'cocina', 'cocina_caliente', 'cocina_fria', 'barra', 'postres']
+  // Solo las estaciones que este negocio usa en su menú (un comedor no ve «barra» ni «postres» si no los tiene).
+  const [used, setUsed] = useState<string[]>([])
+  useEffect(() => { api<any>('GET', '/products').then((r) => setUsed([...new Set<string>(r.products.map((p: any) => p.attrs?.station).filter(Boolean))])).catch(() => {}) }, [])
+  const order = ['cocina', 'cocina_caliente', 'cocina_fria', 'barra', 'postres']
+  const stations = used.length > 1 ? ['', ...order.filter((s) => used.includes(s)), ...used.filter((s) => !order.includes(s))] : []
+  // Una estación guardada que este negocio ya no usa no debe esconder comandas.
+  useEffect(() => { if (used.length && station && !used.includes(station)) setStation('') }, [used.join(), station])
   return (
     <div>
-      <div className="tabs">{stations.map((s) => <button key={s} className={station === s ? 'on' : ''} onClick={() => { setStation(s); localStorage.setItem('nx_station', s) }}>{s ? s.replace('_', ' ') : 'Todas'}</button>)}</div>
+      {stations.length > 0 && <div className="tabs">{stations.map((s) => <button key={s} className={station === s ? 'on' : ''} onClick={() => { setStation(s); localStorage.setItem('nx_station', s) }}>{s ? stationLabel(s) : 'Todas'}</button>)}</div>}
       <div className="results" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>{list.map((k) => (
         <div key={k.id} className="card" style={{ borderColor: k.minutes >= 20 ? 'var(--danger)' : k.minutes >= 10 ? 'var(--accent)' : 'var(--line)', borderWidth: 3 }}>
           <h2>{k.where}</h2>
-          <p className="muted">{k.station.replace(/_/g, ' ')} · hace {k.minutes} min</p>
+          <p className="muted">{stationLabel(k.station)} · hace {k.minutes} min</p>
           <ul style={{ fontSize: '1.2rem' }}>{k.items.map((i: any, n: number) => <li key={n}><b>{i.quantity}</b> {i.description}{i.notes ? ` — ${i.notes}` : ''}</li>)}</ul>
           <button className="primary big" style={{ width: '100%' }} onClick={async () => { await api('POST', `/comandas/${k.id}/ready`); void load() }}>Lista</button>
         </div>
@@ -200,7 +211,7 @@ export function Pedidos({ me }: { me: Me }) {
   const create = async () => {
     try { setTab((await api<any>('POST', '/tabs', { id: crypto.randomUUID(), kind: f.kind, customerName: f.name || undefined, phone: f.phone || undefined })).tab) } catch (e) { setErr((e as Error).message) }
   }
-  const notice = async (t: any) => { const r = await api<any>('GET', `/tabs/${t.id}/notice`); if (r.whatsapp) window.open(r.whatsapp, '_blank'); else alert(r.message) }
+  const notice = async (t: any) => { const r = await api<any>('GET', `/tabs/${t.id}/notice`); if (r.whatsapp) window.open(r.whatsapp, '_blank'); else void ask({ title: 'Mensaje para el cliente', hint: r.message, confirmOnly: true, confirmLabel: 'Listo' }) }
   const STATE: Record<string, string> = { recibido: 'Recibido', en_cocina: 'En cocina', listo: 'Listo', entregado: 'Entregado' }
   return (
     <div className="grid2">
@@ -221,7 +232,7 @@ export function Pedidos({ me }: { me: Me }) {
               {t.orderStatus === 'listo' && <button onClick={() => notice(t)}>Avisar</button>}
               {(t.orderStatus === 'listo' || (hasGiro(me, 'verduleria') && t.items.length > 0)) && <button className="primary" onClick={async () => {
                 // Verdulería: se cobra al entregar (salvo que el dueño cambie la regla).
-                const method = t.pending > 0 ? prompt(`Cobrar ${mxn(t.pending)} al entregar. Forma de pago (efectivo, transferencia, tarjeta, fiado):`, 'efectivo') : null
+                const method = t.pending > 0 ? await ask({ title: `Cobrar ${mxn(t.pending)}`, hint: 'Se cobra al entregar. ¿Cómo pagó?', choices: [{ value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' }, { value: 'tarjeta', label: 'Tarjeta' }] }) : null
                 if (t.pending > 0 && !method) return
                 try { await api('POST', `/tabs/${t.id}/deliver`, method ? { paymentMethod: method.trim().toLowerCase(), customerId: undefined } : {}); void load() } catch (e) { setErr((e as Error).message) }
               }}>Entregado</button>}

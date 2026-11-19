@@ -235,7 +235,7 @@ const SEEDS: Record<string, Seed> = {
     const gel = await c.product({ name: 'Gel UV (uso)', unit: 'pieza', price: 0, minStock: 2, sellable: false })
     const esmalte = await c.product({ name: 'Esmalte rojo', unit: 'pieza', price: 8500, minStock: 4 })
     const crema = await c.product({ name: 'Crema de manos', unit: 'pieza', price: 12000, minStock: 3 })
-    await c.buy(sup, [{ productId: gel.id, quantity: 10, cost: 150000 }, { productId: esmalte.id, quantity: 10, cost: 40000 }, { productId: crema.id, quantity: 2, cost: 12000 }])
+    await c.buy(sup, [{ productId: gel.id, quantity: 10, cost: 150000 }, { productId: esmalte.id, quantity: 10, cost: 40000 }, { productId: crema.id, quantity: 6, cost: 36000 }])
     const mani = await c.service({ name: 'Manicure gel', price: 30000, durationMin: 60, attrs: { technique: 'Gel', dryMin: 15 } })
     const acri = await c.service({ name: 'Uñas acrílicas', price: 45000, durationMin: 90, cost: 8000, attrs: { technique: 'Acrílico', dryMin: 10 } })
     const pedi = await c.service({ name: 'Pedicure spa', price: 35000, durationMin: 60, cost: 5000, attrs: { technique: 'Pedicure' } })

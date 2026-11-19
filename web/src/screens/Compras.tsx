@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
+import { ask } from '../Dialog'
 import type { Me } from '../App'
 import type { Product } from './Caja'
 import { packWord } from './Productos'
@@ -44,14 +45,14 @@ export function Compras(_: { me: Me }) {
     }
   }
   const newSupplier = async () => {
-    const name = prompt('Nombre del proveedor:')
+    const name = await ask({ title: 'Nuevo proveedor', label: 'Nombre', placeholder: 'Ej. Distribuidora del Sur', confirmLabel: 'Agregar' })
     if (!name) return
     const r = await api<{ id: string }>('POST', '/suppliers', { name })
     await load()
     setHead({ ...head, supplierId: r.id })
   }
   const pay = async (id: string, balance: number) => {
-    const a = prompt(`Abono (saldo ${mxn(balance)}):`)
+    const a = await ask({ title: 'Abono al proveedor', hint: `Saldo: ${mxn(balance)}. Se registra como transferencia.`, label: 'Cuánto abonas', placeholder: '$0.00', confirmLabel: 'Registrar abono' })
     if (!a) return
     try {
       await api('POST', `/purchases/${id}/payments`, { amount: toCents(a), method: 'transferencia' })

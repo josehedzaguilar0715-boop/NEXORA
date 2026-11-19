@@ -2,6 +2,7 @@ import { TimeSelect } from '../TimeSelect'
 import { ProfitLine } from './Productos'
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
+import { ask } from '../Dialog'
 import { hasGiro, type Me } from '../App'
 import { Receta } from './Productos'
 
@@ -240,7 +241,7 @@ function SimpleList({ title, hint, placeholder, path, listKey }: { title: string
           <tr key={m.id} className={m.active ? '' : 'muted'}>
             <td>{m.name}</td>
             <td className="num">
-              <button className="mini" onClick={() => { const n = prompt('Nuevo nombre:', m.name); if (n) void run(async () => { await api('PATCH', `${path}/${m.id}`, { name: n }); await load() })() }}>Renombrar</button>{' '}
+              <button className="mini" onClick={async () => { const n = await ask({ title: 'Renombrar', label: 'Nuevo nombre', value: m.name, confirmLabel: 'Guardar' }); if (n) void run(async () => { await api('PATCH', `${path}/${m.id}`, { name: n }); await load() })() }}>Renombrar</button>{' '}
               <button className="mini" onClick={run(async () => { await api('PATCH', `${path}/${m.id}`, { active: !m.active }); await load() }, m.active ? 'Quitado.' : 'Activado.')}>{m.active ? 'Quitar' : 'Activar'}</button>
             </td>
           </tr>

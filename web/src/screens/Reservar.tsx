@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, h12, mxn } from '../api'
+import { confirmAsk } from '../Dialog'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const STATUS: Record<string, string> = { pendiente: 'Por confirmar: te avisaremos', confirmada: 'Confirmada', en_atencion: 'En atención', atendida: 'Atendida', cancelada: 'Cancelada', no_asistio: 'No asistió' }
@@ -65,7 +66,7 @@ export function EstadoCita({ token }: { token: string }) {
         <p>{a.services.map((s: any) => s.name).join(' + ')}{a.staffName ? ` · con ${a.staffName}` : ''}</p>
         {d.business.phone && <p className="muted">Dudas: {d.business.phone}</p>}
         <p className="muted">Guarda este link para ver el estado de tu cita.</p>
-        {['pendiente', 'confirmada'].includes(a.status) && <button onClick={() => { if (confirm('¿Cancelar tu cita?')) void api('POST', `/public/appointments/${token}/cancel`).then(load) }}>Cancelar mi cita</button>}
+        {['pendiente', 'confirmada'].includes(a.status) && <button onClick={async () => { if (await confirmAsk('¿Cancelar tu cita?', 'El negocio verá que la cancelaste.', true)) void api('POST', `/public/appointments/${token}/cancel`).then(load) }}>Cancelar mi cita</button>}
       </div>
     </main>
   )

@@ -1,6 +1,7 @@
 import { TimeSelect } from '../TimeSelect'
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { ask } from '../Dialog'
 import { hasGiro, type Me } from '../App'
 
 const TEMPLATE_LABEL: Record<string, string> = { cajero: 'Cajero', encargado: 'Encargado', barbero: 'Barbero', empleado_piso: 'Empleado de piso' }
@@ -62,7 +63,7 @@ export function Usuarios({ me }: { me: Me }) {
               <h2>Tu código de autorización</h2>
               <p className="muted small">Es distinto a tu contraseña. Sirve para autorizar cancelaciones, descuentos y cambios de precio.</p>
               <p className="muted small">{ownerRow.hasAuthCode ? 'Ya tienes un código asignado.' : 'Todavía no tienes código.'}</p>
-              <button className="primary" onClick={() => { const c = prompt('Tu código (mínimo 4 dígitos):'); if (c) void api('PUT', `/users/${me.user.id}/auth-code`, { code: c }).then(() => { setMsg({ ok: 'Código asignado.' }); void load() }).catch((e) => setMsg({ err: e.message })) }}>{ownerRow.hasAuthCode ? 'Cambiar mi código' : 'Asignar mi código'}</button>
+              <button className="primary" onClick={async () => { const c = await ask({ title: 'Tu código de autorización', hint: 'Mínimo 4 dígitos. Sirve para autorizar cancelaciones, descuentos y cambios de precio.', label: 'Código', secret: true, numeric: true, confirmLabel: 'Guardar código' }); if (c) void api('PUT', `/users/${me.user.id}/auth-code`, { code: c }).then(() => { setMsg({ ok: 'Código asignado.' }); void load() }).catch((e) => setMsg({ err: e.message })) }}>{ownerRow.hasAuthCode ? 'Cambiar mi código' : 'Asignar mi código'}</button>
             </section>
           )}
         </div>
@@ -125,8 +126,8 @@ function Empleado({ me, u, catalog, onClose, onChanged }: { me: Me; u: any; cata
         </>)}
         {tab === 'acceso' && (
           <div className="stack">
-            <div className="info-row"><span>Contraseña olvidada</span><button className="mini" onClick={() => { const p = prompt('Contraseña nueva (mínimo 8). Díctasela a la persona:'); if (p) void run(() => api('POST', `/users/${u.id}/reset-password`, { newPassword: p }), 'Contraseña restablecida. Le pedirá cambiarla al entrar.')() }}>Restablecer</button></div>
-            {owner && <div className="info-row"><span>Código de autorización {u.hasAuthCode ? '(asignado)' : '(sin código)'}</span><button className="mini" onClick={() => { const c = prompt('Código de autorización para esta persona (mínimo 4):'); if (c) void run(() => api('PUT', `/users/${u.id}/auth-code`, { code: c }), 'Código asignado.')() }}>{u.hasAuthCode ? 'Cambiar' : 'Asignar'}</button></div>}
+            <div className="info-row"><span>Contraseña olvidada</span><button className="mini" onClick={async () => { const p = await ask({ title: 'Restablecer contraseña', hint: 'Mínimo 8 caracteres. Díctasela a la persona; le pedirá cambiarla al entrar.', label: 'Contraseña nueva', confirmLabel: 'Restablecer' }); if (p) void run(() => api('POST', `/users/${u.id}/reset-password`, { newPassword: p }), 'Contraseña restablecida. Le pedirá cambiarla al entrar.')() }}>Restablecer</button></div>
+            {owner && <div className="info-row"><span>Código de autorización {u.hasAuthCode ? '(asignado)' : '(sin código)'}</span><button className="mini" onClick={async () => { const c = await ask({ title: 'Código de autorización', hint: 'Mínimo 4 dígitos, para esta persona.', label: 'Código', secret: true, numeric: true, confirmLabel: 'Guardar código' }); if (c) void run(() => api('PUT', `/users/${u.id}/auth-code`, { code: c }), 'Código asignado.')() }}>{u.hasAuthCode ? 'Cambiar' : 'Asignar'}</button></div>}
             <div className="info-row"><span>{active ? 'Puede entrar al sistema' : 'Desactivado: no puede entrar'}</span><button className={active ? 'mini danger' : 'mini'} onClick={run(async () => { await api('PATCH', `/users/${u.id}`, { active: !active }); setActive(!active) }, active ? 'Desactivado. Su historial se conserva.' : 'Activado.')}>{active ? 'Desactivar' : 'Activar'}</button></div>
           </div>
         )}

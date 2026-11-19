@@ -22,9 +22,21 @@
   --selected: #1d2534;
   --selected-line: #2c3649;
   --radius: 18px;
+  /* Sistema de diseño: espacios, radios, sombras y tiempos (todo lo nuevo los usa). */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px;
+  --radius-sm: 10px; --radius-md: 14px; --radius-lg: 22px; --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.75);
+  --focus-ring: 0 0 0 3px rgba(34, 211, 238, 0.35);
+  --dur-fast: 0.12s; --dur: 0.18s; --dur-slow: 0.3s;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --font-body: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Inter Variable', system-ui, sans-serif;
   color-scheme: dark;
   font-size: 20px;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-body);
+  font-feature-settings: 'cv11', 'ss01';
   color: var(--ink);
   background: var(--bg);
 }
@@ -38,6 +50,8 @@ body {
   background-attachment: fixed;
 }
 h1, h2, h3 { margin: 0 0 12px; line-height: 1.2; letter-spacing: -0.01em; }
+h1, h2 { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.02em; }
+h3 { font-weight: 650; }
 h1 { font-size: 1.6rem; } h2 { font-size: 1.25rem; } h3 { font-size: 1.05rem; }
 a { color: var(--cyan); }
 input, select, textarea, button { font: inherit; color: inherit; }
@@ -45,12 +59,14 @@ input, select, textarea {
   width: 100%; min-height: 56px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--input);
 }
 input::placeholder, textarea::placeholder { color: var(--muted); }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.25); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: var(--focus-ring); }
+/* Se ve dónde está el foco al usar teclado o lector de pantalla (no al tocar). */
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--cyan); }
 label { display: block; font-weight: 600; margin: 12px 0 6px; color: var(--ink); }
 label > input, label > select, label > textarea { margin-top: 6px; font-weight: 400; }
 button, a.button {
   min-height: 56px; padding: 10px 18px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--input); cursor: pointer; font-weight: 600;
-  transition: transform 0.08s ease, border-color 0.15s ease, background 0.15s ease;
+  transition: transform var(--dur-fast) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 button:hover:not(:disabled) { border-color: rgba(34, 211, 238, 0.5); }
 button:active:not(:disabled) { transform: scale(0.98); }
@@ -62,6 +78,7 @@ button.big { min-height: 80px; font-size: 1.2rem; }
 button:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 :focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
 
+.show-sm { display: none; }
 /* ---------- Estructura: menú lateral + contenido ---------- */
 .app { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
 .side {
@@ -158,7 +175,7 @@ table.list th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
 /* Logo horizontal (spec §16) */
 .nx-logo { display: inline-flex; align-items: center; gap: 0.6em; }
 .nx-mark { flex: 0 0 auto; display: block; }
-.nx-word, .brand .word { font-weight: 800; letter-spacing: 0.15em; background: linear-gradient(135deg, #f1f5f9, #c4b5fd); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.nx-word, .brand .word { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.15em; background: linear-gradient(135deg, #f1f5f9, #c4b5fd); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
 /* ---------- Pantallas chicas: menú arriba, desplegable ---------- */
 @media (max-width: 900px) {
@@ -225,6 +242,7 @@ label.check { display: flex; align-items: center; gap: 10px; font-weight: 500; }
 label.check input { width: auto; min-height: 0; }
 @media (max-width: 900px) {
   .hide-sm { display: none; }
+  .show-sm { display: table-cell; }
   .period { justify-items: start; width: 100%; }
   .page-head { align-items: flex-start; }
 }
@@ -424,7 +442,7 @@ ol.steps li { margin-bottom: 6px; }
 }
 
 /* ---------- Inicio: accesos rápidos según el negocio ---------- */
-.quick-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 14px 0 18px; }
+.quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 14px 0 18px; }
 .quick-action { display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 18px; text-decoration: none; color: var(--ink); background: var(--card); border: 1px solid var(--line); transition: transform 0.08s ease, border-color 0.15s ease; }
 .quick-action:hover { border-color: var(--selected-line); background: var(--selected); }
 .quick-action:active { transform: scale(0.98); }
@@ -581,7 +599,7 @@ td.row-actions .mini + .mini { margin-left: 6px; }
 .spark { width: 100%; height: 34px; margin-top: auto; }
 .real { margin-bottom: 14px; }
 .real-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-@media (min-width: 1200px) { .real-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+@media (min-width: 1600px) { .real-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
 .real-cell { display: flex; flex-direction: column; gap: 2px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--input); text-align: center; }
 .real-cell span { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
 .real-cell b { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
@@ -662,3 +680,34 @@ table.list tr.strike td b { text-decoration: line-through; }
 .screen-in { animation: screen-in 0.18s ease-out; }
 @keyframes screen-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .screen-in, .notice-toast { animation: none; } }
+
+/* Inicio: cada tarjeta mide lo que necesita (sin huecos al lado de una lista larga). */
+.dash-grid { align-items: start; }
+.goal-link { font-size: 0.8rem; font-weight: 700; white-space: nowrap; min-height: 0; padding: 4px 8px; }
+
+/* ---------- Ventanas para pedir un dato ---------- */
+.dialog-wrap { display: grid; place-items: center; padding: var(--space-4); z-index: 90; }
+.card.dialog { width: min(440px, 100%); box-shadow: var(--shadow-lg); animation: dialog-in var(--dur) var(--ease); }
+.dialog h2 { margin-bottom: var(--space-2); }
+.dialog-actions { display: flex; gap: var(--space-2); justify-content: flex-end; margin-top: var(--space-4); }
+.dialog-actions button { flex: 1 1 0; }
+.dialog-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
+@keyframes dialog-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .card.dialog { animation: none; } }
+/* Inicio en celular: tarjetas en dos columnas para ver más sin bajar tanto. */
+@media (max-width: 640px) {
+  .dash-kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dash-kpis > .dkpi:first-child { grid-column: 1 / -1; }
+  .dash-kpis .dkpi { min-height: 0; padding: 12px; }
+  .dash-kpis .dkpi-value { font-size: 1.15rem; }
+  .dash-kpis > .dkpi:first-child .dkpi-value { font-size: 1.6rem; }
+  .dash-kpis .trend { font-size: 0.72rem; }
+  .dash-kpis .spark { height: 22px; }
+}
+@media (max-width: 640px) {
+  table.merma-list, table.merma-list tbody { display: block; }
+  table.merma-list tr { display: grid; grid-template-columns: 96px 1fr; gap: 6px 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  table.merma-list td { border: 0; padding: 0; width: auto !important; }
+  table.merma-list td:first-child { grid-column: 1 / -1; font-weight: 600; }
+  table.merma-list input { min-height: 46px; }
+}

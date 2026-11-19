@@ -1,6 +1,8 @@
 import { StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { DialogHost } from './Dialog'
+import './fonts.css'
 import './styles.css'
 
 // El navegador avisa una sola vez que la app se puede instalar; se guarda para el botón «Instalar NEXORA».
@@ -15,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
     <Suspense fallback={<div className="boot-loading" aria-busy="true" />}>
       <App />
     </Suspense>
+    <DialogHost />
   </StrictMode>,
 )
 

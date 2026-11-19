@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
+import { confirmAsk } from '../Dialog'
 import { can, type Me } from '../App'
 import { loyaltyText } from './Caja'
 import { cardWhatsApp } from './MiTarjeta'
@@ -181,7 +182,7 @@ function Rifa() {
       <p className="muted small">Premios para los primeros que junten cierta cantidad de sellos. Si varios llegan el mismo día, gana quien tenga más faciales o más compras, según el premio. Cada cliente gana un solo premio y al entregárselo se le descuentan los sellos.</p>
       {active ? (
         <>
-          <div className="card-head"><h3>{active.name}</h3><button className="mini" onClick={() => { if (confirm('¿Terminar la rifa? Ya no aparecerá en las tarjetas de los clientes.')) void run(() => api('POST', `/campaigns/${active.id}/end`), 'Rifa terminada.')() }}>Terminar rifa</button></div>
+          <div className="card-head"><h3>{active.name}</h3><button className="mini" onClick={async () => { if (await confirmAsk('¿Terminar la rifa?', 'Ya no aparecerá en las tarjetas de los clientes.', true)) void run(() => api('POST', `/campaigns/${active.id}/end`), 'Rifa terminada.')() }}>Terminar rifa</button></div>
           <p className="muted small">Desde {new Date(active.startsAt).toLocaleDateString('es-MX')}{active.endsAt ? ` · ${Date.now() >= Date.parse(active.endsAt) ? 'cerró' : 'cierra'} el ${closeDay(active.endsAt)}` : ' · sin fecha de cierre'}</p>
           <div className="row" style={{ alignItems: 'end' }}>
             <label>Cierra el (último día que cuenta)<input type="date" value={close} onChange={(e) => setClose(e.target.value)} /></label>
@@ -196,7 +197,7 @@ function Rifa() {
                   <tr key={x.customerId}>
                     <td>{i + 1}. <b>{x.name}</b><br /><small className="muted">llegó {new Date(x.reachedAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}{x.score != null ? ` · ${x.score} ${p.tiebreak === 'faciales' ? 'faciales' : 'productos'}` : ''}</small></td>
                     <td className="num"><span className={x.status === 'ganador' ? 'pill' : 'muted'}>{STATUS_R[x.status]}</span>{' '}
-                      {x.status === 'ganador' && <button className="mini primary" onClick={() => { if (confirm(`¿Entregar «${p.name}» a ${x.name}? Se le descuentan ${p.goal} sellos.`)) void run(() => api('POST', `/campaigns/${active.id}/prizes/${p.id}/deliver`, { customerId: x.customerId }), 'Premio entregado.')() }}>Entregar</button>}
+                      {x.status === 'ganador' && <button className="mini primary" onClick={async () => { if (await confirmAsk(`¿Entregar «${p.name}» a ${x.name}?`, `Se le descuentan ${p.goal} sellos.`)) void run(() => api('POST', `/campaigns/${active.id}/prizes/${p.id}/deliver`, { customerId: x.customerId }), 'Premio entregado.')() }}>Entregar</button>}
                     </td>
                   </tr>
                 ))}
