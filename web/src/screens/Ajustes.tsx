@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, cache, mxn, outbox, toCents } from '../api'
 import { hasGiro, type Me } from '../App'
-import { giroLabel } from '../giros'
+import { giroLabel, vocab } from '../giros'
 import { WhatsAppShare } from './Descargar'
 
 const MODULES: Record<string, string> = { membresias: 'Membresías y paquetes', promociones: 'Promociones', fidelidad: 'Puntos o sellos', asistencia: 'Asistencia con QR', reservas: 'Reservas y venta por link', recordatorios: 'Recordatorios (solo prepara el mensaje)' }
@@ -48,7 +48,7 @@ export function Ajustes({ me }: { me: Me }) {
       </section>
       <section className="card">
         <h2>Opciones</h2>
-        {check('tipsEnabled', 'Propinas')}
+        {vocab(me).tips && check('tipsEnabled', 'Propinas')}
         {hasGiro(me, 'restaurante', 'taqueria') && check('pickupScheduling', 'Reservar hora para pedidos para recoger')}
         {hasGiro(me, 'verduleria') && check('phoneOrdersPrepaid', 'Cobrar pedidos por teléfono antes de entregar')}
         {hasGiro(me, 'unas') && <label>Cargo por traslado a domicilio (vacío = apagado)<input inputMode="decimal" value={st.travelFee != null ? String(st.travelFee / 100) : ''} onChange={(e) => setSt({ ...st, travelFee: e.target.value.trim() ? toCents(e.target.value) : null })} /></label>}
@@ -75,13 +75,13 @@ export function Ajustes({ me }: { me: Me }) {
         <WhatsAppShare />
         <p><a href="/descargar" target="_blank" rel="noreferrer">Ver la página de descarga</a></p>
       </section>
-      <EmpezarDeCero />
+      <EmpezarDeCero me={me} />
     </div>
   )
 }
 
 /** Borra las ventas y movimientos de prueba (después de enseñar el sistema) para que el negocio empiece limpio. */
-function EmpezarDeCero() {
+function EmpezarDeCero({ me }: { me: Me }) {
   const [open, setOpen] = useState(false)
   const [f, setF] = useState({ confirm: '', code: '' })
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
@@ -89,7 +89,7 @@ function EmpezarDeCero() {
   return (
     <section className="card">
       <h2>Empezar de cero</h2>
-      <p className="muted">Para cuando ya terminaste de enseñar el sistema: borra <b>todas</b> las ventas, cortes, cajas, gastos, fiados, apartados, citas, cuentas de mesa y demás movimientos de prueba. Lo vendido de prueba regresa al inventario y los folios vuelven a empezar en 1.</p>
+      <p className="muted">Para cuando ya terminaste de enseñar el sistema: borra <b>todos</b> los movimientos de prueba: {vocab(me).resetItems}. Lo vendido de prueba regresa al inventario y los folios vuelven a empezar en 1.</p>
       <p className="muted small">Se queda: productos, servicios, clientes, proveedores, compras, personal y configuración. Una venta suelta no se puede borrar; para eso está «Cancelar venta» con código.</p>
       {!open && <p><button className="danger" onClick={() => setOpen(true)}>Borrar datos de prueba…</button></p>}
       {open && (

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { api, mxn } from '../api'
 import type { Me } from '../App'
+import { vocab } from '../giros'
 
 /**
  * Importar datos de otro sistema o de Excel: productos (con existencia y costo), clientes (con su fiado) y proveedores.
@@ -127,7 +128,10 @@ function template(kind: Kind) {
 
 type Built = { line: number; data: Record<string, unknown>; error?: string }
 
-export function Importar(_: { me: Me }) {
+export function Importar({ me }: { me: Me }) {
+  // Solo lo que este negocio usa: el fiado y los sellos dependen del giro y de sus módulos.
+  const kinds = (Object.keys(KIND_LABEL) as Kind[]).filter((k) => k !== 'sellos' || me.modules?.includes('fidelidad'))
+  const label = (k: Kind) => (k === 'clientes' && !vocab(me).fiado ? 'Clientes' : KIND_LABEL[k])
   const [kind, setKind] = useState<Kind>('productos')
   const [file, setFile] = useState<string>('')
   const [table, setTable] = useState<string[][]>([])
@@ -195,7 +199,7 @@ export function Importar(_: { me: Me }) {
     <div className="grid2" style={{ gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)', alignItems: 'start' }}>
       <section className="card">
         <h2>1. ¿Qué vas a traer?</h2>
-        <div className="seg wrap" style={{ marginBottom: 12 }}>{(Object.keys(KIND_LABEL) as Kind[]).map((k) => <button key={k} className={kind === k ? 'on' : ''} onClick={() => switchKind(k)}>{KIND_LABEL[k]}</button>)}</div>
+        <div className="seg wrap" style={{ marginBottom: 12 }}>{kinds.map((k) => <button key={k} className={kind === k ? 'on' : ''} onClick={() => switchKind(k)}>{label(k)}</button>)}</div>
         <p className="muted small">Sirve un archivo de Excel (.xlsx) o CSV exportado de tu sistema anterior. Si no tienes uno, llena la plantilla.</p>
         <p><button onClick={() => template(kind)}>⬇ Descargar plantilla</button></p>
         <h2 style={{ marginTop: 18 }}>2. Sube el archivo</h2>

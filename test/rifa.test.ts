@@ -80,7 +80,7 @@ describe('rifa de sellos (Barbería Fénix)', () => {
     s.setGiro('barberia')
     await s.call('PUT', '/modules', { token: T, body: { active: ['fidelidad'] } })
     await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'todos', dailyCap: 3 } })
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(Date.now()))
+    const today = '2026-11-17' // el reloj de prueba (no la fecha real de la computadora)
     const r = await s.call('POST', '/campaigns', { token: T, body: { name: 'Rifa corta', endDate: today, prizes: [{ name: 'Kit de peinado', goal: 2, quantity: 2, tiebreak: 'ninguno' }] } })
     expect(r.json.campaign.endsAt).toBeTruthy()
     await open(0)
@@ -94,7 +94,7 @@ describe('rifa de sellos (Barbería Fénix)', () => {
     const st = (await s.call('GET', '/campaigns', { token: T })).json.campaigns[0]
     expect(st.prizes[0].standings.map((x: any) => x.name)).toEqual(['Ana'])
     // Se puede mover la fecha de cierre.
-    const later = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(Date.now() + 5 * 86_400_000))
+    const later = '2026-11-25'
     const p = await s.call('PATCH', `/campaigns/${st.id}`, { token: T, body: { endDate: later } })
     expect(p.json.campaign.prizes[0].standings.map((x: any) => x.name)).toEqual(['Ana', 'Beto'])
   })

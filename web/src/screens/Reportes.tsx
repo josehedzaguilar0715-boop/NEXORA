@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, fechaHora, hora, mxn, toCents } from '../api'
 import type { Me } from '../App'
+import { vocab } from '../giros'
 import { PlanFinanciero } from './Finanzas'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
@@ -95,7 +96,7 @@ export function Reportes({ me }: { me: Me }) {
         <div className="card dkpi"><span className="dkpi-label">Ventas {periodLabel}</span><div className="dkpi-value">{P ? mxn(P.sales) : '—'}</div><div className="dkpi-sub">{P ? `${P.tickets} tickets` : ''}</div></div>
         <div className="card dkpi"><span className="dkpi-label">Ganancia {periodLabel}</span><div className={`dkpi-value ${P?.profit < 0 ? 'neg' : 'pos'}`}>{P ? mxn(P.profit) : '—'}</div><div className="dkpi-sub">antes de gastos</div></div>
         <div className="card dkpi"><span className="dkpi-label">Ticket promedio</span><div className="dkpi-value">{P ? mxn(P.avgTicket) : '—'}</div><div className="dkpi-sub">por venta {periodLabel}</div></div>
-        {board?.sellsBulk && <div className="card dkpi"><span className="dkpi-label">Granel {periodLabel}</span><div className="dkpi-value warn">{P ? mxn(P.bulk) : '—'}</div><div className="dkpi-sub">por kilo, litro o metro</div></div>}
+        {board?.sellsBulk && <div className="card dkpi"><span className="dkpi-label">{vocab(me).bulk} {periodLabel}</span><div className="dkpi-value warn">{P ? mxn(P.bulk) : '—'}</div><div className="dkpi-sub">por kilo, litro o metro</div></div>}
       </div>
       <div className="grid2 config">
       <section className="card">
@@ -154,7 +155,7 @@ export function Reportes({ me }: { me: Me }) {
       {owner && (
         <section className="plan-wrap">
           <div className="card-head"><h2>Plan 50/30/20 y retiro sugerido del mes</h2></div>
-          <PlanFinanciero key={`${to}${fixed?.reserveDays}${fixed?.fixedExpenses?.length}`} from={custom ? from : `${to.slice(0, 8)}01`} to={to} />
+          <PlanFinanciero me={me} key={`${to}${fixed?.reserveDays}${fixed?.fixedExpenses?.length}`} from={custom ? from : `${to.slice(0, 8)}01`} to={to} />
         </section>
       )}
       </div>

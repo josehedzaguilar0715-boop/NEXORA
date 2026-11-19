@@ -1,41 +1,65 @@
-import { useEffect, useState, useSyncExternalStore, type CSSProperties } from 'react'
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type ComponentType, type CSSProperties } from 'react'
 import { api, auth, cache, flush, outbox } from './api'
 import { AvisosPanel, BellButton, forgetPush, NoticeToast, useNotices } from './Avisos'
 import { Caja } from './screens/Caja'
-import { Clientes } from './screens/Clientes'
-import { Compras } from './screens/Compras'
-import { Cotizaciones } from './screens/Cotizaciones'
-import { Devoluciones } from './screens/Devoluciones'
-import { Encargos } from './screens/Encargos'
-import { Agenda } from './screens/Agenda'
-import { Entradas } from './screens/Entradas'
-import { MiTarjeta } from './screens/MiTarjeta'
-import { Descargar } from './screens/Descargar'
-import { Acceso, MisBoletos, Taquilla, TiendaBoletos } from './screens/Taquilla'
-import { Cocina, Mesas, Pedidos } from './screens/Mesas'
-import { MenuDia } from './screens/MenuDia'
-import { Trompo } from './screens/Trompo'
-import { CierreDia, PrecioDia } from './screens/Verduleria'
-import { Ajustes, Buzon } from './screens/Ajustes'
-import { Escanear, Lealtad } from './screens/Lealtad'
-import { SuperPanel } from './screens/SuperPanel'
 import { Inicio } from './screens/Inicio'
-import { Privacidad } from './screens/Privacidad'
 import { Intro, Logo } from './Brand'
-import { Comisiones } from './screens/Comisiones'
-import { EstadoCita, Reservar } from './screens/Reservar'
 import { Login } from './screens/Login'
-import { Productos } from './screens/Productos'
-import { Reportes } from './screens/Reportes'
-import { MiAsistencia, Usuarios } from './screens/Usuarios'
-import { Finanzas } from './screens/Finanzas'
-import { Importar } from './screens/Importar'
-import { Configurar } from './screens/Configurar'
-import { Apartados } from './screens/Apartados'
 import {
   Archive, Armchair, Boxes, CalendarDays, ChevronRight, ChartColumn, ChefHat, ClipboardCheck, Clock, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
   LifeBuoy, LogOut, Menu, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
 } from 'lucide-react'
+
+/**
+ * Cada pantalla se descarga cuando se abre (la app arranca más rápido, sobre todo en celular).
+ * Después de entrar, el resto se descarga en segundo plano para que todo funcione sin internet.
+ */
+const loaders: (() => Promise<unknown>)[] = []
+function lazyNamed<M extends Record<string, unknown>>(load: () => Promise<M>, name: keyof M & string) {
+  loaders.push(load)
+  return lazy(async () => ({ default: (await load())[name] as ComponentType<any> }))
+}
+export function preloadScreens() {
+  const run = () => { for (const l of loaders) void l().catch(() => {}) }
+  if ('requestIdleCallback' in window) (window as any).requestIdleCallback(run, { timeout: 4000 }); else setTimeout(run, 1500)
+}
+const Clientes = lazyNamed(() => import('./screens/Clientes'), 'Clientes')
+const Compras = lazyNamed(() => import('./screens/Compras'), 'Compras')
+const Cotizaciones = lazyNamed(() => import('./screens/Cotizaciones'), 'Cotizaciones')
+const Devoluciones = lazyNamed(() => import('./screens/Devoluciones'), 'Devoluciones')
+const Encargos = lazyNamed(() => import('./screens/Encargos'), 'Encargos')
+const Agenda = lazyNamed(() => import('./screens/Agenda'), 'Agenda')
+const Entradas = lazyNamed(() => import('./screens/Entradas'), 'Entradas')
+const MiTarjeta = lazyNamed(() => import('./screens/MiTarjeta'), 'MiTarjeta')
+const Descargar = lazyNamed(() => import('./screens/Descargar'), 'Descargar')
+const Acceso = lazyNamed(() => import('./screens/Taquilla'), 'Acceso')
+const MisBoletos = lazyNamed(() => import('./screens/Taquilla'), 'MisBoletos')
+const Taquilla = lazyNamed(() => import('./screens/Taquilla'), 'Taquilla')
+const TiendaBoletos = lazyNamed(() => import('./screens/Taquilla'), 'TiendaBoletos')
+const Cocina = lazyNamed(() => import('./screens/Mesas'), 'Cocina')
+const Mesas = lazyNamed(() => import('./screens/Mesas'), 'Mesas')
+const Pedidos = lazyNamed(() => import('./screens/Mesas'), 'Pedidos')
+const MenuDia = lazyNamed(() => import('./screens/MenuDia'), 'MenuDia')
+const Trompo = lazyNamed(() => import('./screens/Trompo'), 'Trompo')
+const CierreDia = lazyNamed(() => import('./screens/Verduleria'), 'CierreDia')
+const PrecioDia = lazyNamed(() => import('./screens/Verduleria'), 'PrecioDia')
+const Ajustes = lazyNamed(() => import('./screens/Ajustes'), 'Ajustes')
+const Buzon = lazyNamed(() => import('./screens/Ajustes'), 'Buzon')
+const Escanear = lazyNamed(() => import('./screens/Lealtad'), 'Escanear')
+const Lealtad = lazyNamed(() => import('./screens/Lealtad'), 'Lealtad')
+const SuperPanel = lazyNamed(() => import('./screens/SuperPanel'), 'SuperPanel')
+const Privacidad = lazyNamed(() => import('./screens/Privacidad'), 'Privacidad')
+const Comisiones = lazyNamed(() => import('./screens/Comisiones'), 'Comisiones')
+const EstadoCita = lazyNamed(() => import('./screens/Reservar'), 'EstadoCita')
+const Reservar = lazyNamed(() => import('./screens/Reservar'), 'Reservar')
+const Productos = lazyNamed(() => import('./screens/Productos'), 'Productos')
+const Reportes = lazyNamed(() => import('./screens/Reportes'), 'Reportes')
+const MiAsistencia = lazyNamed(() => import('./screens/Usuarios'), 'MiAsistencia')
+const Usuarios = lazyNamed(() => import('./screens/Usuarios'), 'Usuarios')
+const Finanzas = lazyNamed(() => import('./screens/Finanzas'), 'Finanzas')
+const Importar = lazyNamed(() => import('./screens/Importar'), 'Importar')
+const Configurar = lazyNamed(() => import('./screens/Configurar'), 'Configurar')
+const Apartados = lazyNamed(() => import('./screens/Apartados'), 'Apartados')
 
 export interface Me {
   user: { id: string; name: string; phone?: string | null; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
@@ -46,7 +70,8 @@ export interface Me {
 }
 /** 'owner' = solo el dueño. Un permiso no marcado no aparece en pantalla. */
 /** Giros que manejan fiado o cuenta de crédito (spec: abarrotes, ferretería, papelería, comedor y verdulería). */
-export const FIADO_GIROS = ['abarrotes', 'ferreteria', 'papeleria', 'comedor', 'verduleria']
+import { FIADO_GIROS, vocab } from './giros'
+export { FIADO_GIROS }
 
 /** ¿El negocio tiene alguno de estos giros? (negocio mixto: principal + adicionales) */
 export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.business.giro]).some((x) => g.includes(x))
@@ -55,7 +80,7 @@ export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.bus
 export const can = (me: Me, p: string): boolean => (p.includes('|') ? p.split('|').some((x) => can(me, x)) : p === 'owner' ? me.user.role === 'owner' : p === 'view_reports' || me.permissions === 'todos' || me.permissions.includes(p))
 
 type Icon = import('lucide-react').LucideIcon
-export type Screen = { key: string; label: string; perm: string; C: (p: { me: Me }) => JSX.Element; giros?: string[]; group: string; icon: Icon; ownTitle?: boolean; desc?: string }
+export type Screen = { key: string; label: string; perm: string; C: ComponentType<{ me: Me }>; giros?: string[]; group: string; icon: Icon; ownTitle?: boolean; desc?: string }
 /** Portales del menú: cada uno abre un panel con sus opciones (lo de todos los días arriba, la administración al final). */
 const PORTALS: { group: string; label: string; icon: Icon }[] = [
   { group: 'Operación', label: 'Vender', icon: ShoppingCart },
@@ -69,7 +94,21 @@ export const TONE: Record<string, string> = { '': '#22d3ee', Operación: '#34d39
 export const toneStyle = (group: string) => ({ '--tone': TONE[group] ?? TONE[''] }) as CSSProperties
 export const portalOf = (group: string) => PORTALS.find((p) => p.group === group)?.label ?? group
 
-/** Una línea de qué hace cada opción, para encontrarla sin buscar. */
+/** Una línea de qué hace cada opción, con las palabras de cada giro. */
+function descFor(me: Me, key: string): string | undefined {
+  const v = vocab(me)
+  const mods = me.modules ?? []
+  switch (key) {
+    case 'agenda': return `Citas del día y por ${v.staff}`
+    case 'mesas': return hasGiro(me, 'palapa') ? 'Cuentas por mesa, reservas y rentas' : 'Cuentas por mesa y reservas'
+    case 'clientes': return [v.fiado ? 'Lista y saldo de fiado' : 'Lista de clientes', mods.includes('fidelidad') ? 'sellos y su QR' : mods.includes('membresias') ? 'membresías' : ''].filter(Boolean).join(', ')
+    case 'comisiones': return v.tips ? 'Comisiones y propinas del personal' : 'Comisiones del personal'
+    case 'configurar': return v.food ? 'Mesas, estaciones de cocina y catálogo' : v.agenda ? 'Servicios, horarios y catálogo' : hasGiro(me, 'banos', 'turistico') ? 'Tarifas, servicios y catálogo' : 'Catálogo, categorías y opciones'
+    case 'escanear': { const s = [mods.includes('fidelidad') && 'dar sello', mods.includes('asistencia') && 'registrar entrada', mods.includes('membresias') && 'usar membresía'].filter(Boolean).join(', '); return s ? s[0]!.toUpperCase() + s.slice(1) : DESC[key] }
+    case 'lealtad': return mods.includes('fidelidad') ? 'Tarjeta de sellos, premios y promociones' : 'Membresías y promociones'
+    default: return DESC[key]
+  }
+}
 const DESC: Record<string, string> = {
   caja: 'Cobrar, abrir y cerrar caja, cortes', agenda: 'Citas del día y por barbero o técnica', entradas: 'Cobrar la entrada y ver aforo',
   taquilla: 'Vender boletos y cortes de taquilla', acceso: 'Validar boletos con QR', mesas: 'Cuentas por mesa, reservas y rentas',
@@ -175,11 +214,11 @@ export function screensFor(me: Me): Screen[] {
   const fiado = hasGiro(me, ...FIADO_GIROS)
   const rename = (s: Screen): Screen =>
     s.key === 'clientes' ? { ...s, label: fiado ? 'Clientes y fiado' : 'Clientes' }
-    : s.key === 'menu' ? { ...s, label: hasGiro(me, 'comedor') ? 'Menú del día' : 'Guisados del día' }
+    : s.key === 'menu' ? { ...s, label: hasGiro(me, 'comedor', 'restaurante') ? 'Menú del día' : 'Guisados del día' }
     : s.key === 'precios' ? { ...s, label: hasGiro(me, 'verduleria') ? 'Precio del día' : 'Precio por kilo' }
     : s.key === 'lealtad' ? { ...s, label: me.modules?.includes('fidelidad') ? 'Sellos y promociones' : 'Membresías y promos' }
     : s
-  return SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s) && !(s.key === 'asistencia' && can(me, 'create_employees'))).map((s) => ({ ...rename(s), desc: DESC[s.key] }))
+  return SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s) && !(s.key === 'asistencia' && can(me, 'create_employees'))).map((s) => ({ ...rename(s), desc: descFor(me, s.key) }))
 }
 
 function Privada() {
@@ -198,6 +237,8 @@ function Privada() {
     void load(); const t = setInterval(load, 120_000); return () => clearInterval(t)
   }, [me?.user.id, hash])
   useEffect(() => { setPortal(null) }, [hash])
+  // Con la sesión abierta, el resto de las pantallas se descarga en segundo plano (para trabajar sin internet).
+  useEffect(() => { if (me) preloadScreens() }, [me?.user.id])
   // Esc cierra el panel lateral que esté abierto (el de más arriba).
   useEffect(() => {
     const esc = (e: KeyboardEvent) => {
@@ -314,7 +355,7 @@ function Privada() {
           )
         })()}
         {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <p className="muted">{portalOf(current.group)}</p>}</div></header>}
-        {current ? <current.C me={me} /> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}
+        <Suspense fallback={<ScreenLoading />}>{current ? <div key={current.key} className="screen-in"><current.C me={me} /></div> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}</Suspense>
       </main>
     </div>
   )
@@ -328,4 +369,9 @@ function PortalItem({ s, on }: { s: Screen; on: boolean }) {
       <span><b>{s.label}</b>{s.desc && <small>{s.desc}</small>}</span>
     </a>
   )
+}
+
+/** Mientras llega una pantalla: un esqueleto discreto en lugar de una pantalla en blanco. */
+function ScreenLoading() {
+  return <div className="screen-loading" aria-busy="true" aria-label="Cargando"><div className="sk sk-title" /><div className="sk sk-row" /><div className="sk sk-card" /></div>
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, mxn } from '../api'
 import { FIADO_GIROS, hasGiro, screensFor, toneStyle, type Me } from '../App'
+import { vocab } from '../giros'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const day = (d: string) => new Date(`${d}T12:00:00-06:00`).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
@@ -69,7 +70,7 @@ export function Inicio({ me }: { me: Me }) {
         </div>
         {T?.bulk != null && (
           <div className="card dkpi">
-            <div className="dkpi-top"><span className="dkpi-label">Granel de hoy</span></div>
+            <div className="dkpi-top"><span className="dkpi-label">{vocab(me).bulk} hoy</span></div>
             <div className="dkpi-value" style={{ color: 'var(--accent)' }}>{mxn(T.bulk)}</div>
             <div className="dkpi-sub">por kilo, litro o metro</div>
           </div>

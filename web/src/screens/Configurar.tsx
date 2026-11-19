@@ -112,7 +112,7 @@ function Servicios({ me }: { me: Me }) {
           </div>
           <label>{agenda ? 'Costo por servicio (material: cera, gel, navajas…)' : papel ? 'Costo por unidad (hoja, tinta, luz)' : 'Costo por servicio (insumos)'} — opcional<input inputMode="decimal" value={f.cost} onChange={set('cost')} placeholder="$0.00" /></label>
           {f.cost.trim() !== '' && <ProfitLine price={toCents(f.price)} cost={toCents(f.cost)} margin={0} />}
-          <p className="muted small" style={{ marginTop: -4 }}>Lo que gaste por receta (insumos del inventario) se suma solo. Las comisiones del personal se restan aparte.</p>
+          <p className="muted small" style={{ marginTop: -4 }}>Si el servicio gasta {agenda ? 'productos del inventario' : 'insumos del inventario'}, se descuentan solos al cobrar. Las comisiones del personal se restan aparte.</p>
           {unas && <label>Tiempo de secado que bloquea la agenda (min)<input inputMode="numeric" value={f.extraBlockMin} onChange={set('extraBlockMin')} placeholder="0" /></label>}
           <label>{unas ? 'Técnica' : papel ? 'Tipo (copias, impresión, engargolado…)' : 'Categoría (opcional)'}<input value={f.category} onChange={set('category')} /></label>
           {f.id && toCents(f.price) !== f.orig && <label>Código de autorización (cambio de precio)<input type="password" value={f.authCode} onChange={set('authCode')} /></label>}

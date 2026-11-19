@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import './styles.css'
@@ -12,7 +12,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <Suspense fallback={<div className="boot-loading" aria-busy="true" />}>
+      <App />
+    </Suspense>
   </StrictMode>,
 )
 

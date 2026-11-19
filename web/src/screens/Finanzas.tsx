@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { api, auth, mxn, toCents } from '../api'
 import { can, type Me } from '../App'
 import { GananciaReal } from './Inicio'
+import { vocab } from '../giros'
 
 /** Finanzas y contabilidad: estado de resultados, flujo de efectivo, balance, gastos y libro de movimientos. */
 
@@ -63,10 +64,10 @@ export function Finanzas({ me }: { me: Me }) {
       </header>
       <nav className="subtabs" aria-label="Secciones de finanzas">{TABS.map(([k, v]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{v}</button>)}</nav>
       {err && <p className="error">{err}</p>}
-      {tab === 'resumen' && <Resumen from={from} to={to} onErr={setErr} go={setTab} />}
+      {tab === 'resumen' && <Resumen me={me} from={from} to={to} onErr={setErr} go={setTab} />}
       {tab === 'resultados' && <Resultados from={from} to={to} onErr={setErr} />}
-      {tab === 'flujo' && <Flujo from={from} to={to} onErr={setErr} />}
-      {tab === 'balance' && <Balance onErr={setErr} />}
+      {tab === 'flujo' && <Flujo me={me} from={from} to={to} onErr={setErr} />}
+      {tab === 'balance' && <Balance me={me} onErr={setErr} />}
       {tab === 'gastos' && <Gastos from={from} to={to} onErr={setErr} canEdit={can(me, 'edit_inventory')} />}
       {tab === 'movimientos' && <Movimientos from={from} to={to} onErr={setErr} />}
       <p className="muted small" style={{ marginTop: 18 }}>Contabilidad administrativa para decidir mejor. Para declaraciones ante el SAT, comparte las exportaciones con tu contador.</p>
@@ -88,7 +89,8 @@ function Delta({ now, before, invert }: { now: number; before: number; invert?: 
   return <span className={`delta ${good ? 'pos' : 'neg'}`}>{d >= 0 ? '▲' : '▼'} {Math.abs(d * 100).toFixed(0)} %</span>
 }
 
-function Resumen({ from, to, onErr, go }: { from: string; to: string; onErr: (e: string) => void; go: (t: Tab) => void }) {
+function Resumen({ me, from, to, onErr, go }: { me: Me; from: string; to: string; onErr: (e: string) => void; go: (t: Tab) => void }) {
+  const v = vocab(me)
   const [is] = useLoad<any>(`/accounting/income-statement?from=${from}&to=${to}`, [from, to], onErr)
   const [cf] = useLoad<any>(`/accounting/cash-flow?from=${from}&to=${to}`, [from, to], onErr)
   const [bal] = useLoad<any>('/accounting/balance', [], onErr)
@@ -125,7 +127,7 @@ function Resumen({ from, to, onErr, go }: { from: string; to: string; onErr: (e:
             <div className="table-wrap"><table className="list statement"><tbody>
               <tr><td>Efectivo en cajas abiertas</td><td className="num">{mxn(bal.cashInRegisters)}</td></tr>
               <tr><td>Mercancía (a costo)</td><td className="num">{mxn(bal.inventory)}</td></tr>
-              <tr><td>Te deben (fiado)</td><td className="num">{mxn(bal.receivables)}</td></tr>
+              {(v.fiado || bal.receivables > 0) && <tr><td>Te deben (fiado)</td><td className="num">{mxn(bal.receivables)}</td></tr>}
               <tr><td>Debes a proveedores</td><td className={`num ${bal.payables ? "neg" : ""}`}>{mxn(bal.payables ? -bal.payables : 0)}</td></tr>
               <tr className="total"><td>Valor del negocio</td><td className="num">{mxn(bal.equity)}</td></tr>
             </tbody></table></div>
@@ -233,7 +235,7 @@ function Resultados({ from, to, onErr }: { from: string; to: string; onErr: (e: 
   )
 }
 
-function Flujo({ from, to, onErr }: { from: string; to: string; onErr: (e: string) => void }) {
+function Flujo({ me, from, to, onErr }: { me: Me; from: string; to: string; onErr: (e: string) => void }) {
   const [cf] = useLoad<any>(`/accounting/cash-flow?from=${from}&to=${to}`, [from, to], onErr)
   if (!cf) return <section className="card"><p className="muted">Cargando…</p></section>
   const group = (rows: any[]) => Object.entries(rows.reduce((a: Record<string, any[]>, r) => ({ ...a, [r.category]: [...(a[r.category] ?? []), r] }), {})) as [string, any[]][]
@@ -264,12 +266,13 @@ function Flujo({ from, to, onErr }: { from: string; to: string; onErr: (e: strin
         {block('Entradas de dinero', cf.inflows, cf.totalIn, '+')}
         {block('Salidas de dinero', cf.outflows, cf.totalOut, '−')}
       </div>
-      <p className="muted small">El fiado no cuenta como dinero hasta que el cliente paga. Las compras a crédito cuentan cuando las pagas.</p>
+      <p className="muted small">{vocab(me).fiado ? 'El fiado no cuenta como dinero hasta que el cliente paga. ' : ''}Las compras a crédito cuentan cuando las pagas.</p>
     </>
   )
 }
 
-function Balance({ onErr }: { onErr: (e: string) => void }) {
+function Balance({ me, onErr }: { me: Me; onErr: (e: string) => void }) {
+  const v = vocab(me)
   const [b] = useLoad<any>('/accounting/balance', [], onErr)
   if (!b) return <section className="card"><p className="muted">Cargando…</p></section>
   return (
@@ -278,9 +281,9 @@ function Balance({ onErr }: { onErr: (e: string) => void }) {
         <section className="card">
           <h2>Lo que tiene el negocio</h2>
           <div className="table-wrap"><table className="list statement"><tbody>
-            <tr><td>Efectivo en cajas abiertas<br /><small className="muted">{b.openRegisters} caja(s) abierta(s); sin propinas</small></td><td className="num">{mxn(b.cashInRegisters)}</td></tr>
+            <tr><td>Efectivo en cajas abiertas<br /><small className="muted">{b.openRegisters === 1 ? '1 caja abierta' : `${b.openRegisters} cajas abiertas`}{v.tips ? '; sin propinas' : ''}</small></td><td className="num">{mxn(b.cashInRegisters)}</td></tr>
             <tr><td>Mercancía en inventario<br /><small className="muted">a lo que te costó</small></td><td className="num">{mxn(b.inventory)}</td></tr>
-            <tr><td>Cuentas por cobrar<br /><small className="muted">fiado de clientes</small></td><td className="num">{mxn(b.receivables)}</td></tr>
+            {(v.fiado || b.receivables > 0) && <tr><td>Cuentas por cobrar<br /><small className="muted">fiado de clientes</small></td><td className="num">{mxn(b.receivables)}</td></tr>}
             <tr className="total"><td>Total</td><td className="num">{mxn(b.assets)}</td></tr>
           </tbody></table></div>
         </section>
@@ -288,7 +291,7 @@ function Balance({ onErr }: { onErr: (e: string) => void }) {
           <h2>Lo que debe el negocio</h2>
           <div className="table-wrap"><table className="list statement"><tbody>
             <tr><td>Cuentas por pagar<br /><small className="muted">compras a crédito sin liquidar</small></td><td className="num">{mxn(b.payables)}</td></tr>
-            <tr><td>Saldo a favor de clientes<br /><small className="muted">devoluciones como saldo</small></td><td className="num">{mxn(b.customerCredit)}</td></tr>
+            {(b.customerCredit > 0 || me.business.giro === 'ferreteria' || me.business.giro === 'perfumeria') && <tr><td>Saldo a favor de clientes<br /><small className="muted">devoluciones como saldo</small></td><td className="num">{mxn(b.customerCredit)}</td></tr>}
             {b.layawayDeposits > 0 && <tr><td>Anticipos de apartados<br /><small className="muted">dinero recibido por mercancía sin entregar</small></td><td className="num">{mxn(b.layawayDeposits)}</td></tr>}
             <tr className="total"><td>Total</td><td className="num">{mxn(b.liabilities)}</td></tr>
           </tbody></table></div>
@@ -381,7 +384,7 @@ function Movimientos({ from, to, onErr }: { from: string; to: string; onErr: (e:
 const BUCKET_TONE = { ops: '#fbbf24', owner: '#34d399', savings: '#22d3ee' } as const
 
 /** Plan 50/30/20: cómo repartir la utilidad bruta y cuánto puede retirar el dueño sin dejar el negocio en 0. */
-export function PlanFinanciero({ from, to, compact = false }: { from: string; to: string; compact?: boolean }) {
+export function PlanFinanciero({ me, from, to, compact = false }: { me?: Me; from: string; to: string; compact?: boolean }) {
   const [d, setD] = useState<any>(null)
   const [rule, setRule] = useState({ ops: '50', owner: '30', savings: '20' })
   const [edit, setEdit] = useState(false)
@@ -427,7 +430,7 @@ export function PlanFinanciero({ from, to, compact = false }: { from: string; to
           <h3>De dónde sale</h3>
           <div className="table-wrap"><table className="list statement"><tbody>
             <tr><td>Ventas</td><td className="num">{mxn(d.sales)}</td></tr>
-            <tr><td>Lo que costó lo vendido (productos, material, recetas)</td><td className="num">{mxn(d.costOfSales ? -d.costOfSales : 0)}</td></tr>
+            <tr><td>Costo de lo vendido<br /><small className="muted">{me ? vocab(me).costOf : 'lo que te costó la mercancía'}</small></td><td className="num">{mxn(d.costOfSales ? -d.costOfSales : 0)}</td></tr>
             <tr className="total"><td>Utilidad bruta (lo que se reparte)</td><td className="num">{mxn(d.grossProfit)}</td></tr>
             <tr><td>Gastos de operación</td><td className="num">{mxn(B.ops.actual ? -B.ops.actual : 0)}</td></tr>
             <tr className={`total ${d.profit < 0 ? 'neg' : ''}`}><td>Utilidad</td><td className="num">{mxn(d.profit)}</td></tr>

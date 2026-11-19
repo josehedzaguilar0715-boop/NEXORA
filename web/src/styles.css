@@ -649,3 +649,16 @@ table.list tr.strike td b { text-decoration: line-through; }
 @keyframes nt-in { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .pack-box { border: 1px dashed var(--selected-line); border-radius: 14px; padding: 10px 12px; margin: 10px 0; } .pack-box .check { margin: 0; } .pack-box .row { margin-top: 8px; }
 @media (max-width: 640px) { table.list.products tbody tr { grid-template-columns: minmax(0, 1fr) auto auto; } table.list.products tbody td.num small { white-space: normal; font-size: 0.72rem; } table.list.products tbody td.row-actions { display: flex; gap: 6px; justify-content: flex-end; } }
+
+/* ---------- Carga de pantallas ---------- */
+.screen-loading { display: grid; gap: 14px; padding: 4px 0; }
+.sk { border-radius: 14px; background: linear-gradient(90deg, var(--card) 0%, var(--input) 50%, var(--card) 100%); background-size: 200% 100%; animation: sk 1.2s ease-in-out infinite; }
+.sk-title { height: 34px; width: 220px; }
+.sk-row { height: 48px; }
+.sk-card { height: 260px; }
+@keyframes sk { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.boot-loading { min-height: 100vh; background: var(--bg); }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+.screen-in { animation: screen-in 0.18s ease-out; }
+@keyframes screen-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .screen-in, .notice-toast { animation: none; } }
