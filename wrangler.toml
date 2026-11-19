@@ -1,0 +1,47 @@
+# NEXORA en Cloudflare, plan gratuito ($0, sin tarjeta).
+# Pantallas: incluidas en el paquete del Worker. API: Durable Object con SQLite (la base completa).
+name = "nexora-staging"
+main = "src/worker.ts"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[durable_objects.bindings]]
+name = "NEXORA"
+class_name = "Nexora"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Nexora"]
+
+# Respaldo diario: 09:17 UTC = 3:17 a. m. en el centro de México.
+[triggers]
+crons = ["17 9 * * *"]
+
+[[kv_namespaces]]
+binding = "BACKUPS"
+id = "8c083b72601f4fb6978bb83ac9864feb"
+
+[observability]
+enabled = true
+
+# ---------- Producción: clientes reales. Base, respaldos y secretos propios, separados de staging. ----------
+[env.production]
+name = "nexora"
+
+[[env.production.durable_objects.bindings]]
+name = "NEXORA"
+class_name = "Nexora"
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["Nexora"]
+
+[env.production.triggers]
+crons = ["17 9 * * *"]
+
+[[env.production.kv_namespaces]]
+binding = "BACKUPS"
+id = "c8d9a9b081124f6b92a2b88e3eeeb899"
+
+[env.production.observability]
+enabled = true

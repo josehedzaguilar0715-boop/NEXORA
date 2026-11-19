@@ -1,1 +1,214 @@
 # NEXORA
+
+Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA_SPEC.md` (v1, 2026-11-16).
+
+## Estado
+
+- **Bloque 1 (base)**: cuentas, acceso y roles, código de autorización, caja y corte, bitácora inmutable, tickets. ✅ con pruebas.
+- **Bloque 2 (sin internet y nube)**: cola local de la caja (`src/client/outbox.ts`), llave de idempotencia, sincronización de cambios con conflictos "gana el más reciente" y panel del dueño (`/dashboard`). ✅ con pruebas.
+- **Bloque 3 (super panel)**: estados prueba/activo/vencido/suspendido sin perder datos, pagos y reactivación, planes y límites, alta asistida, restablecer accesos, buzón de soporte y solicitudes de cambio. ✅ con pruebas.
+- **Bloque 4 (módulo común)**: clientes finales con QR, escaneo validado por el servidor, membresías por usos y periodo, promociones automáticas, fidelidad (puntos o sellos), asistencia de clientes y personal. Cada módulo se activa por negocio. ✅ con pruebas.
+- **Bloque 5 (abarrotes) — servidor**: catálogo con presentaciones y códigos de barras, granel por kilo o importe, lotes primero-entra-primero-sale con precio y costo real, compras con fletes repartidos, márgenes sugeridos, caducidad, mermas, conteos, traspasos, proveedores y cuentas por pagar, fiado con límite y abonos, gastos, reportes de utilidad y retiro sugerido, cajas asignadas. ✅ con pruebas.
+- **Bloque 5 (abarrotes) — pantallas**: app web instalable (`web/`) con caja (lector de código de barras, granel por kilo o importe, cobro con cambio, fiado, descuento con código, ventas del turno, retiros, corte), productos con alertas, compras con fletes, clientes y fiado, reportes con retiro sugerido y personal con permisos. Funciona sin internet con contador visible. ✅ con prueba de punta a punta en navegador.
+- **Bloque 6 (ferretería)**: varias unidades con equivalencias (caja, rollo; granel por metro y litro), escalas de precio por volumen que la caja aplica sola, cotizaciones que no apartan existencia, clientes constructores con límite (código del dueño), clave del proveedor por producto y devoluciones con o sin ticket (siempre con código). El negocio tiene un **giro** y las pantallas se adaptan. ✅ con pruebas y prueba en navegador.
+- **Bloque 7 (papelería)**: servicios por hoja con precio por tamaño y color, consumibles de uso (tinta, tóner, papel) con costo vía recetas, contador de copiadoras por turno contra hojas cobradas, combos de temporada con un solo precio, encargos con anticipo (la devolución la decide el dueño con código) y mayoreo con escalas y crédito. ✅ con pruebas y prueba en navegador.
+- **Bloque 8 (barbería)**: agenda por barbero con horarios, días de descanso y bloqueos; citas en mostrador y clientes sin cita en la misma agenda; combos con precio repartido; comisiones por barbero y servicio/producto/categoría sin valores predeterminados (sobre precio final, cada venta guarda su %); propinas aparte; productos en la misma cuenta; reserva pública por link con "el primero disponible", solo horas libres, pendiente hasta confirmar y estado visible. Sin recordatorios automáticos (botón para preparar WhatsApp). ✅ con pruebas y prueba en navegador.
+- **Bloque 9 (estudio de uñas)**: agenda por técnica con tiempo de secado que bloquea; consumibles por técnica; comisiones por técnica (categoría) y propinas aparte; paquetes de sesiones (N usos en su vigencia); notas libres que solo escribe el dueño; a domicilio (todos o algunos servicios, dirección privada, traslado que bloquea la agenda, cargo opcional apagado y fuera de comisión); recordatorio de retoque opcional y apagado, que solo prepara el mensaje. ✅ con pruebas.
+- **Bloque 10 (perfumería)**: variantes por marca, fragancia, ml y presentación (cada una con código de barras y costo); decants que abren frascos, descuentan ml y crean los chicos con costo proporcional (más envase); testers y muestras como inventario de uso; devoluciones solo de sellados, con ticket y código; sets con un precio y empaque como consumible; comisiones por asesora, marca o categoría. ✅ con pruebas.
+- **Bloque 11 (baños públicos)**: tarifas editables combinadas en una entrada con ticket y hora; pases por día, semana o mes con QR que también registra asistencia; conteo de accesos por hora, día y servicio; insumos de uso descontados por acceso según la referencia del dueño; control de limpieza por turno; gastos fijos para la reserva; cobro por tiempo activable por servicio. ✅ con pruebas.
+- **Bloque 12 (lugar turístico)**: boletos por tipo con precio editable, por fecha y horario con aforo (nunca se vende de más); aforo en tiempo real; venta anticipada por link con QR por boleto (queda por pagar y cuenta para el aforo); acceso con QR que rechaza repetidos, vencidos, cancelados y sin pagar; taquilla con corte por tipo de boleto; visitas guiadas con cupo y guía; tienda y estacionamiento aparte; cierre temporal con código que prepara avisos y cancela los afectados; reembolsos solo con código del dueño; grupos vía promociones; reportes por día, horario, tipo y canal. ✅ con pruebas.
+- **Bloque 13 (palapa)**: mesas con cuenta abierta; comandas a cocina y barra con mesa y hora; cobro en mesa completo o dividido por persona o por producto; propinas por mesero aparte; reservas de mesa confirmadas por dueño o encargado; consumo mínimo por mesa; renta de sillas, camastros y sombrillas con su propio control; recetas e insumos; precio por kilo del día con código; merma de perecederos; bebidas y hielo con costo; tolera reenvíos sin señal. ✅ con pruebas.
+- **Bloque 14 (restaurante)**: plano de mesas por área con estados y mapa en vivo; la mesa pasa a limpieza al cobrar y el mesero la libera; comandas por estación (cada una ve solo lo suyo) que se envían al confirmar, con tiempos de cocina; cuenta dividible; cancelaciones y cortesías con código del dueño; pedidos para llevar y recoger con número y estados, cobrados al hacerlos; reserva de hora para recoger con interruptor (apagada); aviso de pedido listo manual; propinas por mesero; menú editable con variantes y combos. ✅ con pruebas y prueba en navegador.
+- **Bloque 15 (comedor)**: menú del día (o corrido) por turno que el encargado publica con código; agotados que no se venden; venta rápida con botones grandes de lo más vendido; turnos de comida (desayuno, comida, cena) con corte por turno; platillos por porción con receta y costo; crédito a oficinas y talleres con límite (pasarlo pide código del dueño); mapa de mesas opcional (apagado); caja rápida con cambio; propinas opcionales (apagadas). ✅ con pruebas.
+- **Bloque 16 (taquería)**: venta por pieza y por kilo o importe con báscula; catálogo corto con botones grandes; recetas por guisado con insumos por kilo y costo por taco; carne del trompo o asada (lo que se empieza, lo vendido y el sobrante contado con código al cierre; el corte no se hace con carne abierta); guisados del día publicados en la mañana con agotados ocultos; cuenta por mesa o barra; pedidos para llevar por pieza o kilo con número; precio por kilo con código en bitácora. ✅ con pruebas.
+- **Bloque 17 (verdulería)**: venta por kilo, pieza, manojo o bolsa armada con equivalencias; báscula en caja; precio del día al abrir, en lote con código; compras al mercado como lote con fletes por kilo; merma diaria con motivo y código; clientes frecuentes con cuenta semanal, límite y saldo; pedidos por teléfono o WhatsApp cobrados al entregar (o antes, si el dueño lo decide); conteo rápido al cierre. ✅ con pruebas.
+- **Los 17 bloques de la especificación están construidos.** Siguiente: revisión de pendientes (sección 12) y subir a staging.
+
+## Desarrollo local
+
+```
+npm install
+npm test          # pruebas
+npm run typecheck
+npm run build     # pantallas (web/dist)
+npm run dev       # http://localhost:3000 — pantallas en / y API en /api (base SQLite en data/nexora.db)
+npm run web:dev   # pantallas con recarga en vivo en :5173 (usa la API de :3000)
+npm run e2e       # prueba de punta a punta en navegador (requiere npm run build)
+npm run check     # todo: tipos, pruebas, build y navegador (se detiene en la primera falla)
+ADMIN_PASSWORD=... npm run admin:create -- soporte "Soporte"   # usuario del super panel
+```
+
+Los códigos de verificación (WhatsApp/SMS) se imprimen en consola en desarrollo.
+Importes siempre en centavos enteros (MXN).
+
+## Decisiones de la base (para revisar)
+
+- Un permiso no marcado → la API responde 403 y la pantalla no debe mostrarlo.
+- Código de autorización: lo asigna solo el dueño (a sí mismo o a quien decida). Quien autoriza debe tener el permiso de la acción; el solicitante también lo necesita. 5 fallos → bloqueo de 15 min.
+- Cancelar una venta solo es posible mientras su turno sigue abierto (después del corte se maneja como devolución, en ferretería).
+- Folio por sucursal asignado por el servidor al recibir la venta (se revisará en el Bloque 2 para cajas sin internet).
+
+## Sin internet (Bloque 2)
+
+- La caja encola cada operación (`Outbox.enqueue`) con un id único que sirve de `Idempotency-Key`. `flush` reenvía en orden; sin señal todo queda pendiente (`pending()` es el contador visible). Los rechazos definitivos se marcan para revisión, nunca se pierden.
+- Abrir caja, retiros, cortes y ventas aceptan `id` y hora (`at`/`createdAt`) del equipo, por lo que una caja puede operar días sin señal y conserva sus horas reales.
+- `/sync/changes` (subir/bajar) aplica "gana el más reciente" y registra el conflicto en `/sync/conflicts` para revisión. Aún no hay productos; lo usará el Bloque 5.
+- Folio: lo asigna el servidor al recibir la venta; el ticket impreso sin señal usará un número local provisional (se resuelve en la interfaz de caja).
+- Pendiente: sincronización entre cajas por red local, y cancelar ventas sin señal (el código de autorización se valida contra el servidor).
+
+## Super panel (Bloque 3)
+
+- Acceso propio (`/admin/login`), separado del de los negocios. No tiene ninguna ruta a ventas, caja ni inventario.
+- **Prueba → Vencido** al terminar la prueba o la mensualidad (automático). Vencido: puede entrar, ver su estado y escribir al buzón; todo lo demás responde 402 y los datos quedan intactos. Las ventas hechas sin señal quedan pendientes en la caja y se envían al reactivar.
+- **Suspendido**: decisión del super panel, permitida solo tras `suspend_after_days` días vencido.
+- **Pago** (`/admin/businesses/:id/payments`): vuelve a Activo, extiende el periodo y aplica el plan pendiente.
+- Cambio de plan: se aplica al siguiente pago salvo `applyNow` (en prueba, al momento). Al bajar, los usuarios y sucursales sobrantes (los más nuevos) quedan desactivados, nunca borrados. El usuario del dueño cuenta dentro de los usuarios del plan.
+- Valores provisionales, editables en `/admin/settings`: prueba 14 días, suspensión tras 30 días vencido. Las solicitudes de cambio no tienen costo (confirmado).
+- El super panel entra con contraseña y un código que llega por SMS y por correo (`/admin/verify`).
+- Pendiente: método para verificar la identidad del dueño que perdió su teléfono (hoy el super panel escribe el motivo y queda en bitácora).
+
+## Módulo común (Bloque 4)
+
+- Activar con `PUT /modules` (`membresias`, `promociones`, `fidelidad`, `asistencia`). Un módulo apagado responde 409 `modulo_inactivo`.
+- QR: cada cliente tiene un código aleatorio de 20 caracteres (`NX…`). `GET /public/qr/<código>.svg` le da su QR para descargar. `POST /scan` valida el código contra el negocio y aplica `entrada`, `membresia` o `consulta`.
+- "Misma visita" = mismo día local: un código no registra dos entradas ni usa la membresía dos veces el mismo día.
+- Membresías: usos por periodo (día, semana o mes, contados desde el inicio). Al venderse se copia el plan, así que editarlo no cambia lo ya vendido ni lo consumido.
+- Promociones: porcentaje (en puntos base: 1000 = 10 %) o monto, con vigencia, a qué aplica (todo, productos o categorías) y cantidad mínima. Se aplica sola en la venta: la mejor no combinable o todas las combinables juntas, lo que convenga más. No requiere código porque la definió el dueño.
+- Fidelidad: puntos por monto o sellos por visita, para todos o solo para clientes inscritos. Al cancelar una venta se registra un movimiento contrario; el saldo puede quedar negativo si ya canjeó.
+- Pendiente: cobrar la membresía o el premio como línea de venta (se conecta con productos en el Bloque 5).
+
+## Abarrotes (Bloque 5)
+
+- Cantidades de inventario en milésimas de la unidad base (1 pieza = 1000; 1 kg = 1000 g), así no hay errores de redondeo.
+- **Compras**: cada renglón crea un lote con su costo. Los fletes (gasolina, casetas…) se reparten por pieza o por kilo según el producto; el reparto es exacto al centavo. Se pueden dar de alta productos nuevos desde el mismo ticket. Contado (opcionalmente desde la caja) o crédito (cuentas por pagar con abonos).
+- **Precio por lote**: cada lote guarda su precio de venta. Se vende primero el lote más viejo, así el precio nuevo entra solo al agotarse el anterior. Un cambio de precio del producto (con código) aplica también a lo que ya está en existencia.
+- **Margen sugerido** por producto o, si no, por categoría (puntos base: 3000 = 30 %). Sin margen no hay sugerencia.
+- **Venta**: por pieza, presentación (paquete) o granel por kilo (báscula) o por importe. Cambiar el precio en caja pide permiso y código. Efectivo recibido y cambio. Sin existencia registrada la venta no se rechaza (puede llegar de una caja sin señal): queda en negativo y sale en la alerta de stock mínimo.
+- **Fiado**: límite por cliente; pasar el límite pide el código del dueño (no de un encargado). Los abonos en efectivo entran al corte como depósito. Cancelar una venta fiada devuelve el cargo.
+- **Retiro sugerido** = utilidad del periodo − reserva (días de gastos fijos que define el dueño) − reposición (lo que cuesta llevar al mínimo los productos que están por debajo). Utilidad = ventas − costo de lo vendido − mermas − gastos.
+- Para los giros siguientes, `saleHooks`, `cancelHooks` y `saleValidators` en `src/sales.ts` permiten agregar comisiones, recetas, propinas, etc. sin tocar la venta base.
+
+## Pantallas (Bloque 5)
+
+- Se sirven desde el mismo servidor; la API vive en `/api`. Navegación por permisos: lo que el usuario no puede hacer no aparece.
+- Link único para empleados: `/?negocio=CODIGO` llena el código del negocio.
+- Sin internet: la apertura, las ventas, los retiros y el corte se guardan en el equipo (cola local) y se envían solos al volver la señal. El botón verde/naranja de arriba es el contador de pendientes. Descuentos, cambios de precio y fiado necesitan señal porque el código se valida en el servidor.
+- Ticket: se imprime con la impresora térmica del sistema (58 mm). El peso de la báscula se captura a mano (decidido). Abrir el cajón desde el navegador queda pendiente.
+
+## Ferretería (Bloque 6)
+
+- Unidades: la unidad base del producto (pieza, kg, metro, litro) más presentaciones con su equivalencia (Caja 100 = 100 piezas; Rollo = 100 m), capturada una vez por producto.
+- Escalas por volumen (`PUT /products/:id/price-tiers`): aplica la escala de mayor cantidad mínima alcanzada. Un precio distinto en caja sigue pidiendo código.
+- Cotizaciones (`/quotes`): fijan precio por su vigencia (15 días por defecto), no apartan existencia; `POST /quotes/:id/convert` crea la venta con esos precios y ahí descuenta. Un precio especial en la cotización pide código al cotizar.
+- Devoluciones (`/returns`): con ticket (por renglón, sin pasar de lo vendido, en proporción a lo cobrado) o sin ticket (producto y monto). Siempre con código. Lo que regresa en buen estado vuelve al inventario; lo dañado (`restock: false`) no. Una venta fiada se devuelve bajando la deuda.
+
+## Papelería (Bloque 7) y piezas comunes nuevas
+
+- **Servicios** (`/services`): catálogo sin inventario propio, con precio, duración y atributos del giro (tamaño, color, técnica…). Se venden con `serviceId` en la venta. Lo usarán barbería, uñas, baños y turístico.
+- **Recetas** (`PUT /recipes/:id`): lo que gasta un servicio o producto por unidad, en millonésimas (una copia = 1/20 000 de cartucho). La fracción sobrante se acumula para no perder consumo. Lo gastado se registra como "consumo" con su costo, que entra al costo de lo vendido.
+- **Uso interno**: productos con `sellable: false` (tóner, papel, insumos) no aparecen ni se venden en la caja.
+- **Combos** (`PUT /products/:id/combo`): un precio, y al venderse descuenta sus componentes.
+- **Contador de copiadora**: lectura de inicio y fin por turno; `GET /shifts/:id/counters` marca la diferencia contra las hojas cobradas.
+- **Encargos** (`/orders`): el anticipo se cobra como venta (entra al corte); al entregar se cobra el saldo. Cancelar con devolución de anticipo exige el código del dueño.
+- Reportes: las devoluciones ya restan de la utilidad (y lo que regresa al inventario recupera su costo).
+
+## Barbería (Bloque 8) y agenda común
+
+- **Agenda** (`src/agenda.ts`): el dueño marca quién atiende y su horario semanal (`PUT /staff/:id/agenda`); un día sin horario es de descanso. Bloqueos con `POST /staff/:id/blocks`. Huecos de 15 minutos. La duración de una cita es la suma de sus servicios (más el bloqueo extra de cada servicio, p. ej. secado, en `attrs.extraBlockMin`).
+- **Estados de cita**: pendiente (por link) → confirmada → en atención → atendida (al cobrar), o cancelada / no vino. Cobrar la cita (`/appointments/:id/checkout`) crea la venta con los servicios al precio agendado, productos extra, descuentos y propinas.
+- **Comisiones** (`src/commissions.ts`): reglas del dueño por persona y por servicio, producto, categoría o todo; gana la más específica. Sin regla no hay comisión; sin quien atendió tampoco. Base = precio final con descuentos y promociones repartidos. Cada venta guarda el % aplicado. Cancelar la venta anula la comisión y la propina.
+- **Propinas**: por persona, no son ingreso del negocio ni cuentan para comisión. Las de efectivo se suman a lo que debe haber en caja (están físicamente ahí) como renglón aparte.
+- **Reserva por link**: `/reservar/<código del negocio>` (módulo `reservas`, apagado por defecto). Muestra solo horas libres, no expone datos de otros clientes, limita 3 reservas pendientes por teléfono, y `/cita/<token>` muestra el estado. Pendiente de decidir si se cobra como módulo o sitio aparte (sección 12).
+
+## Estudio de uñas (Bloque 9)
+
+- Técnicas = servicios con `attrs.technique`, duración y `attrs.extraBlockMin` (secado). Comisión por técnica con reglas de categoría.
+- Paquetes de sesiones: plan con `kind: 'paquete'`, `usesPerPeriod` sesiones en total y `validityDays`.
+- A domicilio: la clienta puede tener `homeAll` (todas sus citas a domicilio) o elegir en cada cita. La dirección se guarda en el cliente y nunca sale en el link público. El traslado (`travelMin`) bloquea antes y después de la cita. Cargo por traslado en `PUT /settings { travelFee }` (apagado por defecto), sin comisión.
+- Retoque: `attrs.retouchDays` en el servicio y módulo `recordatorios` (apagado). `GET /reminders/retouch` lista a quién le toca y prepara el WhatsApp; no envía nada.
+
+## Perfumería (Bloque 10)
+
+- Variantes = productos con `attrs` (`brand`, `fragrance`, `sizeMl`, `presentation`). La búsqueda también busca en marca y fragancia.
+- Decants (`POST /decants`): usa primero frascos ya abiertos (`GET /open-bottles`) y abre los que falten; el costo por ml sale del costo del frasco. Envase opcional como consumible.
+- Testers y muestras: productos de uso interno (`sellable: false`); su gasto se registra con `POST /testers/use`. No se venden ni se devuelven.
+- Devoluciones: en perfumería exigen ticket y que el renglón venga marcado `sealed: true`.
+- Comisiones: nueva regla `brand` (por marca), además de producto, categoría y persona.
+
+## Baños públicos (Bloque 11)
+
+- Tarifas = servicios. `POST /baths/entry` cobra varias en una entrada y registra el acceso. Un servicio con `attrs.timeRate { blockMin, blockPrice }` no se cobra al entrar: se cobra a la salida (`/baths/accesses/:id/exit`) por bloques empezados.
+- Pases: plan de membresía `kind: 'pase'` con periodo día/semana/mes. `POST /baths/pass-entry` valida el QR, cuenta el acceso y registra asistencia (una por día). No vuelve a entrar dentro de `passReentryMin` minutos (30 por defecto, en `/settings`).
+- Insumos por acceso: `PUT /baths/access-supplies` (ej. 0.025 rollo por acceso = uno cada 40), descontados con acumulación exacta.
+- Limpieza: tareas del dueño, y cada quien marca la que hizo con hora y turno. No se muestra fuera del negocio.
+
+## Lugar turístico (Bloque 12)
+
+- Tipos de boleto = servicios con `category: 'boleto'`. Horarios con aforo por día de la semana (`PUT /tourism/slots`).
+- Cada persona tiene su boleto con código propio (`entry_tickets`). `POST /tourism/scan` lo marca usado y suma al aforo; `POST /tourism/exit` resta salidas.
+- Venta anticipada: `/boletos/<código del negocio>` (módulo `reservas`). Los boletos quedan "por pagar" (sin pasarela de pago en línea: se cobran en taquilla con el folio). No entran sin pagar.
+- Cierres (`POST /tourism/closures`) y cancelaciones (`POST /tickets/cancel`) exigen el código del dueño; reembolsar es decisión explícita, nunca automática.
+- Decidido: sin pago en línea. Lo comprado por link queda por pagar y se liquida en efectivo o transferencia.
+
+## Comida: núcleo común (Bloque 13, `src/dining.ts`)
+
+- **Platillos**: productos con `trackStock: false` y receta; al venderse descuentan solo sus insumos. `attrs.station` decide a qué estación va (cocina, cocina_caliente, cocina_fria, barra, postres…) y `attrs.modifiers` sus variantes con precio extra.
+- **Cuentas** (`/tabs`): mesa, para llevar o para recoger. Los precios quedan fijos al pedir. `send` arma una comanda por estación; `GET /kitchen?station=` es la pantalla de cada estación; `POST /comandas/:id/ready` la marca lista (tiempos de cocina en `/reports/kitchen-times`).
+- **Cobro** (`/tabs/:id/checkout`): una o varias partes (todo, por persona o por renglones). Cada parte es una venta normal, con propina para el mesero. Al cerrar, la mesa pasa a limpieza y el mesero la libera.
+- **Cancelar o regalar** un renglón siempre pide el código del dueño y queda en bitácora.
+- **Consumo mínimo** por mesa: al cerrar se cobra la diferencia. (Por horario: pendiente.)
+- **Renta de activos** (`/rental-assets`, `/tabs/:id/rentals`): disponibilidad propia; regresan al cerrar la cuenta.
+
+## Comedor (Bloque 15)
+
+- Menú del día: `POST /daily-menu { meal, productIds, authCode }` (con código). `meal` = desayuno, comida, cena o `dia`. Marcar agotado: `POST /daily-menu/:id/sold-out`. Un agotado se rechaza al vender o al pedir en mesa.
+- Venta rápida: `GET /products/top` ordena los botones de la caja por lo más vendido.
+- Turno de comida: la caja se abre con `meal`, y cada turno tiene su corte.
+- Ajustes (`PUT /settings`): `tipsEnabled` (comedor: apagadas por defecto) y `tablesEnabled` (mapa de mesas, apagado).
+
+## Taquería (Bloque 16)
+
+- Carne: `POST /meat/batches { productId, kg }` al empezar; lo vendido se calcula de las recetas de los tacos y de la venta directa por kilo. `POST /meat/batches/:id/close { leftoverKg, reason, authCode }` cuenta el sobrante con código; la diferencia ajusta el inventario (faltante = merma) y queda en bitácora.
+- El corte de caja se rechaza (`trompo_abierto`) mientras haya carne sin contar en ese turno.
+- `GET /recipes/:id/cost` da el costo de un taco o platillo según su receta.
+
+## Verdulería (Bloque 17) y operaciones en lote
+
+- `POST /daily-prices { prices, authCode }`: precio del día en lote con un solo código; cada cambio queda en bitácora.
+- `POST /inventory/waste-batch { items, authCode }`: merma del día con motivo por producto, con código.
+- `POST /inventory/count-batch { items, reason }`: conteo rápido; compara contra lo esperado, ajusta y devuelve las diferencias con su costo.
+- `GET /customers/:id/statement?from&to`: estado de cuenta (por defecto, los últimos 7 días): saldo inicial, cargos, abonos y saldo final.
+- Pedidos por teléfono: cuenta `recoger` sin cocina; `POST /tabs/:id/deliver { paymentMethod }` cobra al entregar. Con `phoneOrdersPrepaid` (ajustes) se exige cobrar antes.
+
+## Pantallas de administración
+
+- **Super panel** en `/admin` (acceso propio): negocios por estado con su mensualidad, días vencido y mensajes sin leer; registrar pago; días de prueba; plan con sucursales y paquetes de usuarios (ahora o en el siguiente pago); suspender; restablecer el acceso del dueño con motivo; alta asistida; buzón con respuesta y estado de solicitudes; valores por defecto.
+- **Dueño**: Ajustes (datos del ticket, giro, módulos, opciones del giro, dispositivos), Buzón (dudas y solicitudes de cambio con su estado), Membresías y promos (planes, paquetes, pases, promociones, puntos o sellos y premios).
+- **Escanear QR** (si hay un módulo que lo use): entrada, usar membresía o consultar.
+
+## Staging y respaldos
+
+- **Contenedor**: `docker build -t nexora .` y `docker run -p 3000:3000 -v nexora-data:/data nexora`. La base vive en el volumen `/data`; las pantallas y la API (`/api`) salen del mismo puerto. Crear el usuario del super panel dentro del contenedor: `ADMIN_PASSWORD=... npx tsx src/admin-cli.ts soporte "Soporte"`.
+- **Respaldos**: `npm run backup -- carpeta` copia la base en caliente y verifica su integridad. Programarlo (p. ej. cada noche) y guardar copias fuera del servidor.
+- **CI**: `.github/workflows/ci.yml` corre tipos, pruebas y build en cada push. La prueba en navegador (`npm run e2e`) se corre en local con `npm run check`.
+- **Staging en Cloudflare, plan gratuito ($0, sin tarjeta)** en https://nexora-staging.josehedzaguilar0715.workers.dev (`wrangler.toml`, `src/worker.ts`): las pantallas van incluidas en el paquete del Worker (`npm run build:worker`) y la API (`/api/*`) corre en un Durable Object con SQLite que guarda toda la base. Misma lógica que en local; solo cambia la capa de base (`src/db-do.ts` en Cloudflare, `src/db-node.ts` en local).
+- **Despliegue manual**: `npm run deploy` (con `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`). **Automático**: cada push a la rama `staging` corre tipos, pruebas y build y, si pasan, publica con `wrangler deploy` (`.github/workflows/deploy-staging.yml`). Necesita en GitHub los secretos `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`.
+- **Usuario del super panel**: se crea solo en el primer arranque con los secretos `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_PHONE` y `ADMIN_EMAIL` (no viven en el repositorio).
+- **Avisos ($0)**: SMS con la cuenta de prueba de Twilio (crédito gratis; solo envía a números verificados en esa cuenta, suficiente para staging) y correo con el plan gratis de Resend (desde `onboarding@resend.dev` solo llega al correo dueño de la cuenta, que es el del super panel). Secretos `TWILIO_*`, `RESEND_API_KEY`, `MAIL_FROM`. Sin ellos, los códigos se ven en los registros del Worker.
+- **Respaldo**: el super panel descarga toda la base en JSON (Ajustes → Descargar respaldo).
+- **Probar en local como en Cloudflare**: `npm run build && npx wrangler dev` y en otra terminal `npx tsx scripts/smoke.ts http://localhost:8787 <log>`.
+- El `Dockerfile` queda como opción para un servidor propio más adelante.
+
+## Diseño visual (spec §15)
+
+- Tema oscuro con los tokens de la colección "NEXORA" (`web/src/styles.css`): fondos `#07090F` / `#111622` / `#161B26`, acentos cian `#22D3EE` y violeta `#8B5CF6` en degradado, texto `#F1F5F9` / `#7C8799`, positivo `#34D399` y negativo `#F87171`. Fuente Inter con respaldo del sistema.
+- Intro con el logo al abrir (fundido y escala, unos 2.5 s, botón Omitir, una vez por sesión; sin animación si el equipo pide movimiento reducido).
+- Menú lateral (en celular se despliega con ☰). Inicio con indicadores, gráfica de la semana y movimientos recientes; finanzas con la cascada del retiro sugerido; clientes con su QR para descargar; personal con asistencia del día.
+- El logo es provisional (hexágono con N) y la fuente de marca está pendiente. El archivo de Figma no se pudo leer (límite del plan gratuito de Figma), así que el diseño sale de los tokens y la descripción de la spec.
+
+## Antes de clientes reales
+
+- **Equipos de confianza**: el dueño verifica con SMS una vez por equipo; ese equipo no vuelve a pedir código en 30 días (`trusted_devices`). Se olvidan al cambiar o recuperar la contraseña, y el dueño puede quitarlos en Ajustes.
+- **Respaldos automáticos**: cada noche (3:17 a. m.) toda la base comprimida, 30 días en Cloudflare KV y copia al correo del super panel si hay Resend. Lista, descarga y "Respaldar ahora" en el super panel. Restaurar: `npm run restore -- respaldo.json.gz nueva.db`.
+- **Producción separada** (`wrangler.toml` → `[env.production]`, Worker `nexora`, base y respaldos propios): `npm run deploy:prod`. Staging (`npm run deploy`) queda para pruebas.
+- **Aviso de privacidad**: borrador en `docs/aviso-de-privacidad.md`, visible en `/privacidad` y enlazado desde el acceso. Completar los datos entre corchetes y hacerlo revisar por un abogado.
