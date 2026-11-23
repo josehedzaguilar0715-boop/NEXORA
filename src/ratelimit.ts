@@ -23,8 +23,9 @@ export function rateLimiter(now: () => Date, rules: Rule[] = RULES): MiddlewareH
   const hits = new Map<string, { n: number; reset: number }>()
   let sweep = 0
   return async (c, next) => {
-    // Solo la IP que pone Cloudflare (el cliente no la puede inventar). En el servidor de desarrollo no hay límite.
-    const ip = c.req.header('cf-connecting-ip')
+    // La IP la pone el Worker de entrada en x-nexora-ip (siempre la sobrescribe con la de Cloudflare), o Cloudflare directo.
+    // En el servidor de desarrollo (Node) no hay límite.
+    const ip = c.req.header('x-nexora-ip') || c.req.header('cf-connecting-ip')
     const rule = ip ? rules.find((r) => r.match(c.req.method, c.req.path)) : undefined
     if (!rule || !ip) return next()
     const t = now().getTime()

@@ -91,7 +91,11 @@ export default {
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       url.pathname = url.pathname.slice(4) || '/'
       if (url.pathname.startsWith('/__interno')) return new Response('No encontrado', { status: 404 })
-      return withSecurityHeaders(await env.NEXORA.get(env.NEXORA.idFromName('principal')).fetch(new Request(url, req)))
+      // La IP real (la pone Cloudflare) se pasa al objeto en un encabezado propio que siempre se sobrescribe:
+      // el cliente no la puede inventar. La usa el límite de intentos por IP.
+      const inner = new Request(url, req)
+      inner.headers.set('x-nexora-ip', req.headers.get('cf-connecting-ip') ?? '')
+      return withSecurityHeaders(await env.NEXORA.get(env.NEXORA.idFromName('principal')).fetch(inner))
     }
     // Pantallas: archivo exacto o, si no existe, la app (rutas como /admin o /reservar/…).
     const key = ASSETS[url.pathname] ? url.pathname : '/index.html'

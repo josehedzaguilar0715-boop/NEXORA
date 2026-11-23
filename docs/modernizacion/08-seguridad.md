@@ -30,7 +30,10 @@ Fecha: 23 nov 2026. Rama `modernizacion`. **Producción no se tocó.**
 * Los límites son amplios a propósito, porque en México muchos celulares salen a internet con la misma IP (redes de Telcel y AT&T).
 * Responde «Demasiados intentos desde esta conexión. Espera N minutos» con código 429 y el encabezado `Retry-After`.
 * Funciona en la memoria del objeto de Cloudflare: **$0**, sin tablas. Si el objeto se reinicia, los contadores empiezan de cero; esto es aceptable porque el bloqueo por cuenta sí queda guardado en la base.
-* Solo usa la IP que pone Cloudflare (`cf-connecting-ip`), que el cliente no puede inventar. En el servidor de desarrollo (Node) no hay límite.
+* Usa la IP que pone Cloudflare. El Worker de entrada la copia siempre en `x-nexora-ip`, sobrescribiendo lo que mande el cliente, así que el cliente no la puede inventar. En el servidor de desarrollo (Node) no hay límite.
+* **Probado en staging (Cloudflare real):** de 480 intentos de entrar, **224 pasaron y 256 fueron frenados (429)**.
+  * Este entorno de pruebas sale por ~8 IPs que van rotando, y 224 ≈ 30 por IP: justo el límite.
+  * Con 32 intentos no se veía porque se repartían entre las IPs.
 * **Opcional, decisión del propietario:** una regla de límite de Cloudflare (WAF) frenaría el abuso antes de llegar al Worker. El plan gratis incluye una regla. Es un cambio de configuración de la cuenta, así que requiere autorización.
 
 ## 3. Respaldos cifrados: cómo activarlos (requiere autorización, es configuración de producción)
