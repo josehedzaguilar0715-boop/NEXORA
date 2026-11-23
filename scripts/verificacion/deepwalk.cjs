@@ -18,7 +18,7 @@ const probe = () => {
   return [...new Set(out)].slice(0, 8)
 }
 ;(async () => {
-  const b = await chromium.launch(); const report = []; const known = {}
+  const b = await chromium.launch(process.env.HTTPS_PROXY && /^https:/.test(B) ? { proxy: { server: process.env.HTTPS_PROXY } } : {}); const report = []; const known = {}
   for (const [giro, phone] of demos) for (const who of ['dueño', 'empleado']) for (const [dev, vp] of [['pc', { width: 1366, height: 900 }], ['cel', { width: 390, height: 844 }]]) {
     const r = who === 'dueño' ? await post('/auth/owner/login', { phone, password: 'demo1234' }) : await post('/auth/login', { username: 'demo.' + giro, password: 'demo1234' })
     if (!r.token) { report.push(`${giro} ${who}: no pudo entrar ${JSON.stringify(r).slice(0, 120)}`); continue }

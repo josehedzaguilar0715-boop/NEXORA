@@ -21,6 +21,8 @@ async function page(b, token) {
   const ctx = await b.newContext({ viewport: { width: VP.width, height: VP.height }, isMobile: !!VP.isMobile, hasTouch: !!VP.hasTouch });
   await ctx.addInitScript((t) => { sessionStorage.setItem('nx_intro', '1'); localStorage.setItem('nx_token', t) }, token);
   const p = await ctx.newPage();
+  // Contra un servidor remoto (staging) las esperas fijas se alargan: SLOW=3 las triplica.
+  const wt = p.waitForTimeout.bind(p); p.waitForTimeout = (ms) => wt(ms * Number(process.env.SLOW || 1));
   p.errs = [];
   p.on('pageerror', (e) => p.errs.push('JS ' + e.message));
   p.on('response', (x) => { if (x.url().includes('/api/') && x.status() >= 500) p.errs.push(x.status() + ' ' + x.url()) });
@@ -125,12 +127,13 @@ async function unas(b) {
   await p.locator('.modal').getByLabel(/Dirección/).fill('Calle Hidalgo 12');
   await p.waitForTimeout(800);
   const slot = p.locator('.modal button', { hasText: /^\d{1,2}:\d{2} [ap]\.m\.$/ });
+  await slot.first().waitFor({ timeout: 10000 }).catch(() => {});
   ok(g, await slot.count() > 0, 'la agenda muestra horas libres (con secado y traslado)');
   await p.tap(slot.last());
   await p.locator('.modal').getByLabel('Nombre del cliente').fill('Sofía Pérez');
   await p.tap(p.locator('.modal').getByRole('button', { name: 'Guardar' }));
   await p.getByText('Cita guardada.').waitFor({ timeout: 8000 });
-  ok(g, await p.getByText('a domicilio').count() >= 1, 'cita a domicilio guardada');
+  ok(g, await p.getByText('a domicilio').first().waitFor({ timeout: 10000 }).then(() => true).catch(() => false), 'cita a domicilio guardada');
   await p.tap(p.getByRole('button', { name: 'Cobrar' }).first());
   await p.locator('.modal').getByLabel(/Propina/).fill('50');
   await p.tap(p.locator('.modal').getByRole('button', { name: 'Cobrar' }));
@@ -367,7 +370,7 @@ async function verduleria(b) {
 }
 
 (async () => {
-  const b = await chromium.launch();
+  const b = await chromium.launch(process.env.HTTPS_PROXY && /^https:/.test(B) ? { proxy: { server: process.env.HTTPS_PROXY } } : {});
   const only = process.env.ONLY ? process.env.ONLY.split(',') : null;
   for (const [name, fn] of Object.entries({ unas, perfumeria, palapa, comedor, taqueria, verduleria })) {
     if (only && !only.includes(name)) continue;

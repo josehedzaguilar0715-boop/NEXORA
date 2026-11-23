@@ -5,7 +5,7 @@ const B = process.env.B || 'http://localhost:3135'
   const at = (await post('/admin/login', { username: 'soporte', password: 'superpanel1' })).token
   const demos = (await (await fetch(B + '/api/admin/demos', { headers: { authorization: 'Bearer ' + at } })).json()).demos
   for (const d of demos) { const r = await post('/admin/demos/' + d.giro, {}, at); if (r.error) console.log('✗ crear', d.giro, r.error.message) }
-  const b = await chromium.launch(); let bad = 0
+  const b = await chromium.launch(process.env.HTTPS_PROXY && /^https:/.test(B) ? { proxy: { server: process.env.HTTPS_PROXY } } : {}); let bad = 0
   for (const d of demos) {
     const tok = (await post('/auth/owner/login', { phone: d.phone, password: 'demo1234' })).token
     const ctx = await b.newContext({ viewport: { width: 1366, height: 860 }, timezoneId: 'America/Mexico_City' })

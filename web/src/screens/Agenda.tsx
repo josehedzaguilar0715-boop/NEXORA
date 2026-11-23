@@ -141,12 +141,18 @@ function NuevaCita({ walkIn, preset, date, staff, services, onClose, onSaved }: 
   const [err, setErr] = useState('')
   const total = useMemo(() => services.filter((s) => f.serviceIds.includes(s.id)).reduce((a, s) => a + s.price, 0), [f.serviceIds, services])
   useEffect(() => {
-    if (walkIn || !f.serviceIds.length || !f.staffId) return setSlots([])
+    if (walkIn || !f.serviceIds.length || !f.staffId) { setSlots([]); return }
+    // Con internet lento las respuestas pueden llegar en desorden: solo cuenta la de lo último que se eligió.
+    let stale = false
     api<any>('GET', `/agenda/availability?date=${date}&serviceIds=${f.serviceIds.join(',')}&staffId=${f.staffId}&travelMin=${f.atHome ? Number(f.travelMin) || 0 : 0}`).then((r) => {
+      if (stale) return
       setSlots(r.slots)
+      // Una hora elegida que ya no cabe (p. ej. al agregar el traslado a domicilio) se quita.
+      setF((x) => (x.time && !r.slots.includes(x.time) ? { ...x, time: '' } : x))
       // Si se abrió desde una hora libre, queda elegida esa hora (si cabe el servicio).
       if (preset?.time && r.slots.includes(preset.time)) setF((x) => (x.time ? x : { ...x, time: preset.time! }))
-    }).catch(() => setSlots([]))
+    }).catch(() => { if (!stale) setSlots([]) })
+    return () => { stale = true }
   }, [f.serviceIds, f.staffId, date, walkIn, f.atHome, f.travelMin])
   const save = async () => {
     try {

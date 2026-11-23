@@ -15,9 +15,11 @@ export function Ajustes({ me }: { me: Me }) {
   const [sessions, setSessions] = useState<any[]>([])
   const [trusted, setTrusted] = useState<any[]>([])
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  const [ready, setReady] = useState({ mods: false, st: false })
   useEffect(() => {
-    api<any>('GET', '/modules').then((r) => { setMods(r.active); setAddons(r.addons ?? []) }).catch(() => {})
-    api<any>('GET', '/settings').then((r) => setSt(r.settings)).catch(() => {})
+    // Hasta que llegan los módulos y las opciones guardadas no se puede guardar: así no se apaga nada por error.
+    api<any>('GET', '/modules').then((r) => { setMods(r.active); setAddons(r.addons ?? []); setReady((x) => ({ ...x, mods: true })) }).catch(() => setMsg({ err: 'No se pudieron cargar los módulos. Revisa tu internet y vuelve a abrir Ajustes.' }))
+    api<any>('GET', '/settings').then((r) => { setSt(r.settings); setReady((x) => ({ ...x, st: true })) }).catch(() => setMsg({ err: 'No se pudieron cargar las opciones. Revisa tu internet y vuelve a abrir Ajustes.' }))
     api<any>('GET', '/auth/sessions').then((r) => setSessions(r.sessions)).catch(() => {})
     api<any>('GET', '/auth/trusted-devices').then((r) => setTrusted(r.devices)).catch(() => {})
   }, [])
@@ -42,7 +44,7 @@ export function Ajustes({ me }: { me: Me }) {
           const locked = k === 'reservas' && !addons.includes(k)
           return <label key={k} style={{ fontWeight: 500, opacity: locked ? 0.6 : 1 }}><input type="checkbox" disabled={locked} style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={mods.includes(k)} onChange={() => toggle(k)} />{v}{locked ? ' — con costo de instalación; pídelo en el Buzón' : ''}</label>
         })}
-        <p><button className="primary" onClick={run(() => api('PUT', '/modules', { active: mods }))}>Guardar módulos</button></p>
+        <p><button className="primary" disabled={!ready.mods} onClick={run(() => api('PUT', '/modules', { active: mods }))}>{ready.mods ? 'Guardar módulos' : 'Cargando…'}</button></p>
         {mods.includes('reservas') && <EnlacePublico me={me} />}
       </section>
       <section className="card">
@@ -52,7 +54,7 @@ export function Ajustes({ me }: { me: Me }) {
         {hasGiro(me, 'verduleria') && check('phoneOrdersPrepaid', 'Cobrar pedidos por teléfono antes de entregar')}
         {hasGiro(me, 'unas') && <label>Cargo por traslado a domicilio (vacío = apagado)<input inputMode="decimal" value={st.travelFee != null ? String(st.travelFee / 100) : ''} onChange={(e) => setSt({ ...st, travelFee: e.target.value.trim() ? toCents(e.target.value) : null })} /></label>}
         {hasGiro(me, 'banos') && <label>Minutos para volver a entrar con el mismo pase<input inputMode="numeric" value={st.passReentryMin ?? 30} onChange={(e) => setSt({ ...st, passReentryMin: Number(e.target.value) || 0 })} /></label>}
-        <p><button className="primary" onClick={run(() => api('PUT', '/settings', st))}>Guardar opciones</button></p>
+        <p><button className="primary" disabled={!ready.st} onClick={run(() => api('PUT', '/settings', st))}>{ready.st ? 'Guardar opciones' : 'Cargando…'}</button></p>
         {msg.err && <p className="error">{msg.err}</p>}
         {msg.ok && <p className="okmsg">{msg.ok}</p>}
         <h2 style={{ marginTop: 16 }}>Mis dispositivos</h2>

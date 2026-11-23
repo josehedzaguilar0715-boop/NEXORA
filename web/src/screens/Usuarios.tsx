@@ -150,12 +150,15 @@ function Horario({ userId }: { userId: string }) {
   const [inAgenda, setInAgenda] = useState(false)
   const [days, setDays] = useState(DAYS.map(() => ({ on: false, start: '10:00', end: '19:00' })))
   const [msg, setMsg] = useState('')
+  // El formulario aparece hasta tener el horario guardado: así lo que se marque no se pierde cuando llega (internet lento).
+  const [loaded, setLoaded] = useState(false)
   useEffect(() => {
     api<any>('GET', '/agenda/staff').then((r) => {
       const me = r.staff.find((s: any) => s.id === userId)
       setInAgenda(!!me)
       if (me) setDays(DAYS.map((_, i) => { const w = me.schedule.find((x: any) => x.weekday === i); return w ? { on: true, start: w.start, end: w.end } : { on: false, start: '10:00', end: '19:00' } }))
-    }).catch(() => {})
+      setLoaded(true)
+    }).catch(() => setLoaded(true))
   }, [userId])
   const save = async () => {
     try {
@@ -163,6 +166,7 @@ function Horario({ userId }: { userId: string }) {
       setMsg('Horario guardado.')
     } catch (e) { setMsg((e as Error).message) }
   }
+  if (!loaded) return <p className="muted">Cargando horario…</p>
   return (
     <div>
       <label className="check"><input type="checkbox" checked={inAgenda} onChange={(e) => setInAgenda(e.target.checked)} />Atiende citas (aparece en la agenda)</label>

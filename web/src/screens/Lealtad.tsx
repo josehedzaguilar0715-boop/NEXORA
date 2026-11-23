@@ -101,8 +101,11 @@ function Fidelidad({ me }: { me: Me }) {
   const [rewards, setRewards] = useState<any[]>([])
   const [nr, setNr] = useState({ id: '', name: '', cost: '' })
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  // La tarjeta se guarda hasta que llegó la configuración actual (con internet lento no se pierde lo guardado).
+  const [loaded, setLoaded] = useState(false)
   const load = async () => {
     const r = await api<any>('GET', '/loyalty')
+    setLoaded(true)
     setRewards(r.rewards)
     const p = r.program
     if (p) setLp({ unit: p.unit, earnBy: p.earn_by, earnAmount: p.earn_amount ? String(p.earn_amount / 100) : '100', earnPoints: String(p.earn_points), scope: p.scope, dailyCap: p.daily_cap ? String(p.daily_cap) : '' })
@@ -125,7 +128,7 @@ function Fidelidad({ me }: { me: Me }) {
         <label>Máximo al día por cliente<input inputMode="numeric" value={lp.dailyCap} onChange={(e) => setLp({ ...lp, dailyCap: e.target.value })} placeholder="Sin límite" /></label>
       </div>
       <label>Para<select value={lp.scope} onChange={(e) => setLp({ ...lp, scope: e.target.value })}><option value="todos">Todos los clientes</option><option value="por_persona">Solo los inscritos</option></select></label>
-      <p><button className="primary" onClick={run(() => api('PUT', '/loyalty', { unit: lp.unit, earnBy: lp.earnBy, earnAmount: lp.earnBy === 'monto' ? toCents(lp.earnAmount) : undefined, earnPoints: Number(lp.earnPoints) || 1, scope: lp.scope, dailyCap: Number(lp.dailyCap) > 0 ? Number(lp.dailyCap) : null }), 'Tarjeta guardada.')}>Guardar tarjeta</button></p>
+      <p><button className="primary" disabled={!loaded} onClick={run(() => api('PUT', '/loyalty', { unit: lp.unit, earnBy: lp.earnBy, earnAmount: lp.earnBy === 'monto' ? toCents(lp.earnAmount) : undefined, earnPoints: Number(lp.earnPoints) || 1, scope: lp.scope, dailyCap: Number(lp.dailyCap) > 0 ? Number(lp.dailyCap) : null }), 'Tarjeta guardada.')}>Guardar tarjeta</button></p>
       <h3>Mandar la tarjeta a tus clientes</h3>
       <p className="muted small">Cada cliente recibe por WhatsApp el link de su tarjeta. Ahí ve sus sellos y su código QR; en caja se lo escanean en «Escanear QR → Dar sello».</p>
       <p><button onClick={() => setSending(true)}>Mandar tarjetas por WhatsApp</button></p>
