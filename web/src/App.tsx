@@ -64,7 +64,7 @@ const Apartados = lazyNamed(() => import('./screens/Apartados'), 'Apartados')
 export interface Me {
   user: { id: string; name: string; phone?: string | null; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
   permissions: 'todos' | string[]
-  business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string; giros?: string[] }
+  business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string; giros?: string[]; trialEndsAt?: string | null; paidUntil?: string | null; free?: number }
   settings?: Record<string, any>
   modules?: string[]
 }
@@ -225,6 +225,27 @@ export function screensFor(me: Me): Screen[] {
   return SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s) && !hidden.includes(s.key) && !(s.key === 'asistencia' && can(me, 'create_employees'))).map((s) => ({ ...rename(s), desc: descFor(me, s.key) }))
 }
 
+/** Aviso al dueño unos días antes de que termine su prueba o su mensualidad (así no lo sorprende el bloqueo). */
+export function daysToRenew(b: Me['business'], now = Date.now()): { days: number; kind: 'prueba' | 'mensualidad' } | null {
+  if (b.free) return null
+  const end = b.status === 'prueba' ? b.trialEndsAt : b.status === 'activo' ? b.paidUntil : null
+  if (!end) return null
+  const days = Math.ceil((Date.parse(end) - now) / 86_400_000)
+  return days <= 5 && days >= 0 ? { days, kind: b.status === 'prueba' ? 'prueba' : 'mensualidad' } : null
+}
+function RenewNotice({ b }: { b: Me['business'] }) {
+  const r = daysToRenew(b)
+  if (!r) return null
+  const when = r.days === 0 ? 'hoy' : r.days === 1 ? 'mañana' : `en ${r.days} días`
+  return (
+    <div className="card renew-notice" role="status">
+      <b>{r.kind === 'prueba' ? `Tu prueba gratis termina ${when}.` : `Tu mensualidad vence ${when}.`}</b>{' '}
+      <span className="muted">Para seguir vendiendo sin interrupción, {r.kind === 'prueba' ? 'elige tu plan' : 'renueva'} con soporte. Tus datos no se borran.</span>{' '}
+      <a href="#/buzon">Escribir a soporte</a>
+    </div>
+  )
+}
+
 function Privada() {
   const [me, setMe] = useState<Me | null>(cache.get<Me | null>('me', null))
   const [checking, setChecking] = useState(!!auth.token)
@@ -352,6 +373,7 @@ function Privada() {
       {notices.toast && !avisos && <NoticeToast n={notices.toast} onClose={notices.closeToast} onOpen={() => { const l = notices.toast?.link; notices.closeToast(); if (l) location.hash = l }} />}
       <main>
         {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
+        {me.user.role === 'owner' && !blocked && <RenewNotice b={me.business} />}
         {/* Pantallas del mismo portal a un toque, sin abrir el menú. */}
         {current && current.group && (() => {
           const sib = allowed.filter((s) => s.group === current.group)

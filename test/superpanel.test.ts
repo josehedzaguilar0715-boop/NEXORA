@@ -301,3 +301,33 @@ describe('avisos sin proveedor', () => {
     }
   })
 })
+
+describe('métricas comerciales y aviso de renovación', () => {
+  it('el super panel ve negocios por estado y giro, ingreso mensual, pruebas por vencer, vencidos y sin uso', async () => {
+    const { setup } = await import('./helpers.js')
+    const s = setup()
+    const a = await s.registerOwner('5511110001')
+    await s.registerOwner('5511110002')
+    // Uno de los dos vende: cuenta como «en uso».
+    await s.call('PATCH', '/business', { token: a.token, body: { forcePasswordChange: false } })
+    const p = (await s.call('POST', '/products', { token: a.token, body: { name: 'X', unit: 'pieza', price: 1000 } })).json.product
+    await s.call('POST', '/shifts/open', { token: a.token, body: { openingFloat: 0 } })
+    await s.call('POST', '/sales', { token: a.token, body: { id: s.uuid(), paymentMethod: 'efectivo', items: [{ productId: p.id, quantity: 1 }] } })
+    const T = await s.adminToken()
+    let m = (await s.call('GET', '/admin/metrics', { token: T })).json
+    expect(m).toMatchObject({ total: 2, usedLast7Days: 1, mrr: 0 })
+    expect(m.byStatus.prueba).toBe(2)
+    expect(m.inactive).toHaveLength(1)
+    // 12 días después: la prueba (14 días) termina en ≤7 → aparece por vencer.
+    s.advance(12 * 86_400_000)
+    s.db.prepare("UPDATE sessions SET expires_at = '2100-01-01T00:00:00.000Z'").run()
+    const T2 = (await s.call('POST', '/admin/login', { body: { username: 'soporte', password: 'superpanel1' } })).json.token
+    m = (await s.call('GET', '/admin/metrics', { token: T2 })).json
+    expect(m.trialsEnding).toHaveLength(2)
+    // El dueño lo ve en /auth/me (la app muestra el aviso).
+    const me = (await s.call('GET', '/auth/me', { token: a.token })).json
+    expect(me.business.trialEndsAt).toBeTruthy()
+    // Un dueño no puede ver métricas.
+    expect((await s.call('GET', '/admin/metrics', { token: a.token })).status).toBe(401)
+  })
+})

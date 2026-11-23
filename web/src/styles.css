@@ -741,3 +741,6 @@ table.list tr.strike td b { text-decoration: line-through; }
 .at-state.en_atencion { background: color-mix(in srgb, var(--cyan) 18%, transparent); color: var(--cyan); }
 @media (max-width: 640px) { .at-list li { grid-template-columns: 70px 1fr; } .at-state { grid-column: 2; justify-self: start; } }
 .brand .word-wrap { display: grid; line-height: 1.1; }
+
+/* Aviso de renovación (prueba o mensualidad por vencer). */
+.renew-notice { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); margin-bottom: 12px; }

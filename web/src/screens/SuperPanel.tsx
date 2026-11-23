@@ -21,16 +21,46 @@ const PLANS: Record<string, string> = { inicial: 'Inicial ($500, 3 usuarios)', c
 
 export function SuperPanel() {
   const [logged, setLogged] = useState(!!localStorage.getItem(TOKEN))
-  const [tab, setTab] = useState<'negocios' | 'buzon' | 'alta' | 'demos' | 'ajustes'>('negocios')
+  const [tab, setTab] = useState<'resumen' | 'negocios' | 'buzon' | 'alta' | 'demos' | 'ajustes'>('resumen')
   if (!logged) return <AdminLogin onLogin={() => setLogged(true)} />
   return (
     <div className="admin-app">
       <header className="adminbar">
         <span className="brand" style={{ padding: 0 }}><Logo size={28} /><span className="word">NEXORA</span><span className="muted" style={{ letterSpacing: 0, fontWeight: 600 }}>Super panel</span></span>
-        <nav>{(['negocios', 'buzon', 'alta', 'demos', 'ajustes'] as const).map((k) => <a key={k} href="#" className={tab === k ? 'on' : ''} onClick={(e) => { e.preventDefault(); setTab(k) }}>{{ negocios: 'Negocios', buzon: 'Buzón', alta: 'Alta asistida', demos: 'Demos', ajustes: 'Ajustes' }[k]}</a>)}</nav>
+        <nav>{(['resumen', 'negocios', 'buzon', 'alta', 'demos', 'ajustes'] as const).map((k) => <a key={k} href="#" className={tab === k ? 'on' : ''} onClick={(e) => { e.preventDefault(); setTab(k) }}>{{ resumen: 'Resumen', negocios: 'Negocios', buzon: 'Buzón', alta: 'Alta asistida', demos: 'Demos', ajustes: 'Ajustes' }[k]}</a>)}</nav>
         <button onClick={() => { localStorage.removeItem(TOKEN); setLogged(false) }}>Salir</button>
       </header>
-      <main>{tab === 'negocios' ? <Negocios /> : tab === 'buzon' ? <BuzonAdmin /> : tab === 'alta' ? <Alta onDone={() => setTab('negocios')} /> : tab === 'demos' ? <Demos /> : <AjustesAdmin />}</main>
+      <main>{tab === 'resumen' ? <Resumen /> : tab === 'negocios' ? <Negocios /> : tab === 'buzon' ? <BuzonAdmin /> : tab === 'alta' ? <Alta onDone={() => setTab('negocios')} /> : tab === 'demos' ? <Demos /> : <AjustesAdmin />}</main>
+    </div>
+  )
+}
+
+/** Resumen para operar muchos negocios: ingreso mensual, estados, por vencer, vencidos y quién no está usando el sistema. */
+function Resumen() {
+  const [m, setM] = useState<any>(null)
+  const [err, setErr] = useState('')
+  useEffect(() => { adm('GET', '/admin/metrics').then(setM).catch((e) => setErr(e.message)) }, [])
+  if (err) return <p className="error">{err}</p>
+  if (!m) return <p className="muted">Cargando…</p>
+  const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'America/Mexico_City' }) : '—')
+  const list = (title: string, rows: any[], what: (r: any) => string) => rows.length > 0 && (
+    <section className="card"><h2>{title} · {rows.length}</h2>
+      <div className="table-wrap"><table className="list"><tbody>{rows.map((r) => <tr key={r.id}><td>{r.name}<br /><small className="muted">{r.giro}{r.usedLast7Days ? '' : ' · sin ventas en 7 días'}</small></td><td className="num">{what(r)}</td></tr>)}</tbody></table></div>
+    </section>
+  )
+  return (
+    <div className="stack">
+      <div className="kpis">
+        <div className="card kpi"><span className="muted">Ingreso mensual (pagando)</span><b className="value">{mxn(m.mrr)}</b></div>
+        <div className="card kpi"><span className="muted">Negocios</span><b className="value">{m.total}</b><small className="muted">{m.byStatus.activo} activos · {m.byStatus.prueba} en prueba · {m.byStatus.gratis} gratis</small></div>
+        <div className="card kpi"><span className="muted">Usaron el sistema (7 días)</span><b className="value">{m.usedLast7Days}</b><small className="muted">nuevos este mes: {m.newThisMonth}</small></div>
+        <div className="card kpi"><span className="muted">Vencidos</span><b className="value">{m.byStatus.vencido}</b><small className="muted">suspendidos: {m.byStatus.suspendido}</small></div>
+      </div>
+      {list('Pruebas que terminan en 7 días', m.trialsEnding, (r) => day(r.trialEndsAt))}
+      {list('Mensualidades por vencer (7 días)', m.renewalsDue, (r) => `${day(r.paidUntil)} · ${mxn(r.monthlyFee)}`)}
+      {list('Vencidos', m.overdue, (r) => `${r.overdueDays ?? 0} días`)}
+      {list('En prueba o pagando, pero sin ventas en 7 días', m.inactive, (r) => STATUS[r.status] ?? r.status)}
+      <section className="card"><h2>Por giro</h2><p className="muted">{Object.entries(m.byGiro).sort((a: any, b: any) => b[1] - a[1]).map(([g, n]) => `${g}: ${n}`).join(' · ')}</p></section>
     </div>
   )
 }

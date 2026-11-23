@@ -10,8 +10,7 @@ import { demoAccess, demoApp, DEMOS, seedDemo } from './demo.js'
 import { ticketView } from './support.js'
 import { exportAll, runBackup } from './backup.js'
 import {
-  bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone, notFound, numericCode, sha256, unauthorized, verifySecret,
-} from './util.js'
+  bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone, notFound, numericCode, sha256, unauthorized, verifySecret, localDate } from './util.js'
 
 interface AdminRow { id: string; name: string; username: string; password_hash: string; active: number; failed_attempts: number; locked_until: string | null; phone: string | null; email: string | null }
 type AdminEnv = { Variables: { deps: Deps; admin: AdminRow } }
@@ -386,6 +385,37 @@ admin.get('/admin/export', (c) => {
   const data = exportAll(db, now())
   audit(db, now, { businessId: null, userId: c.get('admin').id, action: 'admin.respaldo' })
   return c.json(data, 200, { 'content-disposition': `attachment; filename="nexora-${data.exportedAt.slice(0, 10)}.json"` })
+})
+
+/**
+ * Métricas para operar 100–500 negocios: cuántos hay por estado y giro, ingreso mensual recurrente,
+ * pruebas y mensualidades por vencer, vencidos, y quién de verdad está usando el sistema.
+ */
+admin.get('/admin/metrics', (c) => {
+  const { db, now } = c.get('deps')
+  const t = now()
+  const ids = db.prepare('SELECT id FROM businesses').all() as { id: string }[]
+  const list = ids.map(({ id }) => businessView(db, refreshStatus(db, now, id), t))
+  const in7 = new Date(t.getTime() + 7 * 86_400_000).toISOString()
+  const since7 = new Date(t.getTime() - 7 * 86_400_000).toISOString()
+  const monthStart = `${localDate(t).slice(0, 7)}-01`
+  const active7 = new Set((db.prepare('SELECT DISTINCT business_id b FROM sales WHERE created_at >= ?').all(since7) as { b: string }[]).map((r) => r.b))
+  const byStatus: Record<string, number> = { prueba: 0, activo: 0, vencido: 0, suspendido: 0, gratis: 0 }
+  const byGiro: Record<string, number> = {}
+  for (const b of list) { byStatus[b.free ? 'gratis' : b.status] = (byStatus[b.free ? 'gratis' : b.status] ?? 0) + 1; byGiro[b.giro] = (byGiro[b.giro] ?? 0) + 1 }
+  const short = (b: (typeof list)[number]) => ({ id: b.id, name: b.name, giro: b.giro, status: b.status, trialEndsAt: b.trialEndsAt, paidUntil: b.paidUntil, overdueDays: b.overdueDays, monthlyFee: b.monthlyFee, usedLast7Days: active7.has(b.id) })
+  const paying = list.filter((b) => b.status === 'activo' && !b.free)
+  return c.json({
+    total: list.length, byStatus, byGiro,
+    mrr: paying.reduce((a, b) => a + b.monthlyFee, 0),
+    newThisMonth: list.filter((b) => b.createdAt >= monthStart).length,
+    usedLast7Days: list.filter((b) => active7.has(b.id)).length,
+    trialsEnding: list.filter((b) => !b.free && b.status === 'prueba' && b.trialEndsAt && b.trialEndsAt <= in7).map(short),
+    renewalsDue: list.filter((b) => !b.free && b.status === 'activo' && b.paidUntil && b.paidUntil <= in7).map(short),
+    overdue: list.filter((b) => b.status === 'vencido').map(short).sort((x, y) => (y.overdueDays ?? 0) - (x.overdueDays ?? 0)),
+    // Pagan o están en prueba pero no han vendido en 7 días: riesgo de que se vayan.
+    inactive: list.filter((b) => !b.free && ['prueba', 'activo'].includes(b.status) && !active7.has(b.id)).map(short),
+  })
 })
 
 /**

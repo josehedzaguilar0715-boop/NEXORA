@@ -248,7 +248,7 @@ export const authed = new Hono<Env>()
 authed.get('/auth/me', (c) => {
   const { user } = c.get('session')
   const { db } = c.get('deps')
-  const biz = { ...(db.prepare('SELECT id, code, name, phone, logo_url, status, giro, trial_ends_at AS trialEndsAt, paid_until AS paidUntil FROM businesses WHERE id = ?').get(user.business_id) as object), giros: businessGiros(db, user.business_id) }
+  const biz = { ...(db.prepare('SELECT id, code, name, phone, logo_url, status, giro, trial_ends_at AS trialEndsAt, paid_until AS paidUntil, free FROM businesses WHERE id = ?').get(user.business_id) as object), giros: businessGiros(db, user.business_id) }
   const permissions = user.role === 'owner' ? 'todos' : JSON.parse(user.permissions)
   const settingsRows = db.prepare('SELECT key, value FROM business_settings WHERE business_id = ?').all(user.business_id) as { key: string; value: string }[]
   return c.json({
