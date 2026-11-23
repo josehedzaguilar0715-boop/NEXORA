@@ -29,7 +29,7 @@ Cloudflare Worker (pantallas + entrada) → un Durable Object con SQLite para to
 | 1 | Respaldos verificados: lista de producción (solo metadatos) y restauración completa probada con staging y con 13 negocios de prueba (0 diferencias) | — (procedimiento en `01-auditoria.md` §8) | manual, documentada |
 | 2 | **Aislamiento entre negocios** probado en todas las rutas con `:id` (~90) | `test/aislamiento-negocios.test.ts` | automática |
 | 3 | Reagendar cita solo con personal del mismo negocio; boletos por turno 404 si es de otro negocio | `src/agenda.ts`, `src/tourism.ts` | automática |
-| 4 | **Enlaces públicos** con identificador propio (`public_slug`), separado del código de acceso de empleados; enlaces viejos siguen funcionando; personal como «Luis G.» | `src/publiclinks.ts` (nuevo), `src/agenda.ts`, `src/tourism.ts`, `src/app.ts`, `src/db.ts` (migración 38, solo agrega), `web/src/api.ts`, `web/src/screens/Agenda.tsx`, `web/src/screens/Ajustes.tsx` | `test/enlaces-publicos.test.ts` |
+| 4 | **Enlaces públicos** con identificador propio (`public_slug`), separado del código de acceso de empleados; enlaces viejos siguen funcionando; personal como «Luis G.» | `src/publiclinks.ts` (nuevo), `src/agenda.ts`, `src/tourism.ts`, `src/app.ts`, `src/db.ts` (migración 35, solo agrega), `web/src/api.ts`, `web/src/screens/Agenda.tsx`, `web/src/screens/Ajustes.tsx` | `test/enlaces-publicos.test.ts` |
 | 5 | **Encabezados de seguridad** (CSP, Referrer-Policy, anti-iframe, nosniff, Permissions-Policy) | `src/headers.ts` (nuevo), `src/worker.ts`, `src/server.ts` | verificado en navegador (0 errores de consola) y en workerd |
 | 6 | Colores fijos → **tokens** (base para productos) | `web/src/styles.css`, `web/src/screens/Inicio.tsx`, `web/src/Brand.tsx` | comparación píxel a píxel: 0 diferencias |
 | 7 | **Productos con identidad propia**: NEXORA Barber, Nails y Tienda (registro, identidades, accesos, herramientas ocultas, Inicio con Agenda de hoy) | `web/src/products/index.ts`, `web/src/products/products.css` (nuevos), `web/src/App.tsx`, `web/src/main.tsx`, `web/src/screens/Inicio.tsx`, `package.json` (letras Fraunces e Instrument Serif) | `test/productos.test.ts` + capturas |
@@ -82,7 +82,7 @@ npm run check                      # debe dar 215+ pruebas OK y e2e OK
 
 * **Cambio visual grande** para la barbería (oscuro latón), uñas (claro rosa) y abarrotes (claro verde). Funciona igual, pero se ve distinto: conviene avisar a los 3 negocios antes.
 * Los enlaces de reservas mostrados en la app cambian al identificador nuevo; **los viejos siguen funcionando** (no hay que reenviar nada).
-* Migración 38: agrega columna `public_slug` e índice único parcial. Probada sobre base con datos en workerd.
+* Migración 35 (número en `_migrations`): agrega columna `public_slug` e índice único parcial. Probada sobre base con datos en workerd.
 * Reversión: volver a publicar `efb75ff` (`git checkout efb75ff && npm run deploy:prod`). La columna nueva queda sin uso y no estorba a la versión anterior.
 
 ## 9. Etapa 2 (23 nov): acabado premium, notificaciones y limpieza
@@ -117,6 +117,6 @@ Publicar el commit anterior que se quiera conservar (`git checkout <commit> && n
 * Fase 1 (cierre): `06-fase1-cierre.md`.
 * Fase 2 (auditoría de los 13 giros, matriz y correcciones): `07-auditoria-giros.md`.
   * Ya no sale de la caja más efectivo del que hay (compras, gastos, devoluciones, cancelaciones). Código `efectivo_insuficiente`.
-  * Se puede anular un gasto capturado por error. Migración **39**, que solo agrega columnas.
+  * Se puede anular un gasto capturado por error. Migración **36**, que solo agrega columnas.
   * Pruebas de día completo: `test/dia-completo.test.ts`.
 * Siguiente: Fase 3, empezando por el **pago de comisiones y propinas** (ver matriz §5).

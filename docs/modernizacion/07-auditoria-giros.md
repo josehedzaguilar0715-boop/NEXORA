@@ -26,7 +26,7 @@ No basta con que una pantalla abra. Cada operación se siguió desde que se regi
 |---|---|---|---|---|
 | 1 | Una **compra, abono a proveedor, gasto o devolución «pagada de la caja»** podía ser mayor al efectivo que había. El corte quedaba esperando dinero negativo, y el sistema lo aceptaba. | Cortes que no cuadran y faltantes que no se detectan. | Una sola verificación compartida (`assertCashAvailable` en `src/cash.ts`). Cuando no alcanza, responde «No alcanza el efectivo de la caja… hay $X y se necesitan $Y. Págalo por transferencia o registra primero un depósito». Corre dentro de la transacción, así que no se guarda nada a medias. Aplica a compras, abonos a proveedor, gastos, devoluciones (ferretería y perfumería), anticipos de encargos, reembolsos de boletos y devoluciones de apartados. | `dia-completo` (abarrotes, dos días), `ferreteria` |
 | 2 | **Cancelar una venta en efectivo** cuando ese dinero ya se había retirado dejaba la caja en negativo. | Igual que el 1. | Se rechaza solo si la cancelación baja el efectivo y lo deja negativo. Una venta por transferencia siempre se puede cancelar; con un depósito, la cancelación pasa. | `dia-completo` «cancelar cuando el efectivo ya salió» |
-| 3 | **No había forma de corregir un gasto capturado por error.** Los gastos no se pueden borrar, a propósito, y el error se quedaba en las utilidades para siempre. | Reportes y 50/30/20 con datos falsos. | Nuevo **«Anular»** en Finanzas → Gastos. Pide motivo; el personal necesita además el código del dueño. El gasto queda en la lista tachado, con su motivo, y en la bitácora (no se borra). Sale de los reportes, del libro y del 50/30/20. Si se pagó de la caja, el dinero regresa a esa caja, y solo mientras ese turno siga abierto. Migración 39: solo agrega 3 columnas. | `dia-completo` «corregir un gasto» |
+| 3 | **No había forma de corregir un gasto capturado por error.** Los gastos no se pueden borrar, a propósito, y el error se quedaba en las utilidades para siempre. | Reportes y 50/30/20 con datos falsos. | Nuevo **«Anular»** en Finanzas → Gastos. Pide motivo; el personal necesita además el código del dueño. El gasto queda en la lista tachado, con su motivo, y en la bitácora (no se borra). Sale de los reportes, del libro y del 50/30/20. Si se pagó de la caja, el dinero regresa a esa caja, y solo mientras ese turno siga abierto. Migración 36: solo agrega 3 columnas. | `dia-completo` «corregir un gasto» |
 
 Lo que **ya funcionaba bien** y quedó comprobado de punta a punta:
 
@@ -100,7 +100,7 @@ Reglas:
 
 Datos y pruebas:
 
-* Migración **40**, que solo agrega: la tabla `staff_payouts` y las columnas `payout_id` y `clawback_id`.
+* Migración **37**, que solo agrega: la tabla `staff_payouts` y las columnas `payout_id` y `clawback_id`.
 * «Empezar de cero» también limpia estos pagos de prueba.
 * Pruebas: `test/pago-personal.test.ts` (4 casos) y navegador (barbería y restaurante, en computadora y celular, sin errores ni desbordes).
 
@@ -108,3 +108,10 @@ Datos y pruebas:
 |---|---|---|
 | Barbería, Uñas | 🟡 | ✅ |
 | Perfumería, Palapa, Restaurante | 🟡 | ✅ |
+
+### Actualización de una base con datos (prueba hecha)
+
+* Se creó una base con la **versión de producción** (`efb75ff`): 4 negocios de prueba y 41 ventas. Quedó en la migración 34.
+* Después se abrió con esta versión. Se aplicaron las migraciones **35, 36 y 37** y quedó en la 37.
+* Ventas, renglones, pagos, comisiones, gastos, movimientos de caja, turnos, productos, clientes, fiado, movimientos de inventario y lotes quedaron **idénticos**, renglón por renglón.
+* Nota: documentos anteriores llamaban «38, 39 y 40» a estas migraciones. El número real (tabla `_migrations`) es 35, 36 y 37. Ya está corregido.
