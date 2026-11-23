@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api'
+import { api, ensureSynced } from '../api'
 import { ask, askCode } from '../Dialog'
 import type { Me } from '../App'
 
@@ -20,6 +20,7 @@ export function Trompo(_: { me: Me }) {
     try { await api('POST', '/meat/batches', { productId: f.productId, kg: Number(f.kg) }); setF({ ...f, kg: '' }); setMsg({ ok: 'Registrado.' }); void load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }
   const close = async (b: any) => {
+    try { await ensureSynced('cerrar la carne') } catch (e) { setMsg({ err: (e as Error).message }); return }
     const left = (await ask({ title: `Sobrante de ${b.name}`, hint: `Se esperan ${b.expectedLeftoverKg} kg.`, label: 'Kilos que sobraron', placeholder: String(b.expectedLeftoverKg), confirmLabel: 'Continuar' }))?.replace(',', '.') ?? null
     if (left === null) return
     const diff = Math.abs(Number(left) - b.expectedLeftoverKg) > 0.0005

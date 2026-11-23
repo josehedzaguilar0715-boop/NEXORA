@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { ScanButton } from '../Scanner'
-import { api, mxn, toCents } from '../api'
+import { api, mxn, toCents, ensureSynced } from '../api'
 import { confirmAsk } from '../Dialog'
 import { Sheet } from '../Sheet'
 import { can, type Me, hasGiro } from '../App'
@@ -320,7 +320,7 @@ function Existencia({ p, onSaved }: { p: P; onSaved: () => void }) {
           <label>Motivo<input value={f.reason} onChange={set('reason')} placeholder="Ej. conteo de fin de mes" /></label>
         </div>
         {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
-        <p><button className="primary" disabled={f.counted.trim() === '' || f.reason.trim().length < 3} onClick={() => go(() => api('POST', '/inventory/count', { productId: p.id, counted: Number(f.counted), reason: f.reason }), 'Existencia ajustada.')}>Ajustar existencia</button></p>
+        <p><button className="primary" disabled={f.counted.trim() === '' || f.reason.trim().length < 3} onClick={() => go(async () => { await ensureSynced(); return api('POST', '/inventory/count', { productId: p.id, counted: Number(f.counted), reason: f.reason }) }, 'Existencia ajustada.')}>Ajustar existencia</button></p>
       </>)}
       {mode === 'merma' && (<>
         <p className="muted small">{p.sellable === false ? 'Lo que se usó como tester o muestra (no se vende ni se devuelve; su costo cuenta como gasto de uso).' : 'Lo que se echó a perder, se rompió o caducó.'}</p>

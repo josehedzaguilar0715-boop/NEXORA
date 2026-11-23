@@ -147,3 +147,15 @@ export async function publicSlug(): Promise<string> {
   return slugCache
 }
 export const setPublicSlugCache = (s: string | null) => { slugCache = s }
+
+/**
+ * Antes de contar inventario o cerrar la carne: lo vendido en este equipo que no se ha enviado debe llegar primero.
+ * Si no, el conteo compararía contra una existencia sin esas ventas, anotaría diferencias falsas y al enviarse
+ * las ventas la existencia quedaría descontada dos veces.
+ */
+export async function ensureSynced(what = 'contar el inventario') {
+  if (outbox.pending() === 0) return
+  await flush()
+  const n = outbox.pending()
+  if (n > 0) throw new Error(`Hay ${n} ${n === 1 ? 'movimiento' : 'movimientos'} de este equipo sin enviar (ventas sin internet). Conéctate y espera a que diga «Todo enviado» antes de ${what}; si no, el conteo quedaría con diferencias falsas.`)
+}

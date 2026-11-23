@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, mxn, toCents } from '../api'
+import { api, mxn, toCents, ensureSynced } from '../api'
 import { askCode } from '../Dialog'
 import type { Me } from '../App'
 
@@ -47,7 +47,9 @@ export function CierreDia(_: { me: Me }) {
     try { const r = await api<any>('POST', '/inventory/waste-batch', { items, authCode: code }); setMsg({ ok: `Merma registrada: ${mxn(r.cost)}.` }); setWaste({}); void load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }
   const saveCount = async () => {
+    setMsg({})
     try {
+      await ensureSynced()
       const r = await api<any>('POST', '/inventory/count-batch', { reason: 'Conteo de cierre', items: Object.entries(count).filter(([, v]) => v.trim() !== '').map(([productId, v]) => ({ productId, counted: Number(v) })) })
       setResult(r.items); setCount({}); void load()
     } catch (e) { setMsg({ err: (e as Error).message }) }
