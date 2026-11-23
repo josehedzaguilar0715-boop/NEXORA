@@ -388,6 +388,24 @@ admin.get('/admin/export', (c) => {
   return c.json(data, 200, { 'content-disposition': `attachment; filename="nexora-${data.exportedAt.slice(0, 10)}.json"` })
 })
 
+/**
+ * Espacio de la base: hoy todos los negocios viven en un solo objeto de Cloudflare con tope
+ * (1 GB en plan gratis, 10 GB de pago; STORAGE_LIMIT_MB lo ajusta). Avisa antes de llegar.
+ */
+admin.get('/admin/storage', (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const bytes = deps.dbSize?.() ?? 0
+  const limit = Number((db.prepare("SELECT value FROM settings WHERE key = 'storage_limit_mb'").get() as { value: string } | undefined)?.value ?? 1024) * 1024 * 1024
+  const since = new Date(now().getTime() - 30 * 86_400_000).toISOString()
+  const sales30 = (db.prepare('SELECT COUNT(*) n FROM sales WHERE created_at >= ?').get(since) as { n: number }).n
+  // Crecimiento estimado: ~3 KB por venta (venta, renglones, pago, inventario y bitácora), medido en pruebas.
+  const perMonth = sales30 * 3000
+  const monthsLeft = perMonth > 0 ? Math.max(0, Math.floor((limit - bytes) / perMonth)) : null
+  const pct = limit ? Math.round((bytes / limit) * 1000) / 10 : 0
+  return c.json({ bytes, limit, pct, sales30, perMonth, monthsLeft, level: pct >= 85 ? 'critico' : pct >= 70 ? 'aviso' : 'ok' })
+})
+
 /** Respaldos automáticos guardados (30 días). */
 admin.get('/admin/backups', async (c) => {
   const store = c.get('deps').backups

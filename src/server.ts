@@ -19,6 +19,7 @@ const deps: Deps = {
   now: () => new Date(),
   // SMS por Twilio y correo por Resend; sin credenciales solo se imprime en consola.
   notifier: createNotifier(),
+  dbSize: () => (db.pragma('page_count', { simple: true }) as number) * (db.pragma('page_size', { simple: true }) as number),
   backups: fsBackupStore(process.env.NEXORA_BACKUPS ?? join(dirname(dbPath), 'respaldos')),
 }
 const api = createApp(deps)

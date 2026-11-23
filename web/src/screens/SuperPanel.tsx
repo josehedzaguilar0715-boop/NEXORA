@@ -258,6 +258,8 @@ function AjustesAdmin() {
       {msg && <p className="muted">{msg}</p>}
       <h2 style={{ marginTop: 16 }}>Cambiar mi contraseña</h2>
       <CambiarClave />
+      <h2 style={{ marginTop: 16 }}>Espacio de la base</h2>
+      <Espacio />
       <h2 style={{ marginTop: 16 }}>Respaldos</h2>
       <Respaldos />
       <p className="muted">Precios de planes: {mxn(50000)} / {mxn(70000)} / {mxn(90000)}; sucursal extra {mxn(30000)}; paquete de 5 usuarios {mxn(toCents('200'))}.</p>
@@ -280,6 +282,22 @@ function CambiarClave() {
         try { await adm('POST', '/admin/password', { currentPassword: f.a, newPassword: f.b }); setF({ a: '', b: '', c: '' }); setMsg({ ok: 'Contraseña cambiada.' }) } catch (e) { setMsg({ err: (e as Error).message }) }
       }}>Cambiar contraseña</button></p>
     </>
+  )
+}
+
+/** Cuánto ocupa la base contra el tope de Cloudflare y cuántos meses quedan al ritmo actual. */
+function Espacio() {
+  const [s, setS] = useState<any>(null)
+  useEffect(() => { adm('GET', '/admin/storage').then(setS).catch(() => setS(null)) }, [])
+  if (!s) return <p className="muted">Cargando…</p>
+  const mb = (b: number) => `${(b / 1048576).toFixed(b < 10485760 ? 1 : 0)} MB`
+  return (
+    <div className="card">
+      <p><b>{mb(s.bytes)}</b> de {mb(s.limit)} ({s.pct}%)</p>
+      <div className="goal-bar" style={{ height: 10, borderRadius: 6, background: 'var(--surface-sunken)', overflow: 'hidden' }}><div style={{ width: `${Math.min(100, s.pct)}%`, height: '100%', background: s.level === 'ok' ? 'var(--ok, #2e9d5b)' : s.level === 'aviso' ? 'var(--warn, #d9a400)' : 'var(--danger)' }} /></div>
+      <p className="muted small">Ventas últimos 30 días: {s.sales30} · crece ~{mb(s.perMonth)} al mes{s.monthsLeft != null ? ` · alcanza para ~${s.monthsLeft} meses` : ''}.</p>
+      {s.level !== 'ok' && <p className="error">Hay que separar la base por negocio o pasar al plan de pago antes de llegar al tope (ver docs/modernizacion/08-seguridad.md §5).</p>}
+    </div>
   )
 }
 

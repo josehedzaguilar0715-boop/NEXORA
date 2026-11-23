@@ -90,3 +90,20 @@ describe('respaldos automáticos', () => {
     expect((await req('GET', '/admin/backups', n.T)).status).toBe(401)
   })
 })
+
+describe('espacio de la base', () => {
+  it('el super panel ve tamaño, tope y meses restantes al ritmo actual', async () => {
+    const n = await negocioListo()
+    const { createApp } = await import('../src/app.js')
+    const { createAdmin } = await import('../src/admin.js')
+    const deps = { db: n.s.db, now: () => new Date('2026-11-17T15:00:00Z'), notifier: { sendCode: () => {} }, dbSize: () => 800 * 1048576 }
+    const app = createApp(deps)
+    createAdmin(deps, { name: 'S', username: 'soporte9', password: 'superpanel1' })
+    const token = ((await (await app.request('/admin/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'soporte9', password: 'superpanel1' }) })).json()) as any).token
+    const s = (await (await app.request('/admin/storage', { headers: { authorization: `Bearer ${token}` } })).json()) as any
+    expect(s).toMatchObject({ bytes: 800 * 1048576, limit: 1024 * 1048576, level: 'aviso' })
+    expect(s.pct).toBeCloseTo(78.1, 1)
+    // Un dueño no puede verlo.
+    expect((await app.request('/admin/storage', { headers: { authorization: `Bearer ${n.T}` } })).status).toBe(401)
+  })
+})
