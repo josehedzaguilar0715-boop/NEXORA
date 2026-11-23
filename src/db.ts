@@ -1441,6 +1441,10 @@ const MIGRATIONS: Migration[] = [
   // Identificador público de los enlaces (reservas, boletos), distinto del código interno de acceso.
   `ALTER TABLE businesses ADD COLUMN public_slug TEXT;
   CREATE UNIQUE INDEX businesses_public_slug ON businesses(public_slug) WHERE public_slug IS NOT NULL;`,
+  // Gasto capturado por error: se anula (nunca se borra) con motivo y quién lo autorizó.
+  `ALTER TABLE expenses ADD COLUMN voided_at TEXT;
+  ALTER TABLE expenses ADD COLUMN voided_by TEXT;
+  ALTER TABLE expenses ADD COLUMN void_reason TEXT;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

@@ -134,10 +134,33 @@ finance.post('/expenses', requirePerm('edit_inventory'), async (c) => {
   return c.json({ id }, 201)
 })
 
+/**
+ * Anular un gasto capturado por error (no se borra: queda en la bitácora con motivo y quién autorizó).
+ * Si se pagó de la caja, el dinero regresa a esa caja; por eso solo mientras ese turno siga abierto.
+ */
+finance.post('/expenses/:id/void', requirePerm('edit_inventory'), async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const u = c.get('session').user
+  const e = db.prepare('SELECT * FROM expenses WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; concept: string; amount: number; from_cash_shift: string | null; voided_at: string | null } | undefined
+  if (!e) throw notFound()
+  const d = parse(z.object({ reason: z.string().trim().min(3, 'Escribe el motivo').max(200), authCode: z.string().optional() }), await body(c))
+  if (e.voided_at) throw conflict('Ese gasto ya estaba anulado.', 'ya_anulado')
+  const shift = e.from_cash_shift ? (db.prepare('SELECT id, status FROM shifts WHERE id = ?').get(e.from_cash_shift) as { id: string; status: string }) : null
+  if (shift && shift.status !== 'abierto') throw conflict('Ese gasto salió de una caja que ya tiene corte; no se puede anular. Registra la corrección como depósito en la caja de hoy.', 'turno_cerrado')
+  const auth = u.role === 'owner' ? null : authorize(deps, u, d.authCode, 'cancel_discount', 'anular gasto', { ownerOnly: true })
+  db.transaction(() => {
+    db.prepare('UPDATE expenses SET voided_at = ?, voided_by = ?, void_reason = ? WHERE id = ?').run(iso(now()), auth?.id ?? u.id, d.reason, e.id)
+    if (shift) db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'deposito',?,?,?,?)").run(newId(), shift.id, e.amount, `Gasto anulado: ${e.concept}`, u.id, iso(now()))
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'gasto.anulado', entity: 'expense', entityId: e.id, oldValue: { concept: e.concept, amount: e.amount }, reason: d.reason, ...(auth ? { authorizedBy: auth.id } : {}) })
+  })()
+  return c.json({ ok: true })
+})
+
 finance.get('/expenses', requirePerm('view_reports'), (c) => {
   const from = c.req.query('from') ?? '0000-00-00'
   const to = c.req.query('to') ?? '9999-12-31'
-  const rows = c.get('deps').db.prepare('SELECT id, concept, amount, kind, category, method, date FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ORDER BY date DESC').all(c.get('session').user.business_id, from, to)
+  const rows = c.get('deps').db.prepare('SELECT id, concept, amount, kind, category, method, date, from_cash_shift IS NOT NULL AS fromCash, voided_at AS voidedAt, void_reason AS voidReason FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ORDER BY voided_at IS NOT NULL, date DESC').all(c.get('session').user.business_id, from, to)
   return c.json({ expenses: rows })
 })
 
@@ -202,7 +225,7 @@ export function periodSummary(db: Db, businessId: string, from: string, to: stri
   for (const m of ['efectivo', 'transferencia', 'tarjeta', 'fiado']) s[m] = byMethod.find((x) => x.method === m)?.a ?? 0
   const cogs = (db.prepare(`SELECT COALESCE(SUM(si.cost),0) c FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? ${bf.replace('branch_id', 's.branch_id')}`).get(businessId, start, end, ...bargs) as { c: number }).c
   const waste = -(db.prepare(`SELECT COALESCE(SUM(cost),0) c FROM stock_movements WHERE business_id = ? AND type = 'merma' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { c: number }).c
-  const expenses = (db.prepare(`SELECT COALESCE(SUM(amount),0) a FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ${bf}`).get(businessId, from, to, ...bargs) as { a: number }).a
+  const expenses = (db.prepare(`SELECT COALESCE(SUM(amount),0) a FROM expenses WHERE business_id = ? AND voided_at IS NULL AND date BETWEEN ? AND ? ${bf}`).get(businessId, from, to, ...bargs) as { a: number }).a
   // Devoluciones: restan lo devuelto; lo que regresó al inventario recupera su costo.
   const refunds = (db.prepare(`SELECT COALESCE(SUM(amount),0) a FROM returns WHERE business_id = ? AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { a: number }).a
   const restocked = (db.prepare(`SELECT COALESCE(SUM(cost),0) c FROM stock_movements WHERE business_id = ? AND type = 'devolucion' AND created_at >= ? AND created_at < ? ${bf}`).get(businessId, start, end, ...bargs) as { c: number }).c
@@ -251,7 +274,7 @@ finance.get('/reports/recent', requirePerm('view_reports'), (c) => {
       SELECT 'venta' AS kind, s.created_at AS at, s.total AS amount, 'Venta #' || s.folio || ' · ' || s.payment_method AS label, s.status AS status FROM sales s WHERE s.business_id = ?
       UNION ALL SELECT m.type, m.created_at, m.amount, m.reason, NULL FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ?
       UNION ALL SELECT 'compra', p.created_at, p.items_total + p.freight_total, CASE WHEN p.ticket_ref IS NULL THEN 'de ' || p.payment ELSE 'folio ' || p.ticket_ref || ' · ' || p.payment END, p.payment FROM purchases p WHERE p.business_id = ?
-      UNION ALL SELECT 'gasto', e.created_at, e.amount, e.concept, e.kind FROM expenses e WHERE e.business_id = ?
+      UNION ALL SELECT 'gasto', e.created_at, e.amount, e.concept, CASE WHEN e.voided_at IS NULL THEN e.kind ELSE 'anulado' END FROM expenses e WHERE e.business_id = ?
     ) ORDER BY at DESC LIMIT ?`).all(b, b, b, b, limit)
   return c.json({ movements: rows })
 })

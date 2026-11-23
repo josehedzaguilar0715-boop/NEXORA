@@ -218,3 +218,32 @@ describe('cancelar cuando el efectivo ya salió', () => {
     expect((await s.call('GET', `/shifts/${sh.id}`, { token: T })).json.totals.expectedCash).toBe(0)
   })
 })
+
+describe('corregir un gasto capturado por error', () => {
+  it('se anula con motivo (no se borra); el dinero regresa a la caja; sale de reportes; empleado necesita código; caja con corte no', async () => {
+    const { s, o, T, open } = await negocioListo()
+    const sh = (await open(50000)).json.shift
+    const g = (await s.call('POST', '/expenses', { token: T, body: { concept: 'Garrafones', amount: 8000, kind: 'variable', method: 'efectivo', fromCash: true } })).json
+    const g2 = (await s.call('POST', '/expenses', { token: T, body: { concept: 'Internet', amount: 50000, kind: 'fijo', method: 'transferencia' } })).json
+    expect((await s.call('GET', `/shifts/${sh.id}`, { token: T })).json.totals.expectedCash).toBe(42000)
+    const cajero = await s.createStaff(T, o.business.code, 'caja1', 'encargado')
+    await s.call('POST', '/auth/change-password', { token: cajero.token, body: { currentPassword: 'inicial123', newPassword: 'nueva12345' } })
+    const sinCodigo = await s.call('POST', `/expenses/${g.id}/void`, { token: cajero.token, body: { reason: 'Se capturó dos veces' } })
+    expect(sinCodigo.status).toBeGreaterThanOrEqual(400)
+    expect((await s.call('POST', `/expenses/${g.id}/void`, { token: T, body: { reason: 'Se capturó dos veces' } })).status).toBe(200)
+    expect((await s.call('POST', `/expenses/${g.id}/void`, { token: T, body: { reason: 'otra vez' } })).json.error.code).toBe('ya_anulado')
+    expect((await s.call('GET', `/shifts/${sh.id}`, { token: T })).json.totals.expectedCash).toBe(50000)
+    const sum = (await s.call('GET', '/reports/summary', { token: T })).json
+    expect(sum.expenses).toBe(50000)
+    const lg = (await s.call('GET', '/accounting/ledger', { token: T })).json
+    expect(lg.totalOut).toBe(50000)
+    const list = (await s.call('GET', '/expenses', { token: T })).json.expenses
+    expect(list.find((e: any) => e.id === g.id)).toMatchObject({ voidReason: 'Se capturó dos veces' })
+    expect((await s.call('GET', '/audit', { token: T })).json.entries.some((e: any) => e.action === 'gasto.anulado')).toBe(true)
+    // Un gasto de una caja que ya tiene corte no se anula.
+    const g3 = (await s.call('POST', '/expenses', { token: T, body: { concept: 'Hielo', amount: 3000, kind: 'variable', method: 'efectivo', fromCash: true } })).json
+    await s.call('POST', `/shifts/${sh.id}/close`, { token: T, body: { countedCash: 47000 } })
+    expect((await s.call('POST', `/expenses/${g3.id}/void`, { token: T, body: { reason: 'Error' } })).json.error.code).toBe('turno_cerrado')
+    void g2
+  })
+})

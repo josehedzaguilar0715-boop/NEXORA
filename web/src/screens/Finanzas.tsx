@@ -3,6 +3,7 @@ import { api, auth, mxn, toCents } from '../api'
 import { can, type Me } from '../App'
 import { GananciaReal } from './Inicio'
 import { vocab } from '../giros'
+import { ask, askCode } from '../Dialog'
 
 /** Finanzas y contabilidad: estado de resultados, flujo de efectivo, balance, gastos y libro de movimientos. */
 
@@ -68,7 +69,7 @@ export function Finanzas({ me }: { me: Me }) {
       {tab === 'resultados' && <Resultados from={from} to={to} onErr={setErr} />}
       {tab === 'flujo' && <Flujo me={me} from={from} to={to} onErr={setErr} />}
       {tab === 'balance' && <Balance me={me} onErr={setErr} />}
-      {tab === 'gastos' && <Gastos from={from} to={to} onErr={setErr} canEdit={can(me, 'edit_inventory')} />}
+      {tab === 'gastos' && <Gastos from={from} to={to} onErr={setErr} canEdit={can(me, 'edit_inventory')} owner={me.user.role === 'owner'} />}
       {tab === 'movimientos' && <Movimientos from={from} to={to} onErr={setErr} />}
       <p className="muted small" style={{ marginTop: 18 }}>Contabilidad administrativa para decidir mejor. Para declaraciones ante el SAT, comparte las exportaciones con tu contador.</p>
     </div>
@@ -305,12 +306,19 @@ function Balance({ me, onErr }: { me: Me; onErr: (e: string) => void }) {
   )
 }
 
-function Gastos({ from, to, onErr, canEdit }: { from: string; to: string; onErr: (e: string) => void; canEdit: boolean }) {
+function Gastos({ from, to, onErr, canEdit, owner }: { from: string; to: string; onErr: (e: string) => void; canEdit: boolean; owner: boolean }) {
   const [list, reload] = useLoad<any>(`/expenses?from=${from}&to=${to}`, [from, to], onErr)
   const empty = { concept: '', amount: '', category: 'otros', kind: 'variable', method: 'efectivo', fromCash: false, date: today() }
   const [f, setF] = useState(empty)
   const [ok, setOk] = useState('')
-  const total = (list?.expenses ?? []).reduce((a: number, e: any) => a + e.amount, 0)
+  const total = (list?.expenses ?? []).filter((e: any) => !e.voidedAt).reduce((a: number, e: any) => a + e.amount, 0)
+  const voidIt = async (e: any) => {
+    const reason = await ask({ title: `Anular gasto «${e.concept}»`, hint: e.fromCash ? 'Se capturó por error. El dinero regresa a la caja de donde salió.' : 'Se capturó por error. Queda en la bitácora; no se borra.', label: 'Motivo', placeholder: 'Ej. se capturó dos veces', confirmLabel: 'Continuar', danger: true })
+    if (!reason) return
+    const authCode = owner ? undefined : await askCode('Para anular un gasto se necesita el código del dueño.')
+    if (!owner && !authCode) return
+    try { await api('POST', `/expenses/${e.id}/void`, { reason, authCode }); setOk('Gasto anulado.'); void reload() } catch (x) { onErr((x as Error).message) }
+  }
   const save = async () => {
     try {
       await api('POST', '/expenses', { id: crypto.randomUUID(), concept: f.concept, amount: toCents(f.amount), category: f.category, kind: f.kind, method: f.method, fromCash: f.method === 'efectivo' && f.fromCash, date: f.date })
@@ -335,7 +343,7 @@ function Gastos({ from, to, onErr, canEdit }: { from: string; to: string; onErr:
       <section className="card">
         <div className="card-head"><h2>Gastos del periodo</h2><button onClick={() => download('gastos', from, to).catch((e) => onErr(e.message))}>⬇ Exportar</button></div>
         <div className="table-wrap"><table className="list"><thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Importe</th></tr></thead><tbody>
-          {(list?.expenses ?? []).map((e: any) => <tr key={e.id}><td className="nowrap">{fmtDate(e.date)}</td><td>{e.concept}<br /><small className="muted">{CATEGORIES[e.category] ?? e.category} · {e.kind} · {METHOD[e.method] ?? e.method}</small></td><td className="num">{mxn(e.amount)}</td></tr>)}
+          {(list?.expenses ?? []).map((e: any) => <tr key={e.id}><td className="nowrap">{fmtDate(e.date)}</td><td>{e.concept}<br /><small className="muted">{CATEGORIES[e.category] ?? e.category} · {e.kind} · {METHOD[e.method] ?? e.method}</small></td><td className="num">{e.voidedAt ? <s className="muted">{mxn(e.amount)}</s> : mxn(e.amount)}{e.voidedAt ? <><br /><small className="muted" title={e.voidReason}>Anulado</small></> : canEdit && <><br /><button className="link small" onClick={() => voidIt(e)}>Anular</button></>}</td></tr>)}
           {list && list.expenses.length === 0 && <tr><td colSpan={3} className="muted">No hay gastos en este periodo.</td></tr>}
         </tbody>{total > 0 && <tfoot><tr className="total"><td colSpan={2}>Total</td><td className="num">{mxn(total)}</td></tr></tfoot>}</table></div>
       </section>
