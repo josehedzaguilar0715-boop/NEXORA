@@ -9,6 +9,7 @@ import { createNotifier } from './notify.js'
 import { runBackup } from './backup.js'
 import { fsBackupStore, msUntilLocal } from './backup-fs.js'
 import type { Deps } from './context.js'
+import { SECURITY_HEADERS } from './headers.js'
 
 const dbPath = process.env.NEXORA_DB ?? 'data/nexora.db'
 mkdirSync(dirname(dbPath), { recursive: true })
@@ -27,6 +28,8 @@ const nightly = () => runBackup(deps, deps.backups!).then((r) => console.log(`[r
 setTimeout(() => { void nightly(); setInterval(nightly, 86_400_000) }, msUntilLocal(3, 17))
 
 const root = new Hono()
+// Mismos encabezados de seguridad que en Cloudflare.
+root.use('*', async (c, next) => { await next(); for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!c.res.headers.has(k)) c.res.headers.set(k, v) })
 root.route('/api', api)
 // La app web (pantallas) se sirve desde web/dist después de `npm run build`.
 if (existsSync('web/dist')) {

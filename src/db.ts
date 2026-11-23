@@ -1438,6 +1438,9 @@ const MIGRATIONS: Migration[] = [
   // A granel por pieza: se compra por bolsa, caja o paquete y se vende suelto (chicles, caramelos, cigarros…).
   `ALTER TABLE products ADD COLUMN pack_name TEXT;
   ALTER TABLE products ADD COLUMN pack_size INTEGER;`,
+  // Identificador público de los enlaces (reservas, boletos), distinto del código interno de acceso.
+  `ALTER TABLE businesses ADD COLUMN public_slug TEXT;
+  CREATE UNIQUE INDEX businesses_public_slug ON businesses(public_slug) WHERE public_slug IS NOT NULL;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

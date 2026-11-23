@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, cache, mxn, outbox, toCents } from '../api'
+import { api, cache, mxn, outbox, toCents, publicSlug, setPublicSlugCache } from '../api'
 import { hasGiro, type Me } from '../App'
 import { giroLabel, vocab } from '../giros'
 import { WhatsAppShare } from './Descargar'
@@ -43,8 +43,7 @@ export function Ajustes({ me }: { me: Me }) {
           return <label key={k} style={{ fontWeight: 500, opacity: locked ? 0.6 : 1 }}><input type="checkbox" disabled={locked} style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={mods.includes(k)} onChange={() => toggle(k)} />{v}{locked ? ' — con costo de instalación; pídelo en el Buzón' : ''}</label>
         })}
         <p><button className="primary" onClick={run(() => api('PUT', '/modules', { active: mods }))}>Guardar módulos</button></p>
-        {mods.includes('reservas') && hasGiro(me, 'turistico') && <p className="muted">Link de boletos: {location.origin}/boletos/{me.business.code}</p>}
-        {mods.includes('reservas') && (!hasGiro(me, 'turistico') || (me.business.giros ?? []).length > 1) && <p className="muted">Link de reservas: {location.origin}/reservar/{me.business.code}</p>}
+        {mods.includes('reservas') && <EnlacePublico me={me} />}
       </section>
       <section className="card">
         <h2>Opciones</h2>
@@ -176,6 +175,32 @@ export function Buzon(_: { me: Me }) {
           <p><button className="primary" disabled={!f.reply.trim()} onClick={async () => { const r = await api<any>('POST', `/support/tickets/${sel.id}/messages`, { message: f.reply }); setSel(r.ticket); setF({ ...f, reply: '' }) }}>Enviar</button></p>
         </section>
       )}
+    </div>
+  )
+}
+
+/** Enlace público de reservas o boletos: el dueño puede elegir uno fácil de recordar. No usa el código interno. */
+function EnlacePublico({ me }: { me: Me }) {
+  const [slug, setSlug] = useState('')
+  const [edit, setEdit] = useState('')
+  const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  useEffect(() => { void publicSlug().then((s) => { setSlug(s); setEdit(s) }).catch((e) => setMsg({ err: e.message })) }, [])
+  const tickets = hasGiro(me, 'turistico')
+  const both = tickets && (me.business.giros ?? []).length > 1
+  const save = async () => {
+    try { const r = await api<{ slug: string }>('PUT', '/business/public-link', { slug: edit }); setSlug(r.slug); setPublicSlugCache(r.slug); setMsg({ ok: 'Enlace actualizado. El anterior deja de funcionar.' }) } catch (e) { setMsg({ err: (e as Error).message }) }
+  }
+  if (!slug) return null
+  return (
+    <div className="public-link">
+      {(!tickets || both) && <p className="muted">Link de reservas: <b>{location.origin}/reservar/{slug}</b></p>}
+      {tickets && <p className="muted">Link de boletos: <b>{location.origin}/boletos/{slug}</b></p>}
+      {me.user.role === 'owner' && (<>
+        <label>Nombre del enlace<input value={edit} onChange={(e) => setEdit(e.target.value.toLowerCase())} placeholder="ej. fenix-barberia" /></label>
+        <p className="muted small">Solo letras sin acentos, números y guiones. No incluye datos personales ni el código con el que entran tus empleados.</p>
+        {edit !== slug && <p><button className="primary" onClick={() => void save()}>Guardar enlace</button></p>}
+      </>)}
+      {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { loyaltyText, type Loyalty } from './Caja'
 import { useEffect, useMemo, useState } from 'react'
-import { api, h12, mxn, toCents } from '../api'
+import { api, h12, mxn, toCents, publicSlug } from '../api'
 import { ask } from '../Dialog'
 import { can, type Me } from '../App'
 import type { Service } from './Caja'
@@ -75,7 +75,9 @@ export function Agenda({ me }: { me: Me }) {
   const act = (id: string, path: string, body?: unknown) => async () => {
     try { await api('POST', `/appointments/${id}/${path}`, body); setMsg({}); await load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }
-  const link = `${location.origin}/reservar/${me.business.code}`
+  const [slug, setSlug] = useState('')
+  useEffect(() => { if (me.modules?.includes('reservas')) void publicSlug().then(setSlug).catch(() => {}) }, [])
+  const link = slug ? `${location.origin}/reservar/${slug}` : ''
   // Aviso manual: prepara el mensaje; nada se envía solo.
   const wa = (a: any) => a.phone ? `https://wa.me/52${a.phone}?text=${encodeURIComponent(`Hola ${a.customerName}, tu cita en ${me.business.name} es el ${new Date(a.startsAt).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'medium', timeStyle: 'short', hour12: true })}.`)}` : null
 
@@ -91,7 +93,7 @@ export function Agenda({ me }: { me: Me }) {
         <button className="primary" onClick={() => setForm({ walkIn: false })}>+ Nueva cita</button>
         <button onClick={() => setForm({ walkIn: true })}>Cliente sin cita</button>
       </div>
-      {me.modules?.includes('reservas') && <p className="muted small link-line">Link para que tus clientes reserven: <a href={link} target="_blank" rel="noreferrer">{link}</a></p>}
+      {me.modules?.includes('reservas') && link && <p className="muted small link-line">Link para que tus clientes reserven: <a href={link} target="_blank" rel="noreferrer">{link}</a></p>}
       {msg.err && <p className="error">{msg.err}</p>}
       {msg.ok && <p className="okmsg">{msg.ok}</p>}
       <div className="agenda-cols">

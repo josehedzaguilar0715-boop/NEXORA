@@ -1,3 +1,4 @@
+import { withSecurityHeaders } from './headers.js'
 import { DurableObject } from 'cloudflare:workers'
 import { createAdmin } from './admin.js'
 import { createApp } from './app.js'
@@ -90,14 +91,14 @@ export default {
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       url.pathname = url.pathname.slice(4) || '/'
       if (url.pathname.startsWith('/__interno')) return new Response('No encontrado', { status: 404 })
-      return env.NEXORA.get(env.NEXORA.idFromName('principal')).fetch(new Request(url, req))
+      return withSecurityHeaders(await env.NEXORA.get(env.NEXORA.idFromName('principal')).fetch(new Request(url, req)))
     }
     // Pantallas: archivo exacto o, si no existe, la app (rutas como /admin o /reservar/…).
     const key = ASSETS[url.pathname] ? url.pathname : '/index.html'
     const file = ASSETS[key]!
     const bytes = decoded(key, file.body)
     const immutable = url.pathname.startsWith('/assets/')
-    return new Response(bytes, { headers: { 'content-type': file.type, 'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache' } })
+    return withSecurityHeaders(new Response(bytes, { headers: { 'content-type': file.type, 'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache' } }))
   },
 
   /** Cron diario: respaldo de toda la base. */

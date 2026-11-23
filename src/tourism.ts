@@ -10,6 +10,7 @@ import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Deps, type E
 import type { Db } from './db.js'
 import { createSale, parseSale } from './sales.js'
 import { AppError, bad, conflict, forbidden, iso, localDate, newId, normalizePhone, notFound } from './util.js'
+import { findPublicBusiness } from './publiclinks.js'
 
 /** «14:00» → «2:00 p.m.» para los mensajes al cliente. */
 const h12 = (hm: string) => { const [h = 0, m = 0] = hm.split(':').map(Number); return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a.m.' : 'p.m.'}` }
@@ -281,6 +282,7 @@ tourism.get('/reports/tickets', requirePerm('view_reports'), (c) => {
 tourism.get('/shifts/:id/tickets', requirePerm('open_close_cash'), (c) => {
   const { db } = c.get('deps')
   const u = c.get('session').user
+  if (!db.prepare('SELECT 1 FROM shifts WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id)) throw notFound('No se encontró ese turno.')
   const rows = db.prepare("SELECT t.type_name AS type, COUNT(*) AS tickets, SUM(t.price) AS amount FROM entry_tickets t JOIN sales s ON s.id = t.sale_id WHERE s.shift_id = ? AND s.business_id = ? AND t.status != 'cancelado' GROUP BY t.type_name").all(c.req.param('id'), u.business_id)
   return c.json({ byType: rows })
 })
@@ -289,7 +291,7 @@ tourism.get('/shifts/:id/tickets', requirePerm('open_close_cash'), (c) => {
 
 function publicBiz(c: C) {
   const { db } = c.get('deps')
-  const b = db.prepare('SELECT id, name, phone, status FROM businesses WHERE code = ?').get((c.req.param('code') ?? '').toUpperCase()) as { id: string; name: string; phone: string | null; status: string } | undefined
+  const b = findPublicBusiness(db, c.req.param('code') ?? '')
   if (!b || !moduleOn(db, b.id, 'reservas') || ['vencido', 'suspendido'].includes(b.status)) throw notFound('Este link no está disponible.')
   return b
 }

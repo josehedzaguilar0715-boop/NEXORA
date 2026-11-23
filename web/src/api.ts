@@ -139,3 +139,11 @@ export function h12(hhmm: string): string {
   const h = Number(m[1]) % 24
   return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h < 12 ? 'a.m.' : 'p.m.'}`
 }
+
+/** Identificador público del negocio para los enlaces de reservas y boletos (no es el código interno). */
+let slugCache: string | null = null
+export async function publicSlug(): Promise<string> {
+  if (!slugCache) slugCache = (await api<{ slug: string }>('GET', '/business/public-link')).slug
+  return slugCache
+}
+export const setPublicSlugCache = (s: string | null) => { slugCache = s }

@@ -7,6 +7,7 @@ import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Deps, type E
 import type { Db } from './db.js'
 import { createSale, parseSale } from './sales.js'
 import { notify } from './notifications.js'
+import { findPublicBusiness, publicName } from './publiclinks.js'
 import { getSettings } from './settings.js'
 import { AppError, bad, conflict, forbidden, iso, localDate, newId, normalizePhone, notFound } from './util.js'
 
@@ -86,7 +87,9 @@ function firstAvailable(db: Db, businessId: string, start: string, end: string):
 }
 
 const apptView = (db: Db, a: ApptRow, forBusiness = true) => ({
-  id: a.id, staffId: a.staff_id, staffName: a.staff_id ? (db.prepare('SELECT name FROM users WHERE id = ?').get(a.staff_id) as { name: string }).name : null,
+  id: a.id, staffId: forBusiness ? a.staff_id : undefined,
+  // Al público solo se le muestra nombre e inicial de quien atiende.
+  staffName: a.staff_id ? ((n: string) => (forBusiness ? n : publicName(n)))((db.prepare('SELECT name FROM users WHERE id = ?').get(a.staff_id) as { name: string }).name) : null,
   customerName: a.customer_name, services: JSON.parse(a.services) as Svc[], startsAt: a.starts_at, endsAt: a.ends_at, status: a.status, source: a.source,
   ...(forBusiness ? { customerId: a.customer_id, phone: a.phone, atHome: !!a.at_home, address: a.address, travelMin: a.travel_min, notes: a.notes, saleId: a.sale_id } : {}),
 })
@@ -259,6 +262,8 @@ agenda.post('/appointments/:id/reschedule', async (c) => {
   if (!['pendiente', 'confirmada'].includes(a.status)) throw conflict(`La cita está ${a.status}.`, 'estado_invalido')
   const d = parse(z.object({ startsAt: z.string().datetime(), staffId: z.string().optional() }), await body(c))
   const staff = d.staffId ?? a.staff_id!
+  // Solo personal de este mismo negocio.
+  if (d.staffId && !db.prepare('SELECT 1 FROM users WHERE id = ? AND business_id = ? AND active = 1').get(d.staffId, u.business_id)) throw bad('Esa persona no es de este negocio.')
   const dur = (Date.parse(a.ends_at) - Date.parse(a.starts_at)) / 60_000
   const end = addMin(d.startsAt, dur)
   const f = isFree(db, staff, addMin(d.startsAt, -a.travel_min), addMin(end, a.travel_min), a.id)
@@ -298,7 +303,7 @@ export const publicAgenda = new Hono<Env>()
 
 function publicBusiness(c: C) {
   const { db } = c.get('deps')
-  const b = db.prepare('SELECT id, name, phone, status FROM businesses WHERE code = ?').get((c.req.param('code') ?? '').toUpperCase()) as { id: string; name: string; phone: string | null; status: string } | undefined
+  const b = findPublicBusiness(db, c.req.param('code') ?? '')
   if (!b || !moduleOn(db, b.id, 'reservas') || b.status === 'vencido' || b.status === 'suspendido') throw notFound('Este link de reservas no está disponible.')
   return b
 }
@@ -307,7 +312,7 @@ publicAgenda.get('/public/book/:code', (c) => {
   const { db } = c.get('deps')
   const b = publicBusiness(c)
   const services = (db.prepare('SELECT id, name, price, category FROM services WHERE business_id = ? AND active = 1 ORDER BY category, name').all(b.id) as { id: string }[]).map((s) => ({ ...s, duration: serviceDuration(db, s.id) })).filter((s) => s.duration > 0)
-  return c.json({ business: { name: b.name, phone: b.phone }, services, staff: agendaStaff(db, b.id) })
+  return c.json({ business: { name: b.name, phone: b.phone }, services, staff: agendaStaff(db, b.id).map((s) => ({ id: s.id, name: publicName(s.name) })) })
 })
 
 publicAgenda.get('/public/book/:code/availability', (c) => {

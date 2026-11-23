@@ -13,6 +13,7 @@ import { reset } from './reset.js'
 import { campaigns, publicCampaigns } from './campaigns.js'
 import { today } from './today.js'
 import { notifications } from './notifications.js'
+import { publicLinks } from './publiclinks.js'
 import { dashboard } from './dashboard.js'
 import { setDemoApp } from './demo.js'
 import { inventory } from './inventory.js'
@@ -81,6 +82,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', today)
   protectedApp.route('/', dashboard)
   protectedApp.route('/', notifications)
+  protectedApp.route('/', publicLinks)
   app.route('/', protectedApp)
 
   app.onError((err, c) => {

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type ComponentType, type CSSProperties } from 'react'
-import { api, auth, cache, flush, outbox } from './api'
+import { api, auth, cache, flush, outbox, setPublicSlugCache } from './api'
 import { AvisosPanel, BellButton, forgetPush, NoticeToast, useNotices } from './Avisos'
 import { Caja } from './screens/Caja'
 import { Inicio } from './screens/Inicio'
@@ -266,6 +266,7 @@ function Privada() {
 
   const logout = async () => {
     await forgetPush()
+    setPublicSlugCache(null)
     await api('POST', '/auth/logout').catch(() => {})
     auth.set(null)
     cache.set('me', null)
