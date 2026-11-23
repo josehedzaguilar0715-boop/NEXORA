@@ -4,6 +4,11 @@ import { App } from './App'
 import { DialogHost } from './Dialog'
 import './fonts.css'
 import './styles.css'
+import './products/products.css'
+import { applyProduct, lastProduct } from './products'
+
+// La pantalla de acceso usa la identidad del último producto usado en este equipo.
+applyProduct(lastProduct())
 
 // El navegador avisa una sola vez que la app se puede instalar; se guarda para el botón «Instalar NEXORA».
 window.addEventListener('beforeinstallprompt', (e) => {

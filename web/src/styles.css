@@ -31,6 +31,11 @@
   --glass: rgba(17, 22, 34, 0.72);   /* paneles de vidrio (menú, barras) */
   --glass-blur: 12px;
   --muted-2: #5b6578;             /* títulos de sección del menú */
+  /* Color de los íconos por sección del menú */
+  --tone-main: #22d3ee; --tone-op: #34d399; --tone-inv: #fbbf24; --tone-cli: #22d3ee; --tone-fin: #a78bfa; --tone-adm: #94a3b8;
+  /* Gráficas */
+  --chart-in: #38bdf8; --chart-out: #f87171; --chart-profit: #34d399;
+  --chart-bar-1: #22d3ee; --chart-bar-2: #0891b2; --chart-grid: #232a3a;
   /* Sistema de diseño: espacios, radios, sombras y tiempos (todo lo nuevo los usa). */
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px;
   --radius-sm: 10px; --radius-md: 14px; --radius-lg: 22px; --radius-full: 999px;
@@ -607,7 +612,7 @@ td.row-actions .mini + .mini { margin-left: 6px; }
 .trend { font-size: 0.82rem; font-weight: 700; }
 .spark { width: 100%; height: 34px; margin-top: auto; }
 .real { margin-bottom: 14px; }
-.real-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.real-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
 @media (min-width: 1600px) { .real-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
 .real-cell { display: flex; flex-direction: column; gap: 2px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--input); text-align: center; }
 .real-cell span { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
@@ -720,3 +725,23 @@ table.list tr.strike td b { text-decoration: line-through; }
   table.merma-list td:first-child { grid-column: 1 / -1; font-weight: 600; }
   table.merma-list input { min-height: 46px; }
 }
+
+/* ---------- Agenda de hoy (Inicio de barbería y uñas) ---------- */
+.agenda-today { margin-bottom: 14px; }
+.at-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.at-stats > div { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--input); }
+.at-stats b { font-family: var(--font-display); font-size: 1.6rem; line-height: 1; }
+.at-stats span { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.at-stats .warn b { color: var(--accent); }
+.at-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.at-list li { display: grid; grid-template-columns: 92px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--line); }
+.at-list li.en_atencion { border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 8%, transparent); }
+.at-time { font-weight: 800; font-variant-numeric: tabular-nums; }
+.at-who { display: grid; min-width: 0; }
+.at-who small { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.at-state { font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); background: var(--selected); color: var(--muted); white-space: nowrap; }
+.at-state.pendiente { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.at-state.confirmada { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.at-state.en_atencion { background: color-mix(in srgb, var(--cyan) 18%, transparent); color: var(--cyan); }
+@media (max-width: 640px) { .at-list li { grid-template-columns: 70px 1fr; } .at-state { grid-column: 2; justify-self: start; } }
+.brand .word-wrap { display: grid; line-height: 1.1; }

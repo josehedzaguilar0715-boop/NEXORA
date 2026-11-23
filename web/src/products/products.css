@@ -1,0 +1,118 @@
+/* ============================================================================
+   Identidad visual por producto. Misma estructura (componentes, espacios, flujos),
+   identidad completamente distinta: color, letra, forma, profundidad y vidrio.
+   Se activa con <html data-product="..."> (ver products/index.ts).
+   Regla: nada aquí puede hacer más lenta la caja (sin imágenes, sin sombras animadas,
+   el vidrio solo en menú y barras fijas).
+   ============================================================================ */
+
+@font-face { font-family: 'Fraunces'; font-style: normal; font-display: swap; font-weight: 600; src: url('../../../node_modules/@fontsource/fraunces/files/fraunces-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Fraunces'; font-style: normal; font-display: swap; font-weight: 700; src: url('../../../node_modules/@fontsource/fraunces/files/fraunces-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Instrument Serif'; font-style: normal; font-display: swap; font-weight: 400; src: url('../../../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Instrument Serif'; font-style: italic; font-display: swap; font-weight: 400; src: url('../../../node_modules/@fontsource/instrument-serif/files/instrument-serif-latin-400-italic.woff2') format('woff2'); }
+
+/* ---------- NEXORA Barber · «Navaja y latón» ----------
+   Oscuro cálido (cuero, madera), latón como único acento, serif editorial con peso.
+   Esquinas más rectas y líneas finas: herramienta de precisión, no juguete. */
+:root[data-product='barber'] {
+  color-scheme: dark;
+  --bg: #0f0d0b; --card: #191613; --input: #211d19;
+  --cyan: #d1a954; --violet: #8f6c33; --accent: #e3b45a;
+  --ink: #f3ebdc; --muted: #a3967f; --muted-2: #7d715f;
+  --ok: #86c07a; --danger: #e0795f;
+  --line: #2d2721; --line-strong: #463c31;
+  --primary: #b98a33; --primary-hover: #a07629; --on-primary: #160f06;
+  --selected: #27211b; --selected-line: #4b3f31;
+  --hi: #fff4dc;
+  --gradient: linear-gradient(135deg, #e9c983, #9c7430);
+  --brand-text: linear-gradient(135deg, #f3ebdc, #d1a954);
+  --body-glow: radial-gradient(1000px 520px at 90% -12%, rgba(209, 169, 84, 0.07), transparent 60%);
+  --glass: rgba(22, 19, 16, 0.74); --glass-blur: 14px;
+  --focus-ring: 0 0 0 3px rgba(209, 169, 84, 0.35);
+  --font-display: 'Fraunces', Georgia, serif;
+  --radius: 12px; --radius-md: 10px; --radius-lg: 16px;
+  --chart-in: #d1a954; --chart-out: #e0795f; --chart-profit: #86c07a;
+  --chart-bar-1: #e3c27a; --chart-bar-2: #8f6c33; --chart-grid: #2d2721;
+  --logo-1: #e9c983; --logo-2: #7a5a26; --logo-ink: #160f06; --logo-dot: #e9c983;
+  --tone-main: #d1a954; --tone-op: #d1a954; --tone-inv: #c48a5a; --tone-cli: #e3c27a; --tone-fin: #b39a6b; --tone-adm: #8c8170;
+}
+[data-product='barber'] h1, [data-product='barber'] h2 { letter-spacing: -0.01em; }
+[data-product='barber'] .card { border-color: var(--line); box-shadow: 0 1px 0 rgba(255, 244, 220, 0.03) inset, 0 24px 48px -32px rgba(0, 0, 0, 0.9); }
+[data-product='barber'] button.primary { letter-spacing: 0.02em; }
+
+/* ---------- NEXORA Nails · «Porcelana» ----------
+   Claro y luminoso: porcelana, rosa empolvado y un serif delicado de revista.
+   Formas redondas, sombras suaves y vidrio claro. */
+:root[data-product='nails'] {
+  color-scheme: light;
+  --bg: #fbf6f4; --card: #ffffff; --input: #fdf3f1;
+  --cyan: #b0436e; --violet: #d98fac; --accent: #c2851a;
+  --ink: #2b1d23; --muted: #86707a; --muted-2: #a8929b;
+  --ok: #2c8a68; --danger: #c43d3d;
+  --line: #f0e0e2; --line-strong: #e4c9cf;
+  --primary: #a83c66; --primary-hover: #8f3155; --on-primary: #ffffff;
+  --selected: #fae9ee; --selected-line: #efc8d5;
+  --hi: #4a1f30;
+  --gradient: linear-gradient(135deg, #e7a1bd, #a83c66);
+  --brand-text: linear-gradient(135deg, #2b1d23, #b0436e);
+  --body-glow: radial-gradient(900px 600px at 85% -15%, rgba(232, 160, 188, 0.22), transparent 60%);
+  --glass: rgba(255, 255, 255, 0.74); --glass-blur: 16px;
+  --glow: 0 14px 34px -20px rgba(150, 60, 95, 0.35);
+  --focus-ring: 0 0 0 3px rgba(176, 67, 110, 0.25);
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --radius: 24px; --radius-md: 18px; --radius-lg: 30px;
+  --chart-in: #b0436e; --chart-out: #d26a5f; --chart-profit: #2c8a68;
+  --chart-bar-1: #eaa5c0; --chart-bar-2: #b0436e; --chart-grid: #f1e2e5;
+  --logo-1: #f2b6cb; --logo-2: #a83c66; --logo-ink: #ffffff; --logo-dot: #fbf6f4;
+  --tone-main: #b0436e; --tone-op: #b0436e; --tone-inv: #b97a2a; --tone-cli: #c25b86; --tone-fin: #7c5aa6; --tone-adm: #8a7a80;
+}
+[data-product='nails'] h1, [data-product='nails'] h2 { font-weight: 400; letter-spacing: 0; }
+[data-product='nails'] h1 { font-size: 2rem; }
+[data-product='nails'] h2 { font-size: 1.45rem; }
+[data-product='nails'] .card { border-color: var(--line); box-shadow: 0 1px 2px rgba(120, 50, 75, 0.05), 0 18px 40px -28px rgba(150, 60, 95, 0.3); }
+[data-product='nails'] input, [data-product='nails'] select, [data-product='nails'] textarea, [data-product='nails'] button, [data-product='nails'] a.button { border-radius: 16px; }
+[data-product='nails'] .modal { background: rgba(60, 30, 42, 0.35); }
+
+/* ---------- NEXORA Tienda · «Mostrador» ----------
+   Claro, directo y de alto contraste para vender rápido: verde de mostrador,
+   amarillo de etiqueta de precio, letra grotesca gruesa y botones firmes. */
+:root[data-product='market'] {
+  color-scheme: light;
+  --bg: #f3f4ee; --card: #ffffff; --input: #f6f7f2;
+  --cyan: #12743f; --violet: #e0a300; --accent: #c98500;
+  --ink: #132219; --muted: #5c6c61; --muted-2: #7a887e;
+  --ok: #12743f; --danger: #c62828;
+  --line: #dfe3d8; --line-strong: #c4ccbc;
+  --primary: #12743f; --primary-hover: #0d5e32; --on-primary: #ffffff;
+  --selected: #e5f2e8; --selected-line: #b3d8bf;
+  --hi: #0b2a17;
+  --gradient: linear-gradient(135deg, #f6c33b, #12743f);
+  --brand-text: linear-gradient(135deg, #132219, #12743f);
+  --body-glow: radial-gradient(900px 500px at 90% -12%, rgba(246, 195, 59, 0.16), transparent 60%);
+  --glass: rgba(255, 255, 255, 0.82); --glass-blur: 12px;
+  --glow: 0 10px 26px -18px rgba(19, 34, 25, 0.35);
+  --focus-ring: 0 0 0 3px rgba(18, 116, 63, 0.25);
+  --font-display: 'Bricolage Grotesque', 'Inter Variable', system-ui, sans-serif;
+  --radius: 14px; --radius-md: 12px; --radius-lg: 18px;
+  --chart-in: #12743f; --chart-out: #c62828; --chart-profit: #0f8a4c;
+  --chart-bar-1: #f6c33b; --chart-bar-2: #d99a00; --chart-grid: #e3e7dc;
+  --logo-1: #f6c33b; --logo-2: #12743f; --logo-ink: #ffffff; --logo-dot: #132219;
+  --tone-main: #12743f; --tone-op: #12743f; --tone-inv: #b67a00; --tone-cli: #1d6fb8; --tone-fin: #6a4fb0; --tone-adm: #5c6c61;
+}
+[data-product='market'] h1 { font-weight: 800; letter-spacing: -0.03em; }
+[data-product='market'] .card { border-color: var(--line); box-shadow: 0 1px 2px rgba(19, 34, 25, 0.06), 0 14px 30px -26px rgba(19, 34, 25, 0.35); }
+[data-product='market'] button.primary { font-weight: 800; }
+[data-product='market'] .pos-total b, [data-product='market'] .dkpi-value { letter-spacing: -0.02em; }
+
+/* ---------- Comunes a los productos claros ----------
+   Lo que en la base oscura era un brillo blanco sutil, en claro es una sombra sutil. */
+:root[data-product='nails'] .modal.sheet, :root[data-product='market'] .modal.sheet { background: rgba(20, 20, 20, 0.28); }
+:root[data-product='nails'] .side, :root[data-product='market'] .side { box-shadow: 1px 0 0 var(--line); }
+:root[data-product='nails'] .bar-fill.cost, :root[data-product='market'] .bar-fill.cost { background: #b8b2ad; }
+
+/* Marca del producto junto a NEXORA en el menú. */
+.brand .product-name { display: block; font-family: var(--font-display); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; color: var(--cyan); margin-top: 2px; }
+[data-product='nails'] .brand .product-name { font-style: italic; text-transform: none; letter-spacing: 0.04em; font-size: 1rem; font-weight: 400; }
+
+/* Vidrio: se apaga en equipos que piden menos efectos (y nunca va en la caja). */
+@media (prefers-reduced-transparency: reduce) { :root { --glass-blur: 0px; } }

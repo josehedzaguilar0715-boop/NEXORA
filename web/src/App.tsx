@@ -71,6 +71,7 @@ export interface Me {
 /** 'owner' = solo el dueño. Un permiso no marcado no aparece en pantalla. */
 /** Giros que manejan fiado o cuenta de crédito (spec: abarrotes, ferretería, papelería, comedor y verdulería). */
 import { FIADO_GIROS, vocab } from './giros'
+import { applyProduct, productOf } from './products'
 export { FIADO_GIROS }
 
 /** ¿El negocio tiene alguno de estos giros? (negocio mixto: principal + adicionales) */
@@ -90,7 +91,8 @@ const PORTALS: { group: string; label: string; icon: Icon }[] = [
   { group: 'Administración', label: 'Mi negocio', icon: Settings },
 ]
 /** Cada portal con su color de ícono, para ubicarse de un vistazo (lo demás es neutro). */
-export const TONE: Record<string, string> = { '': '#22d3ee', Operación: '#34d399', Inventario: '#fbbf24', Clientes: '#22d3ee', Finanzas: '#a78bfa', Administración: '#94a3b8' }
+// Los colores reales viven en CSS (--tone-*), así cada producto tiene los suyos.
+export const TONE: Record<string, string> = { '': 'var(--tone-main)', Operación: 'var(--tone-op)', Inventario: 'var(--tone-inv)', Clientes: 'var(--tone-cli)', Finanzas: 'var(--tone-fin)', Administración: 'var(--tone-adm)' }
 export const toneStyle = (group: string) => ({ '--tone': TONE[group] ?? TONE[''] }) as CSSProperties
 export const portalOf = (group: string) => PORTALS.find((p) => p.group === group)?.label ?? group
 
@@ -217,7 +219,8 @@ export function screensFor(me: Me): Screen[] {
     : s.key === 'precios' ? { ...s, label: hasGiro(me, 'verduleria') ? 'Precio del día' : 'Precio por kilo' }
     : s.key === 'lealtad' ? { ...s, label: me.modules?.includes('fidelidad') ? 'Sellos y promociones' : 'Membresías y promos' }
     : s
-  return SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s) && !(s.key === 'asistencia' && can(me, 'create_employees'))).map((s) => ({ ...rename(s), desc: descFor(me, s.key) }))
+  const hidden = productOf(me.business.giro).hide
+  return SCREENS.filter((s) => can(me, s.perm) && giroOk(s) && moduleOk(s) && !hidden.includes(s.key) && !(s.key === 'asistencia' && can(me, 'create_employees'))).map((s) => ({ ...rename(s), desc: descFor(me, s.key) }))
 }
 
 function Privada() {
@@ -236,6 +239,8 @@ function Privada() {
     void load(); const t = setInterval(load, 120_000); return () => clearInterval(t)
   }, [me?.user.id, hash])
   useEffect(() => { setPortal(null) }, [hash])
+  // Identidad visual del producto de este negocio.
+  useEffect(() => { if (me) applyProduct(productOf(me.business.giro)) }, [me?.business.giro])
   // Con la sesión abierta, el resto de las pantallas se descarga en segundo plano (para trabajar sin internet).
   useEffect(() => { if (me) preloadScreens() }, [me?.user.id])
   // Esc cierra el panel lateral que esté abierto (el de más arriba).
@@ -280,6 +285,7 @@ function Privada() {
   if (me.user.mustChangePassword) return <Login forceChange onLogin={(m) => { setMe(m); cache.set('me', m) }} />
 
   const allowed = screensFor(me)
+  const product = productOf(me.business.giro)
   // El personal que cobra entra directo a la caja; el dueño, al inicio.
   // El personal entra directo a su lugar de trabajo: la caja, la cocina o la agenda.
   const current = allowed.find((s) => s.key === hash) ?? (me.user.role === 'staff' ? ['caja', 'cocina', 'agenda'].map((k) => allowed.find((s) => s.key === k)).find(Boolean) : undefined) ?? allowed[0]
@@ -294,7 +300,7 @@ function Privada() {
         <PendingBadge />
       </header>
       <aside className={`side ${menu ? 'open' : ''}`} onClick={() => setMenu(false)}>
-        <div className="brand"><Logo size={36} /><span className="word">NEXORA</span><span style={{ flex: 1 }} /><BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} /></div>
+        <div className="brand"><Logo size={36} /><span className="word-wrap"><span className="word">NEXORA</span>{product.short && <span className="product-name">{product.short}</span>}</span><span style={{ flex: 1 }} /><BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} /></div>
         <div className="biz">{me.business.name}</div>
         {/* Un permiso no marcado no aparece en pantalla. */}
         <nav>

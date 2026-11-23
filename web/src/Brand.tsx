@@ -15,13 +15,13 @@ export function Logo({ size = 32, title = 'NEXORA' }: { size?: number; title?: s
   return (
     <svg width={size} height={size} viewBox="0 0 512 512" role="img" aria-label={title} className="nx-mark">
       <defs>
-        <linearGradient id={grad} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#22D3EE" /><stop offset="1" stopColor="#8B5CF6" /></linearGradient>
+        <linearGradient id={grad} x1="0" y1="0" x2="1" y2="1"><stop offset="0" style={{ stopColor: 'var(--logo-1, #22D3EE)' }} /><stop offset="1" style={{ stopColor: 'var(--logo-2, #8B5CF6)' }} /></linearGradient>
         <radialGradient id={glow} cx="0.3" cy="0.25" r="0.8"><stop offset="0" stopColor="#FFFFFF" stopOpacity="0.22" /><stop offset="1" stopColor="#FFFFFF" stopOpacity="0" /></radialGradient>
       </defs>
       <rect x="32" y="32" width="448" height="448" rx="120" fill={`url(#${grad})`} />
       <rect x="32" y="32" width="448" height="448" rx="120" fill={`url(#${glow})`} />
-      <path d="M168 352 V160 L344 352 V160" fill="none" stroke="#FFFFFF" strokeWidth="46" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="344" cy="160" r="30" fill="#07090F" />
+      <path d="M168 352 V160 L344 352 V160" fill="none" style={{ stroke: 'var(--logo-ink, #FFFFFF)' }} strokeWidth="46" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="344" cy="160" r="30" style={{ fill: 'var(--logo-dot, #07090F)' }} />
       <circle cx="344" cy="160" r="14" fill="#FFFFFF" />
     </svg>
   )

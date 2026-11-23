@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api, mxn } from '../api'
+import { api, hora, mxn } from '../api'
 import { FIADO_GIROS, hasGiro, screensFor, toneStyle, type Me } from '../App'
 import { vocab } from '../giros'
+import { productOf } from '../products'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const day = (d: string) => new Date(`${d}T12:00:00-06:00`).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
@@ -54,19 +55,19 @@ export function Inicio({ me }: { me: Me }) {
           <div className="dkpi-top"><span className="dkpi-label">Ingresos del mes</span></div>
           <div className="dkpi-value">{M ? mxn(M.sales) : '—'}</div>
           {M && <Trend pct={M.vsPrev.sales} label="vs mes anterior" />}
-          <Spark data={db?.series.map((x: any) => x.sales) ?? []} color="#38bdf8" />
+          <Spark data={db?.series.map((x: any) => x.sales) ?? []} color="var(--chart-in)" />
         </div>
         <div className="card dkpi">
           <div className="dkpi-top"><span className="dkpi-label">Egresos del mes</span></div>
           <div className="dkpi-value neg">{M ? mxn(M.out) : '—'}</div>
           {M && <Trend pct={M.vsPrev.out} label="vs mes anterior" inverse />}
-          <Spark data={db?.series.map((x: any) => x.out) ?? []} color="#f87171" />
+          <Spark data={db?.series.map((x: any) => x.out) ?? []} color="var(--chart-out)" />
         </div>
         <div className="card dkpi">
           <div className="dkpi-top"><span className="dkpi-label">Utilidad del mes</span></div>
           <div className={`dkpi-value ${M && M.profit < 0 ? 'neg' : 'pos'}`}>{M ? mxn(M.profit) : '—'}</div>
           {M && <Trend pct={M.vsPrev.profit} label="vs mes anterior" />}
-          <Spark data={db?.series.map((x: any) => x.profit) ?? []} color="#34d399" />
+          <Spark data={db?.series.map((x: any) => x.profit) ?? []} color="var(--chart-profit)" />
         </div>
         {T?.bulk != null && (
           <div className="card dkpi">
@@ -83,6 +84,8 @@ export function Inicio({ me }: { me: Me }) {
           </div>
         )}
       </div>
+      {/* Barbería y uñas: lo más importante del día es la agenda. */}
+      {productOf(me.business.giro).home === 'agenda' && <AgendaHoy me={me} />}
       {/* Ganancia real: lo que de verdad entró, por forma de pago, menos costos y egresos. */}
       {R && (
         <GananciaReal R={R} title="Ganancia real del mes" />
@@ -110,9 +113,9 @@ export function Inicio({ me }: { me: Me }) {
           <h2>Ventas de la semana</h2>
           <svg className="chart" viewBox={`0 0 ${W} ${H + 30}`} role="img" aria-label="Ventas de los últimos 7 días">
             <defs>
-              <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#22D3EE" /><stop offset="1" stopColor="#0891B2" /></linearGradient>
+              <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: 'var(--chart-bar-1)' }} /><stop offset="1" style={{ stopColor: 'var(--chart-bar-2)' }} /></linearGradient>
             </defs>
-            {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} x1={pad} x2={W - pad} y1={H - (H - 20) * f} y2={H - (H - 20) * f} stroke="#232A3A" strokeDasharray="4 6" />)}
+            {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} x1={pad} x2={W - pad} y1={H - (H - 20) * f} y2={H - (H - 20) * f} style={{ stroke: 'var(--chart-grid)' }} strokeDasharray="4 6" />)}
             {days.map((d, i) => {
               const h = ((H - 20) * d.total) / max
               return (
@@ -120,7 +123,7 @@ export function Inicio({ me }: { me: Me }) {
                   <rect x={pad + i * bw + bw * 0.18} y={H - h} width={bw * 0.64} height={Math.max(h, 2)} rx={8} fill="url(#bar)" opacity={d.date === today() ? 1 : 0.65}>
                     <title>{`${day(d.date)}: ${mxn(d.total)} (${d.tickets} tickets)`}</title>
                   </rect>
-                  <text x={pad + i * bw + bw / 2} y={H + 22} textAnchor="middle" fill="#7C8799" fontSize="14">{day(d.date)}</text>
+                  <text x={pad + i * bw + bw / 2} y={H + 22} textAnchor="middle" style={{ fill: 'var(--muted)' }} fontSize="14">{day(d.date)}</text>
                 </g>
               )
             })}
@@ -180,7 +183,7 @@ const QUICK: Record<string, string[]> = {
 function QuickActions({ me }: { me: Me }) {
   const allowed = screensFor(me)
   const giros = me.business.giros ?? [me.business.giro]
-  const keys = [...new Set([...giros.flatMap((g) => QUICK[g] ?? []), 'caja', 'productos', 'clientes', 'reportes'])]
+  const keys = [...new Set([...productOf(me.business.giro).quick, ...giros.flatMap((g) => QUICK[g] ?? []), 'caja', 'productos', 'clientes', 'reportes'])]
   const list = keys.map((k) => allowed.find((s) => s.key === k)).filter((s): s is NonNullable<typeof s> => !!s).slice(0, 6)
   if (!list.length) return null
   return (
@@ -258,7 +261,7 @@ function Spark({ data, color }: { data: number[]; color: string }) {
   if (data.length < 2) return <svg className="spark" viewBox="0 0 120 32" aria-hidden />
   const lo = Math.min(0, ...data), hi = Math.max(1, ...data)
   const pts = data.map((v, i) => `${(i / (data.length - 1)) * 120},${30 - ((v - lo) / (hi - lo || 1)) * 28}`).join(' ')
-  return <svg className="spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden><polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+  return <svg className="spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden><polyline points={pts} fill="none" style={{ stroke: color }} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
 }
 
 /** Anillo de avance contra la meta del día. */
@@ -289,6 +292,46 @@ export function GananciaReal({ R, title }: { R: any; title: string }) {
       </div>
       <div className="bar-track" style={{ marginTop: 12 }}><div className="bar-fill profit" style={{ width: `${R.ingresado > 0 ? Math.max(0, Math.min(100, (R.utilidad / R.ingresado) * 100)) : 0}%` }} /></div>
       {R.fiado > 0 && <p className="muted small" style={{ marginTop: 8 }}>Además se vendieron {mxn(R.fiado)} a crédito (fiado) que todavía no entran como dinero.</p>}
+    </section>
+  )
+}
+
+const ESTADO: Record<string, string> = { pendiente: 'Por confirmar', confirmada: 'Confirmada', en_atencion: 'En atención', atendida: 'Atendida', cancelada: 'Cancelada', no_asistio: 'No vino' }
+
+/** Agenda de hoy en el Inicio (barbería y uñas): lo que sigue, lo que falta confirmar y quién atiende. */
+function AgendaHoy({ me }: { me: Me }) {
+  const [d, setD] = useState<any>(null)
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const load = () => api<any>('GET', '/agenda').then(setD).catch(() => setD(null))
+    void load(); const t = setInterval(() => { void load(); setNow(Date.now()) }, 60_000); return () => clearInterval(t)
+  }, [])
+  if (!d) return null
+  const list = (d.appointments as any[]).filter((a) => !['cancelada'].includes(a.status))
+  const next = list.filter((a) => ['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && Date.parse(a.endsAt) > now).slice(0, 5)
+  const pending = list.filter((a) => a.status === 'pendiente').length
+  const done = list.filter((a) => a.status === 'atendida').length
+  const who = vocab(me).staff
+  return (
+    <section className="card agenda-today">
+      <div className="card-head"><h2>Agenda de hoy</h2><a className="mini-link" href="#/agenda">Abrir agenda</a></div>
+      <div className="at-stats">
+        <div><b>{list.length}</b><span>citas</span></div>
+        <div><b>{done}</b><span>atendidas</span></div>
+        <div className={pending ? 'warn' : ''}><b>{pending}</b><span>por confirmar</span></div>
+      </div>
+      {next.length === 0 ? <p className="muted">{list.length ? 'Ya no quedan citas por atender hoy.' : 'Hoy no hay citas. Comparte tu link de reservas para llenar la agenda.'}</p> : (
+        <ul className="at-list">
+          {next.map((a) => (
+            <li key={a.id} className={a.status}>
+              <span className="at-time">{hora(a.startsAt)}</span>
+              <span className="at-who"><b>{a.customerName}</b><small>{a.services.map((s: any) => s.name).join(' + ')}{a.staffName ? ` · ${a.staffName}` : ''}</small></span>
+              <span className={`at-state ${a.status}`}>{ESTADO[a.status] ?? a.status}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {list.length > 0 && <p className="muted small">Por {who}: {[...new Set(list.map((a) => a.staffName).filter(Boolean))].map((n) => `${n} ${list.filter((a) => a.staffName === n).length}`).join(' · ')}</p>}
     </section>
   )
 }
