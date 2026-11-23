@@ -6,8 +6,8 @@ const keys = (r: any) => r.json.tasks.map((t: any) => t.key)
 describe('pendientes de hoy y pedido sugerido', () => {
   it('abarrotes: por surtir con pedido por proveedor, fiado por cobrar, apartado por vencer y caja sin corte', async () => {
     const { s, T, product, buy, open, sell } = await negocioListo()
-    // Sin nada: todo al día.
-    expect(keys(await s.call('GET', '/today', { token: T }))).toEqual([])
+    // Negocio nuevo: solo los primeros pasos (falta agregar productos y hacer la primera venta).
+    expect(keys(await s.call('GET', '/today', { token: T }))).toEqual(['primeros_pasos'])
     const prov = (await s.call('POST', '/suppliers', { token: T, body: { name: 'Distribuidora Sur', phone: '9631112233' } })).json
     const coca = await product({ name: 'Coca 600', unit: 'pieza', price: 2000, minStock: 10 })
     const pan = await product({ name: 'Pan', unit: 'pieza', price: 500, minStock: 4 })
