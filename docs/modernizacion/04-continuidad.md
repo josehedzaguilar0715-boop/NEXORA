@@ -134,3 +134,19 @@ Publicar el commit anterior que se quiera conservar (`git checkout <commit> && n
   * devolución a proveedor / anulación de compra;
   * anulación de abono de fiado;
   * después, Fase 4 (seguridad).
+
+## 12. Fase 3 (cierre) y Fase 4 (23 nov)
+
+* Fase 3, huecos comunes:
+  * devolución a proveedor (migración 39);
+  * anular abono de fiado (migración 38);
+  * el saldo a favor ya no cuenta como cobro.
+
+  Ver `07-auditoria-giros.md` §7.
+* Fase 4, seguridad: `08-seguridad.md`.
+  * Límite por IP.
+  * Respaldos cifrados: **falta activar `BACKUP_KEY` en producción, con autorización**.
+  * Barrido de permisos.
+  * Monitor de espacio.
+  * Análisis de la base compartida: **decisión pendiente**; se recomienda un objeto por negocio antes de ~10 negocios.
+* Migraciones al día: **39** (número real en `_migrations`).
