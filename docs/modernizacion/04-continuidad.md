@@ -150,3 +150,15 @@ Publicar el commit anterior que se quiera conservar (`git checkout <commit> && n
   * Monitor de espacio.
   * Análisis de la base compartida: **decisión pendiente**; se recomienda un objeto por negocio antes de ~10 negocios.
 * Migraciones al día: **39** (número real en `_migrations`).
+
+## 13. Cierre del plan maestro (23 nov)
+
+* **Informe final: `11-informe-final.md`**. Fases: `06` a `11`.
+* Rama `modernizacion`, staging `a04435ff`. Producción **sin cambios** (`2c16921e`): **falta la autorización del propietario**.
+* Migraciones hasta la **39**.
+* Siguiente trabajo sugerido, en orden:
+  1. publicar con autorización;
+  2. activar `BACKUP_KEY`;
+  3. separar la base por negocio;
+  4. cobro automático y facturación;
+  5. dominio y nombres definitivos.
