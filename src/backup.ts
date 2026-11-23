@@ -19,7 +19,7 @@ export const KEEP_DAYS = 30
 
 /** Todas las tablas de la base (respaldo completo). */
 export function exportAll(db: Db, now: Date) {
-  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").all() as { name: string }[]).map((t) => t.name)
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT LIKE '!_!_%' ESCAPE '!' ORDER BY name").all() as { name: string }[]).map((t) => t.name)
   return {
     exportedAt: iso(now),
     version: (db.prepare('SELECT MAX(version) v FROM _migrations').get() as { v: number }).v,

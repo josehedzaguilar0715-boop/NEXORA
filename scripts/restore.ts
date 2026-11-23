@@ -15,7 +15,8 @@ if (isEncrypted(raw)) {
   if (!process.env.NEXORA_BACKUP_KEY) throw new Error('Este respaldo está cifrado: pon la llave en NEXORA_BACKUP_KEY.')
   raw = Buffer.from(await decryptBackup(raw, process.env.NEXORA_BACKUP_KEY))
 }
-const data = JSON.parse((src.replace(/\.enc$/, '').endsWith('.gz') ? gunzipSync(raw) : raw).toString('utf8')) as { version: number; tables: Record<string, Record<string, unknown>[]> }
+// Comprimido o no se decide por el contenido (firma gzip 1f 8b), no por el nombre del archivo.
+const data = JSON.parse((raw[0] === 0x1f && raw[1] === 0x8b ? gunzipSync(raw) : raw).toString('utf8')) as { version: number; tables: Record<string, Record<string, unknown>[]> }
 restore(data, dest)
 console.log(`Base restaurada en ${dest} (respaldo versión ${data.version}).`)
 
@@ -28,6 +29,8 @@ export function restore(data: { version: number; tables: Record<string, Record<s
   db.transaction(() => {
     for (const [table, rows] of Object.entries(data.tables)) {
       if (table === '_migrations' || !rows.length) continue
+      // Tablas internas del motor (p. ej. del simulador local) no son de NEXORA.
+      if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table)) { console.warn(`Se omite la tabla ${table} (no es de NEXORA).`); continue }
       const cols = Object.keys(rows[0]!)
       const stmt = db.prepare(`INSERT OR REPLACE INTO "${table}" (${cols.map((c) => `"${c}"`).join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
       for (const r of rows) stmt.run(...cols.map((c) => r[c] ?? null))
