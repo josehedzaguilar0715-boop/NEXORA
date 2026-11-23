@@ -26,13 +26,16 @@ async function page(b, token) {
   p.on('response', (x) => { if (x.url().includes('/api/') && x.status() >= 500) p.errs.push(x.status() + ' ' + x.url()) });
   p.answers = [];
   p.on('dialog', (d) => d.accept(d.type() === 'prompt' ? (p.answers.shift() ?? '4321') : undefined));
+  // Un solo ciclo a la vez: si dos ciclos contestan la misma ventana, el segundo escribe otra respuesta.
+  let busy = false
   p.pump = setInterval(async () => {
+    if (busy) return; busy = true
     try {
       const dlg = p.locator('.dialog-wrap'); if (!(await dlg.count())) return
       if (await dlg.locator('.dialog-choices').count()) { const want = p.answers.shift() ?? 'efectivo'; const c = dlg.locator('.dialog-choices button', { hasText: new RegExp('^' + want + '$', 'i') }); await ((await c.count()) ? c : dlg.locator('.dialog-choices button').first()).click(); return }
       if (await dlg.locator('input').count()) await dlg.locator('input').fill(p.answers.shift() ?? '4321')
       await dlg.locator('.dialog-actions button.primary, .dialog-actions button.danger').click()
-    } catch {}
+    } catch {} finally { busy = false }
   }, 250); p.pump.unref();
   p.tap = (loc) => (VP.hasTouch ? loc.tap() : loc.click());
   p.go = async (h) => { await p.goto(B + '/#/' + h); await p.reload(); await p.waitForTimeout(900) };
@@ -312,7 +315,7 @@ async function taqueria(b) {
   ok(g, t.includes('$180.00'), '10 tacos: $180');
   await p.go('carne');
   ok(g, await p.getByText('0.3 kg').count() >= 1, 'el trompo registra 0.3 kg vendidos por receta');
-  await p.screenshot({ path: require('os').tmpdir() + '/nexora-', fullPage: true });
+  await p.screenshot({ path: require('os').tmpdir() + '/nexora-carne.png', fullPage: true });
   p.answers.push('4.7');
   await p.tap(p.getByRole('button', { name: 'Contar sobrante' })); await p.getByText(/Cerrado. Diferencia: 0 kg/).waitFor({ timeout: 8000 });
   ok(g, true, 'sobrante contado con código: 4.7 kg, sin diferencia');

@@ -52,7 +52,10 @@ const page = await ctx.newPage()
 page.on('dialog', (d: any) => void d.accept(d.type() === 'prompt' ? '4321' : undefined))
 // Las ventanas de NEXORA (código, motivo, cantidad): se contestan solas con `answer`, igual que un usuario.
 let answer = '4321'
+let pumping = false // un solo ciclo a la vez (dos ciclos podrían contestar la misma ventana dos veces)
 const pump = setInterval(async () => {
+  if (pumping) return
+  pumping = true
   try {
     const dlg = page.locator('.dialog-wrap')
     if (!(await dlg.count())) return
@@ -60,7 +63,7 @@ const pump = setInterval(async () => {
     if (await dlg.locator('.dialog-choices').count()) { await (await choice.count() ? choice : dlg.locator('.dialog-choices button').first()).click(); return }
     if (await dlg.locator('input').count()) await dlg.locator('input').fill(answer)
     await dlg.locator('.dialog-actions button.primary, .dialog-actions button.danger').click()
-  } catch { /* la ventana cambió mientras se contestaba */ }
+  } catch { /* la ventana cambió mientras se contestaba */ } finally { pumping = false }
 }, 250)
 try {
   // Entrar como dueño con verificación en dos pasos.
