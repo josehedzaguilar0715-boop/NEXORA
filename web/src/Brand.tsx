@@ -27,16 +27,6 @@ export function Logo({ size = 32, title = 'NEXORA' }: { size?: number; title?: s
   )
 }
 
-/** Logo horizontal: el ícono y el nombre NEXORA (Inter 800, degradado #F1F5F9 → #C4B5FD). */
-export function LogoHorizontal({ size = 36 }: { size?: number }) {
-  return (
-    <span className="nx-logo" style={{ fontSize: size * 0.5 }}>
-      <Logo size={size} />
-      <span className="nx-word">NEXORA</span>
-    </span>
-  )
-}
-
 const reduced = () => {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false }
 }
