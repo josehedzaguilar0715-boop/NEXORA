@@ -1,0 +1,1330 @@
+-- Esquema completo de NEXORA (SQLite), generado aplicando las 39 migraciones de src/db.ts a una base vacía.
+-- NO contiene datos. Referencia para traducir a Postgres (Floot). La fuente de verdad son las migraciones de src/db.ts.
+-- Tablas: 102 · índices: 38 · candados (triggers): 34
+
+CREATE TABLE _migrations (version INTEGER PRIMARY KEY);
+
+CREATE TABLE accesses (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    kind TEXT NOT NULL CHECK (kind IN ('cobro','pase')),
+    sale_id TEXT REFERENCES sales(id),
+    customer_id TEXT REFERENCES customers(id),
+    membership_id TEXT,
+    services TEXT NOT NULL,
+    at TEXT NOT NULL,
+    timed_service_id TEXT REFERENCES services(id),
+    exited_at TEXT,
+    exit_sale_id TEXT REFERENCES sales(id),
+    created_by TEXT NOT NULL
+  );
+
+CREATE TABLE admin_challenges (
+    id TEXT PRIMARY KEY,
+    admin_id TEXT NOT NULL REFERENCES admins(id),
+    code_hash TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE admin_sessions (
+    id TEXT PRIMARY KEY,
+    admin_id TEXT NOT NULL REFERENCES admins(id),
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT
+  );
+
+CREATE TABLE admins (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TEXT,
+    created_at TEXT NOT NULL
+  , phone TEXT, email TEXT);
+
+CREATE TABLE agenda_blocks (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE app_keys (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+CREATE TABLE appointments (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    staff_id TEXT REFERENCES users(id),
+    customer_id TEXT REFERENCES customers(id),
+    customer_name TEXT NOT NULL,
+    phone TEXT,
+    services TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pendiente','confirmada','en_atencion','atendida','cancelada','no_asistio')),
+    source TEXT NOT NULL CHECK (source IN ('mostrador','link','sin_cita')),
+    public_token TEXT UNIQUE,
+    at_home INTEGER NOT NULL DEFAULT 0,
+    address TEXT,
+    travel_min INTEGER NOT NULL DEFAULT 0,
+    notes TEXT,
+    sale_id TEXT REFERENCES sales(id),
+    cancel_reason TEXT,
+    created_by TEXT,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE asset_rentals (
+    id TEXT PRIMARY KEY,
+    asset_id TEXT NOT NULL REFERENCES rental_assets(id),
+    tab_id TEXT NOT NULL REFERENCES tabs(id),
+    tab_item_id TEXT NOT NULL REFERENCES tab_items(id),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    out_at TEXT NOT NULL,
+    returned_at TEXT
+  );
+
+CREATE TABLE audit_log (
+    id TEXT PRIMARY KEY,
+    business_id TEXT,
+    user_id TEXT,
+    action TEXT NOT NULL,
+    entity TEXT,
+    entity_id TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    authorized_by TEXT,
+    reason TEXT,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE branches (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  , active INTEGER NOT NULL DEFAULT 1);
+
+CREATE TABLE business_settings (
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (business_id, key)
+  );
+
+CREATE TABLE businesses (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    phone TEXT,
+    logo_url TEXT,
+    status TEXT NOT NULL DEFAULT 'prueba' CHECK (status IN ('prueba','activo','vencido','suspendido')),
+    trial_days INTEGER,
+    force_password_change INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  , trial_ends_at TEXT, paid_until TEXT, overdue_since TEXT, suspended_reason TEXT, plan TEXT NOT NULL DEFAULT 'inicial', extra_branches INTEGER NOT NULL DEFAULT 0, extra_user_packs INTEGER NOT NULL DEFAULT 0, pending_plan TEXT, modules TEXT NOT NULL DEFAULT '[]', reserve_days INTEGER, giro TEXT NOT NULL DEFAULT 'abarrotes', addons TEXT NOT NULL DEFAULT '[]', extra_giros TEXT NOT NULL DEFAULT '[]', free INTEGER NOT NULL DEFAULT 0, public_slug TEXT);
+
+CREATE TABLE campaign_awards (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id),
+    prize_id TEXT NOT NULL REFERENCES campaign_prizes(id),
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    delivered_by TEXT NOT NULL REFERENCES users(id),
+    delivered_at TEXT NOT NULL
+  );
+
+CREATE TABLE campaign_prizes (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id),
+    name TEXT NOT NULL,
+    goal INTEGER NOT NULL CHECK (goal > 0),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    tiebreak TEXT NOT NULL CHECK (tiebreak IN ('faciales','productos','ninguno')),
+    sort INTEGER NOT NULL DEFAULT 0
+  );
+
+CREATE TABLE campaigns (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  , ends_at TEXT);
+
+CREATE TABLE cash_movements (
+    id TEXT PRIMARY KEY,
+    shift_id TEXT NOT NULL REFERENCES shifts(id),
+    type TEXT NOT NULL CHECK (type IN ('retiro','deposito')),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    reason TEXT NOT NULL,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  , origin TEXT NOT NULL DEFAULT 'sistema');
+
+CREATE TABLE categories (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    -- Margen sugerido en puntos base (3000 = 30 %). Sin margen no hay sugerencia.
+    margin_bp INTEGER,
+    created_at TEXT NOT NULL,
+    UNIQUE (business_id, name)
+  );
+
+CREATE TABLE cleaning_log (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    task_id TEXT NOT NULL REFERENCES cleaning_tasks(id),
+    user_id TEXT NOT NULL REFERENCES users(id),
+    shift_id TEXT REFERENCES shifts(id),
+    at TEXT NOT NULL,
+    note TEXT
+  );
+
+CREATE TABLE cleaning_tasks (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE comandas (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    tab_id TEXT NOT NULL REFERENCES tabs(id),
+    station TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'en_preparacion' CHECK (status IN ('en_preparacion','lista','entregada')),
+    created_at TEXT NOT NULL,
+    ready_at TEXT
+  );
+
+CREATE TABLE combo_items (
+    combo_id TEXT NOT NULL REFERENCES products(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    qty_milli INTEGER NOT NULL CHECK (qty_milli > 0),
+    PRIMARY KEY (combo_id, product_id)
+  );
+
+CREATE TABLE "commission_rules" (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    staff_id TEXT REFERENCES users(id),
+    target_type TEXT NOT NULL CHECK (target_type IN ('service','product','category','brand','all')),
+    target_id TEXT,
+    rate_bp INTEGER NOT NULL CHECK (rate_bp BETWEEN 0 AND 10000),
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE consumption_carry (
+    branch_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    micro INTEGER NOT NULL,
+    PRIMARY KEY (branch_id, product_id)
+  );
+
+CREATE TABLE counter_readings (
+    id TEXT PRIMARY KEY,
+    machine_id TEXT NOT NULL REFERENCES machines(id),
+    shift_id TEXT NOT NULL REFERENCES shifts(id),
+    type TEXT NOT NULL CHECK (type IN ('inicio','fin')),
+    value INTEGER NOT NULL CHECK (value >= 0),
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (machine_id, shift_id, type)
+  );
+
+CREATE TABLE credit_ledger (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    delta INTEGER NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('cargo','abono','cancelacion')),
+    method TEXT,
+    sale_id TEXT,
+    shift_id TEXT,
+    note TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  , reverses_id TEXT);
+
+CREATE TABLE customer_memberships (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    plan_id TEXT NOT NULL REFERENCES membership_plans(id),
+    -- Copia del plan al venderse: editar el plan no altera membresías ya vendidas.
+    plan_snapshot TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    price_paid INTEGER NOT NULL,
+    sale_id TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE customers (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    phone TEXT,
+    notes TEXT,
+    -- Identificador único, aleatorio y no consecutivo para QR / código de barras.
+    code TEXT NOT NULL UNIQUE,
+    loyalty_enrolled INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  , credit_limit INTEGER NOT NULL DEFAULT 0, address TEXT, home_all INTEGER NOT NULL DEFAULT 0);
+
+CREATE TABLE daily_menus (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    date TEXT NOT NULL,
+    meal TEXT NOT NULL DEFAULT 'dia',
+    items TEXT NOT NULL,
+    published_by TEXT NOT NULL REFERENCES users(id),
+    authorized_by TEXT NOT NULL REFERENCES users(id),
+    published_at TEXT NOT NULL,
+    UNIQUE (business_id, date, meal)
+  );
+
+CREATE TABLE day_closes (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    date TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    closed_by TEXT NOT NULL REFERENCES users(id),
+    closed_at TEXT NOT NULL,
+    UNIQUE (branch_id, date)
+  );
+
+CREATE TABLE dining_tables (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    name TEXT NOT NULL,
+    area TEXT NOT NULL DEFAULT 'salon',
+    seats INTEGER NOT NULL DEFAULT 4,
+    status TEXT NOT NULL DEFAULT 'libre' CHECK (status IN ('libre','ocupada','reservada','por_cobrar','limpieza')),
+    min_consumption INTEGER,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE entry_tickets (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    code TEXT NOT NULL UNIQUE,
+    service_id TEXT NOT NULL REFERENCES services(id),
+    type_name TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    start TEXT NOT NULL,
+    tour_id TEXT REFERENCES tours(id),
+    channel TEXT NOT NULL CHECK (channel IN ('taquilla','en_linea')),
+    status TEXT NOT NULL CHECK (status IN ('por_pagar','pagado','usado','cancelado')),
+    sale_id TEXT REFERENCES sales(id),
+    order_token TEXT,
+    buyer_name TEXT,
+    phone TEXT,
+    used_at TEXT,
+    cancel_reason TEXT,
+    cancelled_by TEXT,
+    refunded INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE expenses (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    concept TEXT NOT NULL,
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    kind TEXT NOT NULL CHECK (kind IN ('fijo','variable')),
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta')),
+    from_cash_shift TEXT REFERENCES shifts(id),
+    date TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  , category TEXT NOT NULL DEFAULT 'otros', voided_at TEXT, voided_by TEXT, void_reason TEXT);
+
+CREATE TABLE fixed_expenses (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    concept TEXT NOT NULL,
+    monthly_amount INTEGER NOT NULL CHECK (monthly_amount > 0),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE idempotency (
+    user_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    status INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key)
+  );
+
+CREATE TABLE layaway_items (
+    id TEXT PRIMARY KEY,
+    layaway_id TEXT NOT NULL REFERENCES layaways(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    presentation_id TEXT,
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL,
+    qty_milli INTEGER NOT NULL,
+    unit_price INTEGER NOT NULL,
+    total INTEGER NOT NULL
+  );
+
+CREATE TABLE layaway_payments (
+    id TEXT PRIMARY KEY,
+    layaway_id TEXT NOT NULL REFERENCES layaways(id),
+    kind TEXT NOT NULL CHECK (kind IN ('anticipo','abono','devolucion')),
+    amount INTEGER NOT NULL,
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta')),
+    shift_id TEXT REFERENCES shifts(id),
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE layaways (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    folio INTEGER NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    total INTEGER NOT NULL CHECK (total > 0),
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'abierto' CHECK (status IN ('abierto','entregado','cancelado')),
+    sale_id TEXT REFERENCES sales(id),
+    cancel_reason TEXT,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    closed_at TEXT
+  );
+
+CREATE TABLE lots (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    purchase_id TEXT REFERENCES purchases(id),
+    source_lot_id TEXT REFERENCES lots(id),
+    qty_initial_milli INTEGER NOT NULL,
+    qty_remaining_milli INTEGER NOT NULL CHECK (qty_remaining_milli >= 0),
+    -- Costo real por unidad (incluye su parte de fletes), en centavos.
+    unit_cost REAL NOT NULL,
+    -- Precio de venta de este lote: entra cuando se agota el anterior.
+    price INTEGER NOT NULL,
+    expires_at TEXT,
+    received_at TEXT NOT NULL
+  );
+
+CREATE TABLE loyalty_ledger (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    delta INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    sale_id TEXT,
+    reward_id TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  , note TEXT, ext_ref TEXT);
+
+CREATE TABLE "loyalty_program" (
+    business_id TEXT PRIMARY KEY REFERENCES businesses(id),
+    unit TEXT NOT NULL CHECK (unit IN ('puntos','sellos')),
+    earn_by TEXT NOT NULL CHECK (earn_by IN ('monto','visita','venta')),
+    earn_amount INTEGER,
+    earn_points INTEGER NOT NULL CHECK (earn_points > 0),
+    scope TEXT NOT NULL CHECK (scope IN ('todos','por_persona')),
+    daily_cap INTEGER CHECK (daily_cap IS NULL OR daily_cap > 0),
+    updated_at TEXT NOT NULL
+  );
+
+CREATE TABLE loyalty_rewards (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    cost INTEGER NOT NULL CHECK (cost > 0),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE machines (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE meat_batches (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    shift_id TEXT REFERENCES shifts(id),
+    started_milli INTEGER NOT NULL CHECK (started_milli > 0),
+    started_at TEXT NOT NULL,
+    started_by TEXT NOT NULL,
+    closed_at TEXT,
+    sold_milli INTEGER,
+    expected_milli INTEGER,
+    counted_milli INTEGER,
+    difference_milli INTEGER,
+    reason TEXT,
+    authorized_by TEXT REFERENCES users(id)
+  );
+
+CREATE TABLE membership_plans (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    uses_per_period INTEGER NOT NULL CHECK (uses_per_period > 0),
+    period TEXT NOT NULL CHECK (period IN ('dia','semana','mes')),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    applies_to TEXT NOT NULL DEFAULT '[]',
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  , kind TEXT NOT NULL DEFAULT 'periodo', validity_days INTEGER);
+
+CREATE TABLE membership_uses (
+    id TEXT PRIMARY KEY,
+    membership_id TEXT NOT NULL REFERENCES customer_memberships(id),
+    use_date TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    at TEXT NOT NULL,
+    scanned_by TEXT NOT NULL
+  );
+
+CREATE TABLE notification_seen (user_id TEXT PRIMARY KEY, seen_at TEXT NOT NULL);
+
+CREATE TABLE notifications (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    link TEXT,
+    audience TEXT NOT NULL,
+    dedupe TEXT,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE occupancy_events (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('entrada','salida')),
+    ticket_id TEXT,
+    count INTEGER NOT NULL DEFAULT 1,
+    at TEXT NOT NULL,
+    created_by TEXT NOT NULL
+  );
+
+CREATE TABLE one_time_charges (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    concept TEXT NOT NULL,
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    recorded_by TEXT NOT NULL REFERENCES admins(id),
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE open_bottles (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    ml_total REAL NOT NULL,
+    ml_remaining REAL NOT NULL CHECK (ml_remaining >= 0),
+    cost_per_ml REAL NOT NULL,
+    opened_by TEXT NOT NULL,
+    opened_at TEXT NOT NULL
+  );
+
+CREATE TABLE orders (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    folio INTEGER NOT NULL,
+    customer_id TEXT REFERENCES customers(id),
+    customer_name TEXT,
+    phone TEXT,
+    description TEXT NOT NULL,
+    total INTEGER NOT NULL CHECK (total >= 0),
+    deposit INTEGER NOT NULL CHECK (deposit >= 0),
+    deposit_sale_id TEXT REFERENCES sales(id),
+    final_sale_id TEXT REFERENCES sales(id),
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente','listo','entregado','cancelado')),
+    cancel_reason TEXT,
+    deposit_refunded INTEGER,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (business_id, folio)
+  );
+
+CREATE TABLE payments (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    months INTEGER NOT NULL CHECK (months > 0),
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    note TEXT,
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    recorded_by TEXT NOT NULL REFERENCES admins(id),
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE presentations (
+    id TEXT PRIMARY KEY,
+    product_id TEXT NOT NULL REFERENCES products(id),
+    name TEXT NOT NULL,
+    factor_milli INTEGER NOT NULL CHECK (factor_milli > 0),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    barcode TEXT,
+    active INTEGER NOT NULL DEFAULT 1
+  );
+
+CREATE TABLE price_tiers (
+    product_id TEXT NOT NULL REFERENCES products(id),
+    min_milli INTEGER NOT NULL CHECK (min_milli > 0),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    PRIMARY KEY (product_id, min_milli)
+  );
+
+CREATE TABLE product_suppliers (
+    product_id TEXT NOT NULL REFERENCES products(id),
+    supplier_id TEXT NOT NULL REFERENCES suppliers(id),
+    supplier_code TEXT NOT NULL,
+    PRIMARY KEY (product_id, supplier_id),
+    UNIQUE (supplier_id, supplier_code)
+  );
+
+CREATE TABLE products (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    category_id TEXT REFERENCES categories(id),
+    barcode TEXT,
+    -- pieza: cantidades enteras; granel: por kilo (u otra unidad base).
+    unit TEXT NOT NULL CHECK (unit IN ('pieza','kg','metro','litro')),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    margin_bp INTEGER,
+    min_stock_milli INTEGER NOT NULL DEFAULT 0,
+    track_expiry INTEGER NOT NULL DEFAULT 0,
+    last_cost REAL NOT NULL DEFAULT 0,
+    version INTEGER NOT NULL DEFAULT 1,
+    updated_at TEXT NOT NULL,
+    updated_device TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  , sellable INTEGER NOT NULL DEFAULT 1, attrs TEXT NOT NULL DEFAULT '{}', track_stock INTEGER NOT NULL DEFAULT 1, pack_name TEXT, pack_size INTEGER);
+
+CREATE TABLE promotions (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('porcentaje','monto')),
+    value INTEGER NOT NULL CHECK (value > 0),
+    starts_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    -- {"all":true} o {"refs":[...],"categories":[...]}
+    applies_to TEXT NOT NULL,
+    combinable INTEGER NOT NULL DEFAULT 0,
+    min_quantity INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE purchase_items (
+    id TEXT PRIMARY KEY,
+    purchase_id TEXT NOT NULL REFERENCES purchases(id),
+    product_id TEXT NOT NULL REFERENCES products(id),
+    qty_milli INTEGER NOT NULL,
+    cost_total INTEGER NOT NULL,
+    freight_share INTEGER NOT NULL,
+    unit_cost REAL NOT NULL,
+    lot_id TEXT NOT NULL REFERENCES lots(id)
+  );
+
+CREATE TABLE purchases (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    supplier_id TEXT REFERENCES suppliers(id),
+    ticket_ref TEXT,
+    items_total INTEGER NOT NULL,
+    freight_total INTEGER NOT NULL,
+    freight_detail TEXT NOT NULL,
+    payment TEXT NOT NULL CHECK (payment IN ('contado','credito')),
+    due_date TEXT,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE push_subscriptions (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    endpoint TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE quotes (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    folio INTEGER NOT NULL,
+    customer_id TEXT REFERENCES customers(id),
+    customer_name TEXT,
+    items TEXT NOT NULL,
+    total INTEGER NOT NULL,
+    valid_until TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'abierta' CHECK (status IN ('abierta','vendida','cancelada')),
+    sale_id TEXT REFERENCES sales(id),
+    price_authorized_by TEXT REFERENCES users(id),
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    UNIQUE (business_id, folio)
+  );
+
+CREATE TABLE recipes (
+    owner_id TEXT NOT NULL,
+    product_id TEXT NOT NULL REFERENCES products(id),
+    qty_micro INTEGER NOT NULL CHECK (qty_micro > 0),
+    PRIMARY KEY (owner_id, product_id)
+  );
+
+CREATE TABLE registers (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE rental_assets (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity >= 0),
+    price INTEGER NOT NULL CHECK (price >= 0),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE return_items (
+    id TEXT PRIMARY KEY,
+    return_id TEXT NOT NULL REFERENCES returns(id),
+    sale_item_id TEXT,
+    product_id TEXT REFERENCES products(id),
+    description TEXT NOT NULL,
+    qty_milli INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    restocked INTEGER NOT NULL DEFAULT 1
+  );
+
+CREATE TABLE returns (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    sale_id TEXT REFERENCES sales(id),
+    shift_id TEXT REFERENCES shifts(id),
+    customer_id TEXT REFERENCES customers(id),
+    amount INTEGER NOT NULL CHECK (amount >= 0),
+    refund_method TEXT NOT NULL CHECK (refund_method IN ('efectivo','transferencia','tarjeta','saldo')),
+    reason TEXT NOT NULL,
+    authorized_by TEXT NOT NULL REFERENCES users(id),
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE sale_commissions (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    sale_item_id TEXT NOT NULL,
+    staff_id TEXT NOT NULL REFERENCES users(id),
+    base INTEGER NOT NULL,
+    rate_bp INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+  , status TEXT NOT NULL DEFAULT 'vigente', payout_id TEXT, clawback_id TEXT);
+
+CREATE TABLE sale_counters (branch_id TEXT PRIMARY KEY REFERENCES branches(id), last INTEGER NOT NULL);
+
+CREATE TABLE sale_items (
+    id TEXT PRIMARY KEY,
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL CHECK (quantity > 0),
+    unit_price INTEGER NOT NULL CHECK (unit_price >= 0),
+    total INTEGER NOT NULL
+  , ref TEXT, category TEXT, product_id TEXT, presentation_id TEXT, qty_milli INTEGER, cost INTEGER NOT NULL DEFAULT 0, service_id TEXT REFERENCES services(id));
+
+CREATE TABLE "sale_payments" (
+    id TEXT PRIMARY KEY,
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta','fiado','anticipo')),
+    amount INTEGER NOT NULL CHECK (amount >= 0)
+  );
+
+CREATE TABLE sale_promotions (
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    promotion_id TEXT NOT NULL REFERENCES promotions(id),
+    amount INTEGER NOT NULL,
+    PRIMARY KEY (sale_id, promotion_id)
+  );
+
+CREATE TABLE "sales" (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    shift_id TEXT NOT NULL REFERENCES shifts(id),
+    folio INTEGER NOT NULL,
+    cashier_id TEXT NOT NULL REFERENCES users(id),
+    subtotal INTEGER NOT NULL,
+    discount INTEGER NOT NULL DEFAULT 0,
+    total INTEGER NOT NULL,
+    payment_method TEXT NOT NULL CHECK (payment_method IN ('efectivo','transferencia','tarjeta','fiado')),
+    status TEXT NOT NULL DEFAULT 'completada' CHECK (status IN ('completada','cancelada')),
+    discount_authorized_by TEXT REFERENCES users(id),
+    cancelled_by TEXT REFERENCES users(id),
+    cancel_authorized_by TEXT REFERENCES users(id),
+    cancel_reason TEXT,
+    cancelled_at TEXT,
+    created_at TEXT NOT NULL,
+    received_at TEXT NOT NULL,
+    promo_discount INTEGER NOT NULL DEFAULT 0,
+    customer_id TEXT REFERENCES customers(id),
+    cash_received INTEGER,
+    price_authorized_by TEXT REFERENCES users(id),
+    credit_authorized_by TEXT REFERENCES users(id),
+    UNIQUE (branch_id, folio)
+  );
+
+CREATE TABLE service_combos (
+    combo_id TEXT NOT NULL REFERENCES services(id),
+    service_id TEXT NOT NULL REFERENCES services(id),
+    share INTEGER NOT NULL CHECK (share >= 0),
+    PRIMARY KEY (combo_id, service_id)
+  );
+
+CREATE TABLE services (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    category TEXT,
+    price INTEGER NOT NULL CHECK (price >= 0),
+    duration_min INTEGER,
+    attrs TEXT NOT NULL DEFAULT '{}',
+    machine_id TEXT,
+    sheets_per_unit INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  , cost INTEGER NOT NULL DEFAULT 0);
+
+CREATE TABLE sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    token_hash TEXT NOT NULL UNIQUE,
+    device_id TEXT,
+    device_name TEXT,
+    created_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT
+  );
+
+CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+CREATE TABLE shifts (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    cashier_id TEXT NOT NULL REFERENCES users(id),
+    opening_float INTEGER NOT NULL CHECK (opening_float >= 0),
+    opened_at TEXT NOT NULL,
+    opened_date TEXT NOT NULL,
+    closed_at TEXT,
+    closed_by TEXT REFERENCES users(id),
+    expected_cash INTEGER,
+    counted_cash INTEGER,
+    difference INTEGER,
+    difference_reason TEXT,
+    status TEXT NOT NULL DEFAULT 'abierto' CHECK (status IN ('abierto','cerrado'))
+  , register_id TEXT REFERENCES registers(id), meal TEXT);
+
+CREATE TABLE slot_closures (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    date TEXT NOT NULL,
+    start TEXT,
+    reason TEXT NOT NULL,
+    authorized_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE slot_templates (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+    start TEXT NOT NULL,
+    end TEXT NOT NULL,
+    capacity INTEGER NOT NULL CHECK (capacity > 0)
+  );
+
+CREATE TABLE staff_attendance (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    type TEXT NOT NULL CHECK (type IN ('entrada','salida')),
+    at TEXT NOT NULL
+  );
+
+CREATE TABLE staff_payouts (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    staff_id TEXT NOT NULL REFERENCES users(id),
+    commission INTEGER NOT NULL,
+    tips INTEGER NOT NULL,
+    adjustments INTEGER NOT NULL DEFAULT 0,
+    amount INTEGER NOT NULL,
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia')),
+    shift_id TEXT REFERENCES shifts(id),
+    note TEXT,
+    authorized_by TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE staff_schedules (
+    user_id TEXT NOT NULL REFERENCES users(id),
+    weekday INTEGER NOT NULL CHECK (weekday BETWEEN 0 AND 6),
+    start TEXT NOT NULL,
+    end TEXT NOT NULL,
+    CHECK (start < end)
+  );
+
+CREATE TABLE "stock_movements" (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL,
+    product_id TEXT NOT NULL REFERENCES products(id),
+    lot_id TEXT REFERENCES lots(id),
+    type TEXT NOT NULL CHECK (type IN ('compra','venta','cancelacion','merma','traspaso_salida','traspaso_entrada','ajuste','consumo','devolucion','fraccion_salida','fraccion_entrada')),
+    qty_milli INTEGER NOT NULL,
+    cost INTEGER NOT NULL,
+    ref_id TEXT,
+    reason TEXT,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE supplier_payments (
+    id TEXT PRIMARY KEY,
+    purchase_id TEXT NOT NULL REFERENCES purchases(id),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta')),
+    from_cash_shift TEXT REFERENCES shifts(id),
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE supplier_returns (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    purchase_id TEXT NOT NULL REFERENCES purchases(id),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    refund TEXT NOT NULL CHECK (refund IN ('credito','efectivo','transferencia')),
+    items TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    shift_id TEXT REFERENCES shifts(id),
+    authorized_by TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE suppliers (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    phone TEXT,
+    notes TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE sync_changes (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    op_id TEXT NOT NULL UNIQUE,
+    business_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    data TEXT NOT NULL,
+    client_updated_at TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    applied INTEGER NOT NULL,
+    received_at TEXT NOT NULL
+  );
+
+CREATE TABLE sync_conflicts (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    winner TEXT NOT NULL,
+    loser TEXT NOT NULL,
+    winner_device TEXT NOT NULL,
+    loser_device TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente','revisado')),
+    created_at TEXT NOT NULL,
+    reviewed_by TEXT,
+    reviewed_at TEXT
+  );
+
+CREATE TABLE sync_state (
+    business_id TEXT NOT NULL,
+    entity TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    data TEXT NOT NULL,
+    client_updated_at TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    PRIMARY KEY (business_id, entity, entity_id)
+  );
+
+CREATE TABLE tab_items (
+    id TEXT PRIMARY KEY,
+    tab_id TEXT NOT NULL REFERENCES tabs(id),
+    product_id TEXT REFERENCES products(id),
+    service_id TEXT REFERENCES services(id),
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL CHECK (quantity > 0),
+    unit_price INTEGER NOT NULL,
+    modifiers TEXT NOT NULL DEFAULT '[]',
+    notes TEXT,
+    station TEXT,
+    person INTEGER,
+    status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente','enviado','listo','entregado','cancelado','pagado')),
+    comanda_id TEXT REFERENCES comandas(id),
+    courtesy INTEGER NOT NULL DEFAULT 0,
+    authorized_by TEXT REFERENCES users(id),
+    cancel_reason TEXT,
+    sale_id TEXT REFERENCES sales(id),
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE table_reservations (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    table_id TEXT REFERENCES dining_tables(id),
+    starts_at TEXT NOT NULL,
+    people INTEGER NOT NULL CHECK (people > 0),
+    name TEXT NOT NULL,
+    phone TEXT,
+    notes TEXT,
+    status TEXT NOT NULL CHECK (status IN ('pendiente','confirmada','llego','no_llego','cancelada')),
+    confirmed_by TEXT REFERENCES users(id),
+    created_by TEXT,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE tabs (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    kind TEXT NOT NULL CHECK (kind IN ('mesa','llevar','recoger')),
+    table_id TEXT REFERENCES dining_tables(id),
+    waiter_id TEXT REFERENCES users(id),
+    people INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL CHECK (status IN ('abierta','por_cobrar','cerrada','cancelada')),
+    order_number INTEGER,
+    order_status TEXT CHECK (order_status IN ('recibido','en_cocina','listo','entregado')),
+    customer_name TEXT,
+    phone TEXT,
+    pickup_at TEXT,
+    opened_by TEXT NOT NULL,
+    opened_at TEXT NOT NULL,
+    closed_at TEXT
+  );
+
+CREATE TABLE ticket_messages (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL REFERENCES tickets(id),
+    author_type TEXT NOT NULL CHECK (author_type IN ('cliente','soporte')),
+    author_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE tickets (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    type TEXT NOT NULL CHECK (type IN ('soporte','cambio')),
+    subject TEXT NOT NULL,
+    module TEXT,
+    status TEXT NOT NULL,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    unread_by_client INTEGER NOT NULL DEFAULT 0,
+    unread_by_support INTEGER NOT NULL DEFAULT 1
+  );
+
+CREATE TABLE tips (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    sale_id TEXT NOT NULL REFERENCES sales(id),
+    shift_id TEXT NOT NULL REFERENCES shifts(id),
+    staff_id TEXT NOT NULL REFERENCES users(id),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia','tarjeta')),
+    status TEXT NOT NULL DEFAULT 'vigente' CHECK (status IN ('vigente','cancelada')),
+    created_at TEXT NOT NULL
+  , payout_id TEXT, clawback_id TEXT);
+
+CREATE TABLE tours (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    date TEXT NOT NULL,
+    start TEXT NOT NULL,
+    capacity INTEGER NOT NULL CHECK (capacity > 0),
+    guide_id TEXT REFERENCES users(id),
+    service_id TEXT NOT NULL REFERENCES services(id),
+    status TEXT NOT NULL DEFAULT 'abierta' CHECK (status IN ('abierta','cancelada')),
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE transfers (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    from_branch TEXT NOT NULL REFERENCES branches(id),
+    to_branch TEXT NOT NULL REFERENCES branches(id),
+    items TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE trusted_devices (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    token_hash TEXT NOT NULL UNIQUE,
+    device_name TEXT,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    revoked_at TEXT
+  );
+
+CREATE TABLE users (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    branch_id TEXT REFERENCES branches(id),
+    role TEXT NOT NULL CHECK (role IN ('owner','staff')),
+    name TEXT NOT NULL,
+    username TEXT,
+    phone TEXT,
+    phone_verified INTEGER NOT NULL DEFAULT 0,
+    password_hash TEXT NOT NULL,
+    must_change_password INTEGER NOT NULL DEFAULT 0,
+    permissions TEXT NOT NULL DEFAULT '[]',
+    auth_code_hash TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TEXT,
+    auth_failed_attempts INTEGER NOT NULL DEFAULT 0,
+    auth_locked_until TEXT,
+    created_at TEXT NOT NULL
+  , register_id TEXT REFERENCES registers(id), in_agenda INTEGER NOT NULL DEFAULT 0);
+
+CREATE TABLE "verification_codes" (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    purpose TEXT NOT NULL CHECK (purpose IN ('registro','login','recuperar','identidad')),
+    code_hash TEXT NOT NULL,
+    device_id TEXT,
+    device_name TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    created_at TEXT NOT NULL
+  );
+
+CREATE TABLE visits (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES customers(id),
+    visit_date TEXT NOT NULL,
+    at TEXT NOT NULL,
+    scanned_by TEXT NOT NULL REFERENCES users(id)
+  );
+
+CREATE INDEX accesses_business ON accesses(business_id, at);
+
+CREATE INDEX appointments_staff ON appointments(staff_id, starts_at);
+
+CREATE INDEX audit_business ON audit_log(business_id, created_at);
+
+CREATE UNIQUE INDEX businesses_public_slug ON businesses(public_slug) WHERE public_slug IS NOT NULL;
+
+CREATE UNIQUE INDEX campaign_awards_one ON campaign_awards(campaign_id, customer_id);
+
+CREATE INDEX comandas_station ON comandas(business_id, station, status);
+
+CREATE INDEX credit_ledger_customer ON credit_ledger(customer_id);
+
+CREATE UNIQUE INDEX credit_ledger_reverses ON credit_ledger(reverses_id) WHERE reverses_id IS NOT NULL;
+
+CREATE INDEX customers_business ON customers(business_id, name);
+
+CREATE INDEX entry_tickets_order ON entry_tickets(order_token);
+
+CREATE INDEX entry_tickets_slot ON entry_tickets(business_id, date, start);
+
+CREATE INDEX layaway_items_product ON layaway_items(product_id);
+
+CREATE UNIQUE INDEX layaways_folio ON layaways(business_id, folio);
+
+CREATE INDEX lots_fifo ON lots(branch_id, product_id, received_at);
+
+CREATE INDEX loyalty_ledger_customer ON loyalty_ledger(customer_id);
+
+CREATE UNIQUE INDEX membership_one_use_per_visit ON membership_uses(membership_id, use_date);
+
+CREATE INDEX notifications_biz ON notifications(business_id, created_at);
+
+CREATE UNIQUE INDEX notifications_dedupe ON notifications(business_id, dedupe) WHERE dedupe IS NOT NULL;
+
+CREATE UNIQUE INDEX products_barcode ON products(business_id, barcode) WHERE barcode IS NOT NULL;
+
+CREATE INDEX push_subscriptions_user ON push_subscriptions(user_id);
+
+CREATE INDEX sale_commissions_staff ON sale_commissions(staff_id, created_at);
+
+CREATE INDEX sale_payments_sale ON sale_payments(sale_id);
+
+CREATE INDEX sales_customer ON sales(customer_id);
+
+CREATE INDEX sales_shift ON sales(shift_id);
+
+CREATE UNIQUE INDEX shifts_one_open ON shifts(cashier_id) WHERE status = 'abierto';
+
+CREATE UNIQUE INDEX shifts_one_open_register ON shifts(register_id) WHERE status = 'abierto' AND register_id IS NOT NULL;
+
+CREATE INDEX staff_payouts_business ON staff_payouts(business_id, created_at);
+
+CREATE INDEX staff_schedules_user ON staff_schedules(user_id, weekday);
+
+CREATE INDEX stock_movements_product ON stock_movements(branch_id, product_id);
+
+CREATE INDEX stock_movements_ref ON stock_movements(ref_id);
+
+CREATE INDEX supplier_returns_purchase ON supplier_returns(purchase_id);
+
+CREATE INDEX sync_changes_pull ON sync_changes(business_id, seq);
+
+CREATE INDEX tab_items_tab ON tab_items(tab_id);
+
+CREATE INDEX tabs_open ON tabs(business_id, status);
+
+CREATE INDEX tickets_business ON tickets(business_id, updated_at);
+
+CREATE UNIQUE INDEX users_owner_phone ON users(phone) WHERE role = 'owner';
+
+CREATE UNIQUE INDEX users_username ON users(business_id, username) WHERE username IS NOT NULL;
+
+CREATE UNIQUE INDEX visits_one_per_day ON visits(customer_id, visit_date);
+
+CREATE TRIGGER accesses_no_delete BEFORE DELETE ON accesses BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABORT, 'La bitácora no se puede borrar'); END;
+
+CREATE TRIGGER audit_no_update BEFORE UPDATE ON audit_log BEGIN SELECT RAISE(ABORT, 'La bitácora no se puede modificar'); END;
+
+CREATE TRIGGER cash_movements_no_delete BEFORE DELETE ON cash_movements BEGIN SELECT RAISE(ABORT, 'Los movimientos no se pueden borrar'); END;
+
+CREATE TRIGGER cleaning_log_no_delete BEFORE DELETE ON cleaning_log BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER credit_ledger_no_delete BEFORE DELETE ON credit_ledger BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER credit_ledger_no_update BEFORE UPDATE ON credit_ledger BEGIN SELECT RAISE(ABORT, 'No se puede modificar'); END;
+
+CREATE TRIGGER entry_tickets_no_delete BEFORE DELETE ON entry_tickets BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER expenses_no_delete BEFORE DELETE ON expenses BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER layaway_payments_no_delete BEFORE DELETE ON layaway_payments BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER layaways_no_delete BEFORE DELETE ON layaways BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER loyalty_ledger_no_delete BEFORE DELETE ON loyalty_ledger BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER loyalty_ledger_no_update BEFORE UPDATE ON loyalty_ledger BEGIN SELECT RAISE(ABORT, 'No se puede modificar'); END;
+
+CREATE TRIGGER membership_uses_no_delete BEFORE DELETE ON membership_uses BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER one_time_charges_no_delete BEFORE DELETE ON one_time_charges BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER payments_no_delete BEFORE DELETE ON payments BEGIN SELECT RAISE(ABORT, 'Los pagos no se pueden borrar'); END;
+
+CREATE TRIGGER sale_commissions_no_delete BEFORE DELETE ON sale_commissions BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER sale_items_no_delete BEFORE DELETE ON sale_items BEGIN SELECT RAISE(ABORT, 'Las ventas no se pueden borrar'); END;
+
+CREATE TRIGGER sale_payments_no_delete BEFORE DELETE ON sale_payments BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER sales_no_delete BEFORE DELETE ON sales BEGIN SELECT RAISE(ABORT, 'Las ventas no se pueden borrar'); END;
+
+CREATE TRIGGER shifts_no_delete BEFORE DELETE ON shifts BEGIN SELECT RAISE(ABORT, 'Los turnos no se pueden borrar'); END;
+
+CREATE TRIGGER staff_attendance_no_delete BEFORE DELETE ON staff_attendance BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER staff_payouts_no_delete BEFORE DELETE ON staff_payouts BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER stock_movements_no_delete BEFORE DELETE ON stock_movements BEGIN SELECT RAISE(ABORT, 'Los movimientos no se pueden borrar'); END;
+
+CREATE TRIGGER stock_movements_no_update BEFORE UPDATE ON stock_movements BEGIN SELECT RAISE(ABORT, 'Los movimientos no se pueden modificar'); END;
+
+CREATE TRIGGER supplier_returns_no_delete BEFORE DELETE ON supplier_returns BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER sync_changes_no_delete BEFORE DELETE ON sync_changes BEGIN SELECT RAISE(ABORT, 'Los cambios no se pueden borrar'); END;
+
+CREATE TRIGGER sync_conflicts_no_delete BEFORE DELETE ON sync_conflicts BEGIN SELECT RAISE(ABORT, 'Los conflictos no se pueden borrar'); END;
+
+CREATE TRIGGER tab_items_no_delete BEFORE DELETE ON tab_items BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER tabs_no_delete BEFORE DELETE ON tabs BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER ticket_messages_no_delete BEFORE DELETE ON ticket_messages BEGIN SELECT RAISE(ABORT, 'El buzón no se puede borrar'); END;
+
+CREATE TRIGGER tickets_no_delete BEFORE DELETE ON tickets BEGIN SELECT RAISE(ABORT, 'El buzón no se puede borrar'); END;
+
+CREATE TRIGGER tips_no_delete BEFORE DELETE ON tips BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+
+CREATE TRIGGER visits_no_delete BEFORE DELETE ON visits BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;

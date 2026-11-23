@@ -1,0 +1,29 @@
+# Copia este archivo como .dev.vars (para `wrangler dev`) o expórtalo como variables de entorno (para `npm run dev`).
+# NUNCA subas el archivo con valores reales al repositorio: .dev.vars está en .gitignore.
+# Todas son opcionales para desarrollo: sin ellas el sistema funciona y solo imprime los códigos en la consola.
+
+# Usuario del super panel que se crea solo en el primer arranque en Cloudflare (si no hay ninguno).
+ADMIN_USERNAME=
+ADMIN_PASSWORD=
+ADMIN_NAME=
+# Con teléfono o correo, el super panel pide un segundo código al entrar.
+ADMIN_PHONE=
+ADMIN_EMAIL=
+
+# SMS (Twilio): códigos de registro y recuperación. Sin esto, el registro funciona sin SMS.
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM=
+
+# Correo (Resend): respaldos al correo y segundo paso del super panel.
+RESEND_API_KEY=
+MAIL_FROM=
+
+# Llave para cifrar respaldos (32 bytes en base64: `openssl rand -base64 32`). Guárdala fuera del servidor.
+BACKUP_KEY=
+
+# Solo servidor local (Node):
+# NEXORA_DB=data/nexora.db        # archivo SQLite
+# NEXORA_BACKUPS=data/respaldos   # carpeta de respaldos
+# PORT=3000
+# Restaurar un respaldo cifrado: NEXORA_BACKUP_KEY=<llave> npm run restore -- respaldo.json.gz.enc nueva.db
