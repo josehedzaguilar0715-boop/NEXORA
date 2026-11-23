@@ -111,3 +111,12 @@ Detalle completo en `05-acabado-y-limpieza.md`.
 
 ### Reversión de esta etapa
 Publicar el commit anterior que se quiera conservar (`git checkout <commit> && npm run deploy:prod`, con autorización). Ningún cambio de esta etapa toca la base de datos.
+
+## 10. Plan maestro: Fase 1 y Fase 2 (23 nov)
+
+* Fase 1 (cierre): `06-fase1-cierre.md`.
+* Fase 2 (auditoría de los 13 giros, matriz y correcciones): `07-auditoria-giros.md`.
+  * Ya no sale de la caja más efectivo del que hay (compras, gastos, devoluciones, cancelaciones). Código `efectivo_insuficiente`.
+  * Se puede anular un gasto capturado por error. Migración **39**, que solo agrega columnas.
+  * Pruebas de día completo: `test/dia-completo.test.ts`.
+* Siguiente: Fase 3, empezando por el **pago de comisiones y propinas** (ver matriz §5).
