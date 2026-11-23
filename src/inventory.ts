@@ -513,8 +513,58 @@ const purchaseBody = z.object({
 export function purchaseBalance(db: Db, purchaseId: string) {
   const p = db.prepare('SELECT items_total + freight_total AS total, payment FROM purchases WHERE id = ?').get(purchaseId) as { total: number; payment: string }
   const paid = (db.prepare('SELECT COALESCE(SUM(amount),0) a FROM supplier_payments WHERE purchase_id = ?').get(purchaseId) as { a: number }).a
-  return { total: p.total, paid, balance: p.total - paid }
+  // Lo devuelto al proveedor: a cuenta (baja lo que se debe) o con reembolso (regresa lo pagado).
+  const r = db.prepare("SELECT COALESCE(SUM(CASE WHEN refund = 'credito' THEN amount END),0) credit, COALESCE(SUM(CASE WHEN refund <> 'credito' THEN amount END),0) refunded FROM supplier_returns WHERE purchase_id = ?").get(purchaseId) as { credit: number; refunded: number }
+  // Lo que se debe = total − pagado − devuelto a cuenta. Un reembolso no cambia lo que se debe (regresa algo ya pagado).
+  return { total: p.total, paid, returned: r.credit + r.refunded, refunded: r.refunded, balance: p.total - paid - r.credit }
 }
+
+/**
+ * Devolución a proveedor: sale del inventario del lote de esa compra (al costo con el que entró).
+ * A cuenta: baja lo que se le debe (no más del saldo). Con reembolso: el proveedor regresa dinero (efectivo a la caja
+ * abierta o transferencia). Con código del dueño; nada se borra.
+ */
+inventory.post('/purchases/:id/returns', requirePerm('edit_inventory'), async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const u = c.get('session').user
+  const p = db.prepare('SELECT * FROM purchases WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; branch_id: string; ticket_ref: string | null } | undefined
+  if (!p) throw notFound()
+  const d = parse(z.object({
+    id: z.string().uuid().optional(),
+    items: z.array(z.object({ purchaseItemId: z.string(), quantity: z.number().positive() })).min(1).max(100),
+    refund: z.enum(['credito', 'efectivo', 'transferencia']), reason: z.string().trim().min(3, 'Escribe el motivo').max(200), authCode: z.string().optional(),
+  }), await body(c))
+  if (d.id && db.prepare('SELECT 1 FROM supplier_returns WHERE id = ?').get(d.id)) return c.json({ duplicate: true, ...purchaseBalance(db, p.id) })
+  const auth = u.role === 'owner' ? null : authorize(deps, u, d.authCode, 'edit_inventory', 'devolución a proveedor', { ownerOnly: true })
+  const shift = d.refund === 'efectivo' ? (db.prepare("SELECT id FROM shifts WHERE cashier_id = ? AND status = 'abierto'").get(u.id) as { id: string } | undefined) : undefined
+  if (d.refund === 'efectivo' && !shift) throw conflict('Abre tu caja para recibir el reembolso en efectivo.', 'caja_cerrada')
+  const id = d.id ?? newId()
+  const ctx = { db, now, businessId: u.business_id, branchId: p.branch_id, userId: u.id }
+  const result = db.transaction(() => {
+    let amount = 0
+    const lines: { productId: string; name: string; quantity: number; cost: number }[] = []
+    for (const it of d.items) {
+      const pi = db.prepare('SELECT pi.*, pr.name, pr.unit FROM purchase_items pi JOIN products pr ON pr.id = pi.product_id WHERE pi.id = ? AND pi.purchase_id = ?').get(it.purchaseItemId, p.id) as { product_id: string; lot_id: string; name: string; unit: string; unit_cost: number } | undefined
+      if (!pi) throw bad('Ese renglón no es de esta compra.')
+      if (pi.unit === 'pieza' && !Number.isInteger(it.quantity)) throw bad(`${pi.name} se cuenta por pieza.`)
+      // Solo lo que queda de ese lote (lo vendido ya no se puede devolver).
+      const r = consume(ctx, pi.product_id, toMilli(it.quantity), 'ajuste', id, `Devolución a proveedor: ${d.reason}`, pi.lot_id)
+      amount += r.cost
+      lines.push({ productId: pi.product_id, name: pi.name, quantity: it.quantity, cost: r.cost })
+    }
+    if (amount <= 0) throw bad('No hay nada que devolver.')
+    const bal = purchaseBalance(db, p.id)
+    if (d.refund === 'credito' && amount > bal.balance) throw bad(`A cuenta solo se puede devolver hasta lo que se debe de esta compra (${(bal.balance / 100).toFixed(2)} pesos). Pide el reembolso en efectivo o transferencia.`, 'excede_saldo')
+    if (d.refund !== 'credito' && amount > bal.paid - bal.refunded) throw bad('El reembolso no puede ser mayor a lo que se le pagó por esta compra.', 'excede_pagado')
+    db.prepare('INSERT INTO supplier_returns (id, business_id, purchase_id, amount, refund, items, reason, shift_id, authorized_by, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(
+      id, u.business_id, p.id, amount, d.refund, JSON.stringify(lines), d.reason, shift?.id ?? null, auth?.id ?? null, u.id, iso(now()))
+    if (shift) db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'deposito',?,?,?,?)").run(newId(), shift.id, amount, `Reembolso de proveedor${p.ticket_ref ? ` (folio ${p.ticket_ref})` : ''}`, u.id, iso(now()))
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'compra.devolucion', entity: 'purchase', entityId: p.id, newValue: { amount, refund: d.refund, items: lines }, reason: d.reason, ...(auth ? { authorizedBy: auth.id } : {}) })
+    return { amount, lines }
+  })()
+  return c.json({ id, ...result, ...purchaseBalance(db, p.id) }, 201)
+})
 
 inventory.post('/purchases', requirePerm('edit_inventory'), async (c) => {
   const { db, now } = c.get('deps')
@@ -578,6 +628,13 @@ inventory.get('/purchases/:id', requirePerm('edit_inventory'), (c) => {
   if (!p) throw notFound()
   const items = db.prepare('SELECT pi.*, pr.name FROM purchase_items pi JOIN products pr ON pr.id = pi.product_id WHERE purchase_id = ?').all(p.id)
   return c.json({ purchase: p, items, ...purchaseBalance(db, p.id), payments: db.prepare('SELECT amount, method, created_at AS createdAt FROM supplier_payments WHERE purchase_id = ?').all(p.id) })
+})
+
+/** Compras recientes (para consultar o devolver al proveedor). */
+inventory.get('/purchases', requirePerm('edit_inventory'), (c) => {
+  const { db } = c.get('deps')
+  const rows = db.prepare('SELECT p.id, p.ticket_ref AS ticketRef, p.payment, p.created_at AS createdAt, s.name AS supplier FROM purchases p LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? ORDER BY p.created_at DESC LIMIT 50').all(c.get('session').user.business_id) as { id: string }[]
+  return c.json({ purchases: rows.map((r) => ({ ...r, ...purchaseBalance(db, r.id), items: db.prepare('SELECT pi.id, pr.name, pr.unit, pi.qty_milli / 1000.0 AS quantity, l.qty_remaining_milli / 1000.0 AS remaining, pi.unit_cost AS unitCost FROM purchase_items pi JOIN products pr ON pr.id = pi.product_id JOIN lots l ON l.id = pi.lot_id WHERE pi.purchase_id = ?').all(r.id) })) })
 })
 
 // Cuentas por pagar.

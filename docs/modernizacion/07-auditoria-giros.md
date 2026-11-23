@@ -115,3 +115,31 @@ Datos y pruebas:
 * Después se abrió con esta versión. Se aplicaron las migraciones **35, 36 y 37** y quedó en la 37.
 * Ventas, renglones, pagos, comisiones, gastos, movimientos de caja, turnos, productos, clientes, fiado, movimientos de inventario y lotes quedaron **idénticos**, renglón por renglón.
 * Nota: documentos anteriores llamaban «38, 39 y 40» a estas migraciones. El número real (tabla `_migrations`) es 35, 36 y 37. Ya está corregido.
+
+## 7. Avance de la Fase 3: huecos comunes cerrados (23 nov)
+
+| Hueco | Estado | Dónde | Prueba |
+|---|---|---|---|
+| **Devolución a proveedor** | ✅ | *Inventario → Compras → Compras recientes → Devolver*. Detalle abajo. Migración **39**. | `test/devolucion-proveedor.test.ts` (3) + navegador en computadora y celular |
+| **Anular abono de fiado** | ✅ | *Clientes → cuenta → Movimientos → Anular*. Detalle abajo. Migración **38**. | `dia-completo` «fiado: corregir un abono» |
+| **Error encontrado:** una devolución dejada como **saldo a favor** (no es dinero) contaba como «cobro» en el flujo de efectivo, el libro y el panel de Inicio | ✅ corregido | Solo cuentan los abonos con forma de pago. | `dia-completo` «saldo a favor» |
+
+**Devolución a proveedor:**
+
+* La mercancía sale del lote de esa compra, al costo con el que entró. Lo ya vendido no se puede devolver.
+* Hay tres formas de arreglarse con el proveedor:
+  * **a cuenta**: baja lo que se le debe, sin pasar del saldo;
+  * **reembolso en efectivo**: el dinero entra a la caja abierta;
+  * **reembolso por transferencia**.
+* No cuenta como merma.
+* Aparece en cuentas por pagar, en el balance y, si hubo reembolso, en el flujo de efectivo y el libro.
+* Pide el código del dueño y queda en la bitácora.
+
+**Anular abono de fiado:**
+
+* Se registra un movimiento contrario que apunta al abono original. El abono original no se borra y no se puede anular dos veces.
+* La deuda vuelve a subir.
+* Si el abono fue en efectivo, el dinero sale de la caja donde entró, solo mientras ese turno siga abierto y con la verificación de efectivo.
+* El cobro sale de los reportes. Pide el código del dueño.
+
+Matriz actualizada: **Abarrotes y Ferretería → ✅**. Con esto, **los 13 giros quedan en ✅** para los procesos auditados.

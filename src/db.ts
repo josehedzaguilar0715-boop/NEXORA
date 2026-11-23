@@ -1471,6 +1471,23 @@ const MIGRATIONS: Migration[] = [
   // Abono de fiado capturado por error: se anula con un movimiento contrario que apunta al original (nunca se borra).
   `ALTER TABLE credit_ledger ADD COLUMN reverses_id TEXT;
   CREATE UNIQUE INDEX credit_ledger_reverses ON credit_ledger(reverses_id) WHERE reverses_id IS NOT NULL;`,
+  // Devolución a proveedor: mercancía que regresa de una compra (dañada, equivocada). Baja el saldo por pagar
+  // o el proveedor regresa el dinero. La salida de inventario queda como 'ajuste' con esta referencia.
+  `CREATE TABLE supplier_returns (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    purchase_id TEXT NOT NULL REFERENCES purchases(id),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    refund TEXT NOT NULL CHECK (refund IN ('credito','efectivo','transferencia')),
+    items TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    shift_id TEXT REFERENCES shifts(id),
+    authorized_by TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX supplier_returns_purchase ON supplier_returns(purchase_id);
+  CREATE TRIGGER supplier_returns_no_delete BEFORE DELETE ON supplier_returns BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

@@ -24,7 +24,7 @@ export const CATEGORIES: Record<string, string> = {
   mantenimiento: 'Mantenimiento', publicidad: 'Publicidad', impuestos: 'Impuestos y permisos', comisiones_bancarias: 'Comisiones bancarias', otros: 'Otros',
 }
 const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
-const FLOW: Record<string, string> = { apartados: 'Anticipos y abonos de apartados', ventas: 'Ventas cobradas', cobranza: 'Cobro de fiado', aportaciones: 'Depósitos a caja', proveedores: 'Pagos a proveedores', gastos: 'Gastos', devoluciones: 'Devoluciones a clientes', retiros: 'Retiros de caja', personal: 'Comisiones pagadas al personal' }
+const FLOW: Record<string, string> = { apartados: 'Anticipos y abonos de apartados', ventas: 'Ventas cobradas', cobranza: 'Cobro de fiado', aportaciones: 'Depósitos a caja', proveedores: 'Pagos a proveedores', gastos: 'Gastos', devoluciones: 'Devoluciones a clientes', retiros: 'Retiros de caja', personal: 'Comisiones pagadas al personal', reembolsos_proveedor: 'Reembolsos de proveedores' }
 const pct = (n: number | null) => (n == null ? '—' : `${(n * 100).toFixed(1)} %`)
 const fmtDate = (d: string) => new Date(`${d}T12:00:00-06:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
 

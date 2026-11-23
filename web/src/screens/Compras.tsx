@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, mxn, toCents } from '../api'
-import { ask } from '../Dialog'
+import { ask, askCode } from '../Dialog'
 import type { Me } from '../App'
 import type { Product } from './Caja'
 import { packWord } from './Productos'
@@ -9,10 +9,11 @@ import { packWord } from './Productos'
 interface Row { productId: string; name: string; quantity: string; cost: string; newPrice: string; expiresAt: string; pack: { name: string; size: number } | null; byPack: boolean }
 
 /** Captura de una compra desde su ticket: cada renglón es un lote; los fletes se reparten solos. */
-export function Compras(_: { me: Me }) {
+export function Compras({ me }: { me: Me }) {
   const [catalog, setCatalog] = useState<Product[]>([])
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
   const [payables, setPayables] = useState<{ payables: any[]; total: number }>({ payables: [], total: 0 })
+  const [recent, setRecent] = useState<any[]>([])
   const [rows, setRows] = useState<Row[]>([])
   const [freight, setFreight] = useState<{ concept: string; amount: string }[]>([])
   const [head, setHead] = useState({ supplierId: '', ticketRef: '', payment: 'contado', paidFromCash: false, dueDate: '' })
@@ -22,6 +23,7 @@ export function Compras(_: { me: Me }) {
     setCatalog((await api<{ products: Product[] }>('GET', '/products')).products)
     setSuppliers((await api<{ suppliers: any[] }>('GET', '/suppliers')).suppliers)
     setPayables(await api('GET', '/payables'))
+    setRecent((await api<{ purchases: any[] }>('GET', '/purchases')).purchases)
   }
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
 
@@ -57,6 +59,27 @@ export function Compras(_: { me: Me }) {
     try {
       await api('POST', `/purchases/${id}/payments`, { amount: toCents(a), method: 'transferencia' })
       void load()
+    } catch (e) { setMsg({ err: (e as Error).message }) }
+  }
+
+  /** Devolución a proveedor: qué producto, cuánto, cómo lo regresa (a cuenta o con dinero) y por qué. */
+  const giveBack = async (p: any) => {
+    const left = p.items.filter((i: any) => i.remaining > 0)
+    if (!left.length) { setMsg({ err: 'De esa compra ya no queda nada en existencia para devolver.' }); return }
+    const itemId = left.length === 1 ? left[0].id : await ask({ title: 'Devolver al proveedor', hint: '¿Qué producto regresa?', choices: left.map((i: any) => ({ value: i.id, label: `${i.name} (quedan ${i.remaining})` })) })
+    if (!itemId) return
+    const it = left.find((i: any) => i.id === itemId)
+    const q = await ask({ title: `Devolver ${it.name}`, hint: `De esta compra quedan ${it.remaining}. Costo ${mxn(Math.round(it.unitCost))} c/u.`, label: 'Cuántos', numeric: true, placeholder: '0', confirmLabel: 'Continuar' })
+    if (!q || !(Number(q) > 0)) return
+    const refund = await ask({ title: 'Cómo se arregla con el proveedor', choices: [...(p.balance > 0 ? [{ value: 'credito', label: 'Baja lo que le debo' }] : []), { value: 'efectivo', label: 'Me regresa efectivo (a mi caja)' }, { value: 'transferencia', label: 'Me regresa por transferencia' }] })
+    if (!refund) return
+    const reason = await ask({ title: 'Motivo de la devolución', label: 'Motivo', placeholder: 'Ej. venían caducadas', confirmLabel: 'Devolver' })
+    if (!reason) return
+    const authCode = me.user.role === 'owner' ? undefined : await askCode('Para devolver al proveedor se necesita el código del dueño.')
+    if (me.user.role !== 'owner' && !authCode) return
+    try {
+      const r = await api<any>('POST', `/purchases/${p.id}/returns`, { id: crypto.randomUUID(), items: [{ purchaseItemId: itemId, quantity: Number(q) }], refund, reason, authCode })
+      setMsg({ ok: `Devolución registrada por ${mxn(r.amount)}.` }); void load()
     } catch (e) { setMsg({ err: (e as Error).message }) }
   }
 
@@ -119,6 +142,14 @@ export function Compras(_: { me: Me }) {
           <h2>Cuentas por pagar · {mxn(payables.total)}</h2>
           <div className="table-wrap"><table className="list"><tbody>{payables.payables.map((p) => <tr key={p.id}><td>{p.supplier ?? 'Sin proveedor'}<br /><small className="muted">{p.ticketRef ?? ''} {p.dueDate ? `vence ${p.dueDate}` : ''}</small></td><td className="num">{mxn(p.balance)}</td><td><button onClick={() => pay(p.id, p.balance)}>Abonar</button></td></tr>)}</tbody></table></div>
         </div>
+        {recent.length > 0 && <div className="card" style={{ marginTop: 16 }}>
+          <h2>Compras recientes</h2>
+          <div className="table-wrap"><table className="list"><tbody>{recent.slice(0, 15).map((p) => <tr key={p.id}>
+            <td>{p.supplier ?? 'Sin proveedor'}<br /><small className="muted">{new Date(p.createdAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'America/Mexico_City' })} · {p.payment === 'credito' ? 'a crédito' : 'de contado'}{p.returned ? ` · devuelto ${mxn(p.returned)}` : ''}</small></td>
+            <td className="num">{mxn(p.total)}</td>
+            <td><button className="link small" onClick={() => giveBack(p)}>Devolver</button></td>
+          </tr>)}</tbody></table></div>
+        </div>}
       </section>
     </div>
   )

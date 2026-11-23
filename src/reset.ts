@@ -67,6 +67,7 @@ export const STEPS: [table: string, sql: string][] = [
   ['cleaning_log', 'DELETE FROM cleaning_log WHERE business_id = ?'],
   ['cash_movements', `DELETE FROM cash_movements WHERE shift_id IN ${SHIFTS}`],
   ['supplier_payments', `UPDATE supplier_payments SET from_cash_shift = NULL WHERE from_cash_shift IN ${SHIFTS}`],
+  ['supplier_returns', `UPDATE supplier_returns SET shift_id = NULL WHERE shift_id IN ${SHIFTS}`],
   ['expenses', 'DELETE FROM expenses WHERE business_id = ?'],
   ['shifts', 'DELETE FROM shifts WHERE business_id = ?'],
   ['sale_counters', `DELETE FROM sale_counters WHERE branch_id IN ${BRANCHES}`],
