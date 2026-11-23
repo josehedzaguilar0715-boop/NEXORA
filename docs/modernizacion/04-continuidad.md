@@ -120,3 +120,17 @@ Publicar el commit anterior que se quiera conservar (`git checkout <commit> && n
   * Se puede anular un gasto capturado por error. Migración **36**, que solo agrega columnas.
   * Pruebas de día completo: `test/dia-completo.test.ts`.
 * Siguiente: Fase 3, empezando por el **pago de comisiones y propinas** (ver matriz §5).
+
+## 11. Fase 3, primer bloque (23 nov)
+
+* **Pago de comisiones y propinas al personal**: detalle en `07-auditoria-giros.md` §6. Migración 37.
+* Staging: versión `be939fe0`, con todo lo de las fases 2 y 3. Se probó contra staging (7/7):
+  * rechazo por efectivo insuficiente;
+  * pago por transferencia;
+  * no se paga dos veces;
+  * anular un gasto devuelve la caja.
+* Producción: **sin cambios** (`2c16921e`). Publicar requiere la autorización del propietario.
+* Pendiente de la matriz:
+  * devolución a proveedor / anulación de compra;
+  * anulación de abono de fiado;
+  * después, Fase 4 (seguridad).
