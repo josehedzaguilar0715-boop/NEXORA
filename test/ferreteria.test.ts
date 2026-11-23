@@ -93,9 +93,11 @@ describe('ferretería', () => {
 
   it('devolución sin ticket también requiere código; lo dañado no regresa al inventario', async () => {
     const { s, T, open, pintura, stock } = await ferre()
-    await open(0)
+    await open(10000)
     const body = { items: [{ productId: pintura.id, quantity: 1, amount: 9000, restock: false }], refundMethod: 'efectivo', reason: 'Cubeta golpeada' }
     expect((await s.call('POST', '/returns', { token: T, body })).json.error.code).toBe('codigo_requerido')
+    // Devolver en efectivo más de lo que hay en la caja no se puede (se ofrece transferencia o saldo).
+    expect((await s.call('POST', '/returns', { token: T, body: { ...body, items: [{ ...body.items[0], amount: 20000 }], authCode: '4321' } })).json.error.code).toBe('efectivo_insuficiente')
     expect((await s.call('POST', '/returns', { token: T, body: { ...body, authCode: '4321' } })).status).toBe(201)
     expect(await stock(pintura.id)).toBe(19)
     const log = (await s.call('GET', '/audit', { token: T })).json.entries

@@ -54,6 +54,17 @@ export function shiftTotals(db: import('./db.js').Db, shift: ShiftRow) {
   return { openingFloat: shift.opening_float, ...sales, ...mv, tipsCash, expectedCash }
 }
 
+/**
+ * No puede salir de la caja más efectivo del que hay (compras, abonos a proveedores, gastos y devoluciones pagadas
+ * de la caja). Igual que el retiro manual: así el corte nunca espera un efectivo negativo.
+ */
+export function assertCashAvailable(db: import('./db.js').Db, shiftId: string, amount: number, what: string) {
+  const s = db.prepare('SELECT * FROM shifts WHERE id = ?').get(shiftId) as ShiftRow | undefined
+  if (!s) return
+  const available = shiftTotals(db, s).expectedCash
+  if (amount > available) throw bad(`No alcanza el efectivo de la caja para ${what}: hay ${pesos(available)} y se necesitan ${pesos(amount)}. Págalo por transferencia o registra primero un depósito.`, 'efectivo_insuficiente')
+}
+
 function loadShift(c: C): ShiftRow {
   const { db } = c.get('deps')
   const s = db.prepare('SELECT * FROM shifts WHERE id = ? AND business_id = ?').get(c.req.param('id'), c.get('session').user.business_id) as ShiftRow | undefined

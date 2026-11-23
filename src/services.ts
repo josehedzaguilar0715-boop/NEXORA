@@ -7,6 +7,7 @@ import type { Db } from './db.js'
 import { getProduct, toMilli, fromMilli } from './inventory.js'
 import { createSale, parseSale } from './sales.js'
 import { bad, conflict, iso, newId, notFound } from './util.js'
+import { assertCashAvailable } from './cash.js'
 
 /** Servicios, recetas (consumibles), combos, copiadoras con contador y encargos con anticipo. */
 export const services = new Hono<Env>()
@@ -290,6 +291,7 @@ services.post('/orders/:id/cancel', requirePerm('sell'), async (c) => {
         rid, u.business_id, u.branch_id, o.deposit_sale_id, shift?.id ?? null, o.customer_id, o.deposit, d.refundMethod, `Encargo #${o.folio} cancelado: ${d.reason}`, auth.id, u.id, iso(now()),
       )
       db.prepare('INSERT INTO return_items (id, return_id, sale_item_id, product_id, description, qty_milli, amount, restocked) VALUES (?,?,NULL,NULL,?,1000,?,0)').run(newId(), rid, `Anticipo encargo #${o.folio}`, o.deposit)
+      if (d.refundMethod === 'efectivo') assertCashAvailable(db, shift!.id, o.deposit, 'devolver el anticipo')
       if (d.refundMethod === 'efectivo') db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'retiro',?,?,?,?)").run(newId(), shift!.id, o.deposit, `Devolución de anticipo encargo #${o.folio}`, u.id, iso(now()))
     }
     db.prepare("UPDATE orders SET status = 'cancelado', cancel_reason = ?, deposit_refunded = ? WHERE id = ?").run(d.reason, d.refundDeposit ? 1 : 0, o.id)

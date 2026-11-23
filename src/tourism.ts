@@ -10,6 +10,7 @@ import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Deps, type E
 import type { Db } from './db.js'
 import { createSale, parseSale } from './sales.js'
 import { AppError, bad, conflict, forbidden, iso, localDate, newId, normalizePhone, notFound } from './util.js'
+import { assertCashAvailable } from './cash.js'
 import { findPublicBusiness } from './publiclinks.js'
 
 /** «14:00» → «2:00 p.m.» para los mensajes al cliente. */
@@ -222,6 +223,7 @@ function cancelTickets(deps: Deps, u: UserRow, ids: string[], reason: string, re
     if (refund!.method === 'efectivo' && !shift) throw conflict('Abre tu caja para devolver en efectivo.', 'caja_cerrada')
     const rid = newId()
     db.prepare('INSERT INTO returns (id, business_id, branch_id, sale_id, shift_id, amount, refund_method, reason, authorized_by, created_by, created_at) VALUES (?,?,?,NULL,?,?,?,?,?,?,?)').run(rid, u.business_id, u.branch_id, shift?.id ?? null, refunded, refund!.method, `Boletos: ${reason}`, authId, u.id, iso(now()))
+    if (refund!.method === 'efectivo') assertCashAvailable(db, shift!.id, refunded, 'este reembolso')
     if (refund!.method === 'efectivo') db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'retiro',?,?,?,?)").run(newId(), shift!.id, refunded, `Reembolso de boletos: ${reason}`, u.id, iso(now()))
   }
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'turistico.cancelacion', newValue: { tickets: ids.length, refunded }, authorizedBy: authId, reason })

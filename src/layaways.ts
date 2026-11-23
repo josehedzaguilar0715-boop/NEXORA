@@ -7,6 +7,7 @@ import type { Db } from './db.js'
 import { fromMilli, stockOf } from './inventory.js'
 import { createSale, parseSale, resolveLine } from './sales.js'
 import { bad, conflict, iso, localDate, newId, notFound } from './util.js'
+import { assertCashAvailable } from './cash.js'
 
 /**
  * Apartados con anticipo: el cliente aparta mercancía con precio fijo, deja un anticipo, abona y se la lleva al liquidar.
@@ -51,6 +52,7 @@ function recordPayment(db: Db, now: () => Date, u: UserRow, l: { id: string; fol
   const shift = openShift(db, u)
   if (m === 'efectivo' && !shift) throw conflict('Abre tu caja para recibir o devolver efectivo.', 'caja_cerrada')
   db.prepare('INSERT INTO layaway_payments (id, layaway_id, kind, amount, method, shift_id, created_by, created_at) VALUES (?,?,?,?,?,?,?,?)').run(newId(), l.id, kind, amount, m, shift?.id ?? null, u.id, iso(now()))
+  if (m === 'efectivo' && amount < 0) assertCashAvailable(db, shift!.id, -amount, 'devolver este apartado')
   if (m === 'efectivo') {
     const label = kind === 'anticipo' ? 'Anticipo' : kind === 'abono' ? 'Abono' : 'Devolución'
     db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at, origin) VALUES (?,?,?,?,?,?,?,'sistema')").run(newId(), shift!.id, amount > 0 ? 'deposito' : 'retiro', Math.abs(amount), `${label} apartado #${l.folio}`, u.id, iso(now()))

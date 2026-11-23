@@ -8,6 +8,7 @@ import type { Db } from './db.js'
 import { fromMilli, stockOf, type ProductRow } from './inventory.js'
 import { customerBalance } from './sales.js'
 import { bad, conflict, iso, localDate, newId, notFound } from './util.js'
+import { assertCashAvailable } from './cash.js'
 
 export const finance = new Hono<Env>()
 
@@ -126,6 +127,7 @@ finance.post('/expenses', requirePerm('edit_inventory'), async (c) => {
     db.prepare('INSERT INTO expenses (id, business_id, branch_id, concept, amount, kind, category, method, from_cash_shift, date, created_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(
       id, u.business_id, branchId, d.concept, d.amount, d.kind, d.category ?? 'otros', d.method, shift?.id ?? null, d.date ?? localDate(now()), u.id, iso(now()),
     )
+    if (shift) assertCashAvailable(db, shift.id, d.amount, 'este gasto')
     if (shift) db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'retiro',?,?,?,?)").run(newId(), shift.id, d.amount, `Gasto: ${d.concept}`, u.id, iso(now()))
     audit(db, now, { businessId: u.business_id, userId: u.id, action: 'gasto.alta', entity: 'expense', entityId: id, newValue: d })
   })()

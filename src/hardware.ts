@@ -6,6 +6,7 @@ import { body, hasPerm, parse, requirePerm, type C, type Env } from './context.j
 import { addLot, fromMilli, getProduct, toMilli } from './inventory.js'
 import { createSale, parseSale, tierPrice, type SaleRow } from './sales.js'
 import { bad, conflict, forbidden, iso, localDate, newId, notFound } from './util.js'
+import { assertCashAvailable } from './cash.js'
 
 /** Ferretería (y cualquier giro que lo necesite): escalas de precio, claves de proveedor, cotizaciones y devoluciones. */
 export const hardware = new Hono<Env>()
@@ -240,6 +241,7 @@ hardware.post('/returns', requirePerm('cancel_discount'), async (c) => {
         addLot(ctx, { productId: p.id, qtyMilli: l.stockMilli, unitCost: l.unitCost, price, type: 'devolucion', refId: id })
       }
     }
+    if (d.refundMethod === 'efectivo') assertCashAvailable(db, shift!.id, amount, 'esta devolución')
     if (d.refundMethod === 'efectivo') db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'retiro',?,?,?,?)").run(newId(), shift!.id, amount, `Devolución: ${d.reason}`, u.id, iso(now()))
     // Saldo a favor (o regreso de fiado): abono a la cuenta del cliente.
     if (d.refundMethod === 'saldo') {

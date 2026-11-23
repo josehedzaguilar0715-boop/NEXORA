@@ -5,6 +5,7 @@ import { authorize } from './authcode.js'
 import { body, hasPerm, parse, requirePerm, type C, type Env } from './context.js'
 import type { Db } from './db.js'
 import { bad, clampTime, conflict, forbidden, iso, newId, notFound, type Clock } from './util.js'
+import { assertCashAvailable } from './cash.js'
 
 // Cantidades de inventario en milésimas de la unidad base (1 pieza = 1000, 1 kg = 1000 g).
 export const toMilli = (q: number) => Math.round(q * 1000)
@@ -562,6 +563,7 @@ inventory.post('/purchases', requirePerm('edit_inventory'), async (c) => {
     })
     if (d.payment === 'contado') {
       db.prepare('INSERT INTO supplier_payments (id, purchase_id, amount, method, from_cash_shift, created_by, created_at) VALUES (?,?,?,?,?,?,?)').run(newId(), id, itemsTotal + freightTotal, d.paidFromCash ? 'efectivo' : 'transferencia', shift?.id ?? null, u.id, iso(now()))
+      if (shift) assertCashAvailable(db, shift.id, itemsTotal + freightTotal, 'pagar esta compra')
       if (shift) db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'retiro',?,?,?,?)").run(newId(), shift.id, itemsTotal + freightTotal, `Pago de compra ${d.ticketRef ?? id.slice(0, 8)}`, u.id, iso(now()))
     }
     audit(db, now, { businessId: u.business_id, userId: u.id, action: 'compra.alta', entity: 'purchase', entityId: id, newValue: { itemsTotal, freightTotal, payment: d.payment } })
@@ -598,6 +600,7 @@ inventory.post('/purchases/:id/payments', requirePerm('edit_inventory'), async (
   if (d.fromCash && (d.method !== 'efectivo' || !shift)) throw conflict('Para pagar desde la caja debe ser en efectivo y con la caja abierta.', 'caja_cerrada')
   db.transaction(() => {
     db.prepare('INSERT INTO supplier_payments (id, purchase_id, amount, method, from_cash_shift, created_by, created_at) VALUES (?,?,?,?,?,?,?)').run(newId(), p.id, d.amount, d.method, shift?.id ?? null, u.id, iso(now()))
+    if (shift) assertCashAvailable(db, shift.id, d.amount, 'este abono al proveedor')
     if (shift) db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'retiro',?,?,?,?)").run(newId(), shift.id, d.amount, `Abono a proveedor ${p.ticket_ref ?? p.id.slice(0, 8)}`, u.id, iso(now()))
     audit(db, now, { businessId: u.business_id, userId: u.id, action: 'compra.abono', entity: 'purchase', entityId: p.id, newValue: d })
   })()
