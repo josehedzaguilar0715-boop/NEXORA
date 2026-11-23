@@ -51,10 +51,10 @@ function Resumen() {
   return (
     <div className="stack">
       <div className="kpis">
-        <div className="card kpi"><span className="muted">Ingreso mensual (pagando)</span><b className="value">{mxn(m.mrr)}</b></div>
-        <div className="card kpi"><span className="muted">Negocios</span><b className="value">{m.total}</b><small className="muted">{m.byStatus.activo} activos · {m.byStatus.prueba} en prueba · {m.byStatus.gratis} gratis</small></div>
-        <div className="card kpi"><span className="muted">Usaron el sistema (7 días)</span><b className="value">{m.usedLast7Days}</b><small className="muted">nuevos este mes: {m.newThisMonth}</small></div>
-        <div className="card kpi"><span className="muted">Vencidos</span><b className="value">{m.byStatus.vencido}</b><small className="muted">suspendidos: {m.byStatus.suspendido}</small></div>
+        <div className="card kpi" style={{ display: 'grid', gap: 4 }}><span className="muted">Ingreso mensual (pagando)</span><b className="value">{mxn(m.mrr)}</b></div>
+        <div className="card kpi" style={{ display: 'grid', gap: 4 }}><span className="muted">Negocios</span><b className="value">{m.total}</b><small className="muted">{m.byStatus.activo} activos · {m.byStatus.prueba} en prueba · {m.byStatus.gratis} gratis</small></div>
+        <div className="card kpi" style={{ display: 'grid', gap: 4 }}><span className="muted">Usaron el sistema (7 días)</span><b className="value">{m.usedLast7Days}</b><small className="muted">nuevos este mes: {m.newThisMonth}</small></div>
+        <div className="card kpi" style={{ display: 'grid', gap: 4 }}><span className="muted">Vencidos</span><b className="value">{m.byStatus.vencido}</b><small className="muted">suspendidos: {m.byStatus.suspendido}</small></div>
       </div>
       {list('Pruebas que terminan en 7 días', m.trialsEnding, (r) => day(r.trialEndsAt))}
       {list('Mensualidades por vencer (7 días)', m.renewalsDue, (r) => `${day(r.paidUntil)} · ${mxn(r.monthlyFee)}`)}

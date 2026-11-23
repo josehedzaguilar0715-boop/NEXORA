@@ -230,7 +230,9 @@ export function daysToRenew(b: Me['business'], now = Date.now()): { days: number
   if (b.free) return null
   const end = b.status === 'prueba' ? b.trialEndsAt : b.status === 'activo' ? b.paidUntil : null
   if (!end) return null
-  const days = Math.ceil((Date.parse(end) - now) / 86_400_000)
+  // Días de calendario en hora de México (vence mañana = 1 aunque falten 30 horas).
+  const day = (ms: number) => Date.parse(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(ms)))
+  const days = Math.round((day(Date.parse(end)) - day(now)) / 86_400_000)
   return days <= 5 && days >= 0 ? { days, kind: b.status === 'prueba' ? 'prueba' : 'mensualidad' } : null
 }
 function RenewNotice({ b }: { b: Me['business'] }) {
