@@ -1,3 +1,4 @@
+import { printText } from '../print'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, ApiError, cache, flush, mxn, outbox, toCents } from '../api'
@@ -402,7 +403,7 @@ export function Caja({ me }: { me: Me }) {
           <pre style={{ fontSize: 14, background: 'var(--bg)', padding: 10, borderRadius: 8, overflowX: 'auto' }}>{modal.text}</pre>
           <div className="ticket">{modal.text}</div>
           <div className="row">
-            <button className="big" onClick={() => window.print()}>Imprimir ticket</button>
+            <button className="big" onClick={() => printText(modal.text)}>Imprimir ticket</button>
             <button className="primary big" autoFocus onClick={() => { setModal(null); focusSearch() }}>Nueva venta</button>
           </div>
         </Modal>
@@ -739,7 +740,7 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
             {result.report && <><pre className="report">{result.report.text}</pre><div className="ticket">{result.report.text}</div></>}
           </>
         )}
-        <p className="row">{result.report && <button className="big" onClick={() => window.print()}>Imprimir corte Z</button>}<button className="primary big" onClick={onClosed}>Listo</button></p>
+        <p className="row">{result.report && <button className="big" onClick={() => printText(result.report.text)}>Imprimir corte Z</button>}<button className="primary big" onClick={onClosed}>Listo</button></p>
       </Modal>
     )
   }
@@ -773,7 +774,7 @@ function Corte({ shift, onClose, onClosed }: { shift: Shift; onClose: () => void
         </div>
         <pre className="report">{xReport.text}</pre>
         <div className="ticket">{xReport.text}</div>
-        <p className="row"><button className="big" onClick={() => window.print()}>Imprimir corte X</button><button className="primary big" onClick={onClose}>Seguir vendiendo</button></p>
+        <p className="row"><button className="big" onClick={() => printText(xReport.text)}>Imprimir corte X</button><button className="primary big" onClick={onClose}>Seguir vendiendo</button></p>
       </Modal>
     )
   }

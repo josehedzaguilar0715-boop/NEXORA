@@ -123,3 +123,20 @@ describe('lugar turístico', () => {
     expect(r.json.sale.total).toBe(120000 - 18000)
   })
 })
+
+describe('taquilla: horarios que ya pasaron', () => {
+  it('la lista los marca como pasados (la pantalla no los ofrece) y vender en ellos se rechaza', async () => {
+    const { negocioListo } = await import('./helpers.js')
+    const n = await negocioListo()
+    n.s.setGiro('turistico')
+    const T = n.T
+    // El reloj de las pruebas marca las 9:00 a. m. del martes 17.
+    await n.s.call('PUT', '/tourism/slots', { token: T, body: { slots: [{ weekday: 2, start: '06:00', end: '08:00', capacity: 50 }, { weekday: 2, start: '10:00', end: '13:00', capacity: 50 }] } })
+    const boleto = (await n.s.call('POST', '/services', { token: T, body: { name: 'Adulto', price: 10000, category: 'boleto' } })).json.service
+    await n.open(0)
+    const slots = (await n.s.call('GET', '/tourism/slots?date=2026-11-17', { token: T })).json.slots
+    expect(slots.map((s: any) => [s.start, s.past])).toEqual([['06:00', true], ['10:00', false]])
+    const r = await n.s.call('POST', '/tourism/sell', { token: T, body: { date: '2026-11-17', start: '06:00', items: [{ serviceId: boleto.id, quantity: 1 }] } })
+    expect(r.json.error.message).toBe('Ese horario ya pasó.')
+  })
+})

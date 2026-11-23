@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { applyPublicProduct } from '../products'
+import { printElement } from '../print'
 import { ScanButton } from '../Scanner'
 import { api, h12, mxn } from '../api'
 import type { Me } from '../App'
@@ -37,7 +38,7 @@ export function Taquilla(_: { me: Me }) {
         <label>Día<input type="date" value={date} onChange={(e) => { setDate(e.target.value); setStart('') }} /></label>
         <h3 style={{ marginTop: 12 }}>Horario</h3>
         <div className="results">{slots.map((s) => (
-          <button key={s.start} disabled={s.closed || s.available === 0} className={start === s.start ? 'primary' : ''} onClick={() => setStart(s.start)}>{h12(s.start)}–{h12(s.end)}<small>{s.closed ? 'Cerrado' : `${s.available} lugares`}</small></button>
+          <button key={s.start} disabled={s.closed || s.past || s.available === 0} className={start === s.start ? 'primary' : ''} onClick={() => setStart(s.start)}>{h12(s.start)}–{h12(s.end)}<small>{s.closed ? 'Cerrado' : s.past ? 'Ya pasó' : `${s.available} lugares`}</small></button>
         ))}</div>
         {slots.length === 0 && <p className="muted">No hay horarios para este día. Configúralos en <a href="#/configurar">Configurar negocio → Horarios y aforo</a>.</p>}
         <h3 style={{ marginTop: 12 }}>Boletos</h3>
@@ -62,7 +63,7 @@ export function Taquilla(_: { me: Me }) {
         {!last ? <p className="muted">Aquí aparecen los códigos para imprimir.</p> : (
           <>
             <div className="results">{last.tickets.map((t: any) => <div key={t.code} className="card" style={{ textAlign: 'center' }}><img alt={`QR ${t.code}`} src={`/api/public/ticket-qr/${t.code}.svg`} width={140} height={140} /><div>{t.type}</div><small className="muted">{t.code}</small></div>)}</div>
-            <p><button onClick={() => window.print()}>Imprimir</button></p>
+            <p><button onClick={(e) => printElement(e.currentTarget.closest('section')?.querySelector('.results') ?? null)}>Imprimir</button></p>
           </>
         )}
       </section>

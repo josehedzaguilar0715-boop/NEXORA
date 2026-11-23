@@ -1,3 +1,4 @@
+import { printText } from '../print'
 import { useEffect, useMemo, useState } from 'react'
 import { api, cache, mxn, toCents } from '../api'
 import { can, type Me } from '../App'
@@ -175,7 +176,7 @@ function Detalle({ me, id, onClose, onChanged }: { me: Me; id: string; onClose: 
             {l.balance > 0 && <button className="primary big" onClick={() => setMode('abonar')}>Abonar</button>}
             <button className={l.balance > 0 ? 'big' : 'primary big'} onClick={() => setMode('entregar')}>{l.balance > 0 ? 'Liquidar y entregar' : 'Entregar mercancía'}</button>
             {can(me, 'cancel_discount') && <button className="big" onClick={() => setMode('cancelar')}>Cancelar apartado</button>}
-            <button className="big" onClick={() => window.print()}>Imprimir comprobante</button>
+            <button className="big" onClick={() => printText(String(ticket ?? ''))}>Imprimir comprobante</button>
           </div>
         )}
         {mode === 'abonar' && (

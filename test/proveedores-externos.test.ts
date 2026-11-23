@@ -80,7 +80,7 @@ describe('push (Web Push, RFC 8030 y VAPID RFC 8292)', () => {
     await open(0)
     const k = await s.createStaff(T, o.business.code, 'cocina1', 'cocina')
     const pub = (await s.call('GET', '/push/key', { token: k.token })).json.publicKey as string
-    const f = vi.fn(async () => new Response(null, { status: 201 }))
+    const f = vi.fn(async (_u: string, _i?: RequestInit) => new Response(null, { status: 201 }))
     vi.stubGlobal('fetch', f)
     for (const ep of ['https://fcm.googleapis.com/fcm/send/a1', 'https://web.push.apple.com/QGx', 'https://updates.push.services.mozilla.com/wpush/v2/z'])
       expect((await s.call('POST', '/push/subscribe', { token: k.token, body: { endpoint: ep } })).status).toBe(201)

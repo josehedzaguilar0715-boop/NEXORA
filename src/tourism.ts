@@ -103,7 +103,8 @@ tourism.get('/tourism/slot-templates', (c) => c.json({ slots: c.get('deps').db.p
 tourism.get('/tourism/slots', (c) => {
   const { db, now } = c.get('deps')
   const date = c.req.query('date') ?? localDate(now())
-  return c.json({ date, slots: slotsFor(db, c.get('session').user.business_id, date) })
+  // «past»: el horario ya terminó (no se le puede vender; misma regla que al cobrar).
+  return c.json({ date, slots: slotsFor(db, c.get('session').user.business_id, date).map((s) => ({ ...s, past: localToIso(date, s.end) <= iso(now()) })) })
 })
 
 tourism.post('/tours', ownerOnly, async (c) => {

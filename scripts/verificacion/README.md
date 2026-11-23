@@ -12,5 +12,6 @@ y las demos creadas (`POST /api/admin/demos/{giro}` con el token de soporte, o `
 | `giros6.cjs` | Flujos completos de 6 giros (venta, agenda, mesas, carne, merma…) | `SIZE=pc N=11 node scripts/verificacion/giros6.cjs` y `SIZE=cel N=41 …` (N cambia los teléfonos; usar 1–89) |
 | `deepwalk.cjs` | Cada pantalla y pestaña, dueño y empleado, celular y computadora: desbordes, botones cortados, errores | `node scripts/verificacion/deepwalk.cjs <carpeta> [giro1,giro2]` (necesita `<carpeta>/demos.txt` con «giro teléfono» por línea) |
 | `leaks.py` | Palabras de un giro que aparecen en otro (sobre la salida de un recorrido de texto) | `python3 scripts/verificacion/leaks.py textos.json` |
+| `impresion.cjs` | Ticket, corte X y boletos con QR tal como los recibe la impresora (PDF 58 y 80 mm): una hoja, renglones completos, QR | `node scripts/verificacion/impresion.cjs <carpeta>` (necesita poppler: `pdfinfo`, `pdftotext`) |
 | `pixdiff.cjs` | Compara píxel a píxel una pantalla con un CSS anterior | ver comentario del archivo |
 | `perf.cjs` | Tiempo de abrir la caja y agregar productos con CPU 4× más lenta, versión anterior contra actual | dos servidores en 3136 (anterior) y 3135 (actual) |
