@@ -1,0 +1,147 @@
+/* ============================================================================
+   NEXORA · acabado premium (capa sobre styles.css; la identidad de cada producto
+   la cambia por tokens en products/products.css).
+   Reglas de rendimiento:
+   - Solo se anima transform y opacity (lo más barato para un celular).
+   - Efectos de pasar el mouse solo en equipos con mouse (@media (hover: hover)).
+   - Vidrio (backdrop-filter) solo en menú, barra superior y fondos de ventanas.
+   - Caja y cobro: solo confirmaciones cortas (≤ 160 ms), nunca retrasan un toque.
+   - Todo se apaga con «reducir movimiento» del sistema.
+   ============================================================================ */
+
+:root {
+  /* Profundidad en capas: borde de luz arriba + sombra corta + sombra larga. */
+  --elev-1: 0 1px 0 color-mix(in srgb, var(--hi) 5%, transparent) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 color-mix(in srgb, var(--hi) 7%, transparent) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 color-mix(in srgb, var(--hi) 9%, transparent) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  /* Superficie con un degradado mínimo de luz (da volumen sin costo). */
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, var(--hi) 6%) 0%, var(--card) 38%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  /* Botón principal con brillo arriba. */
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 82%, #fff 18%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 22px -10px color-mix(in srgb, var(--primary) 85%, transparent);
+  --spring: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------- Fondo: aurora estática (sin animación, se pinta una vez) ---------- */
+body {
+  background:
+    radial-gradient(1200px 700px at 100% -10%, color-mix(in srgb, var(--cyan) 9%, transparent), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, color-mix(in srgb, var(--violet) 8%, transparent), transparent 60%),
+    var(--body-glow), var(--bg);
+  background-attachment: fixed;
+}
+
+/* ---------- Tarjetas y paneles con profundidad ---------- */
+.card { background: var(--surface); box-shadow: var(--elev-2); }
+.card .card, .modal .card .card { box-shadow: var(--elev-1); }
+.kpi, .dkpi, .quick-action, .real-cell { position: relative; isolation: isolate; }
+/* Línea de luz del color de la sección arriba de cada indicador. */
+.dkpi::before, .kpi::before {
+  content: ''; position: absolute; inset: 0 0 auto; height: 2px; border-radius: var(--radius) var(--radius) 0 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cyan) 70%, transparent), transparent); opacity: 0.7; pointer-events: none;
+}
+.dkpi-value, .kpi .value { text-shadow: 0 1px 0 rgba(0, 0, 0, 0.15); }
+.real-cell { background: var(--surface-sunken); }
+.real-cell.hi { background: linear-gradient(180deg, color-mix(in srgb, var(--ok) 12%, var(--input)), var(--input)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok) 35%, transparent), 0 10px 26px -16px color-mix(in srgb, var(--ok) 60%, transparent); }
+
+/* ---------- Botones ---------- */
+button, a.button { transition: transform var(--dur-fast) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), color var(--dur) var(--ease); }
+button.primary, a.button.primary { background: var(--btn-primary); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, var(--btn-primary-glow); }
+button.primary:hover:not(:disabled), a.button.primary:hover { background: var(--btn-primary); filter: brightness(1.06); }
+button.primary:active:not(:disabled) { transform: scale(0.97); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 4px 12px -8px color-mix(in srgb, var(--primary) 85%, transparent); }
+button.danger { background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 85%, #fff 15%), var(--danger)); }
+button:disabled { filter: saturate(0.6); }
+@media (hover: hover) {
+  button:not(:disabled):not(.link):not(.link-danger):hover { transform: translateY(-1px); }
+  button.primary:not(:disabled):hover { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset, 0 12px 28px -12px color-mix(in srgb, var(--primary) 90%, transparent); }
+}
+
+/* ---------- Formularios ---------- */
+input, select, textarea { background: var(--surface-sunken); transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease); }
+input:hover:not(:focus):not(:disabled), select:hover:not(:focus):not(:disabled), textarea:hover:not(:focus) { border-color: var(--line-strong); }
+input:focus, select:focus, textarea:focus { background: var(--input); box-shadow: var(--focus-ring), 0 8px 20px -14px color-mix(in srgb, var(--cyan) 60%, transparent); }
+label.check input[type='checkbox'] { accent-color: var(--primary); }
+
+/* ---------- Menú lateral: vidrio y marcador animado ---------- */
+.side { background: linear-gradient(180deg, color-mix(in srgb, var(--glass) 100%, transparent), color-mix(in srgb, var(--glass) 92%, var(--cyan) 8%)); box-shadow: 1px 0 0 color-mix(in srgb, var(--hi) 4%, transparent) inset; }
+.side nav a, .side nav .portal-btn { position: relative; transition: background var(--dur) var(--ease), color var(--dur) var(--ease), transform var(--dur-fast) var(--ease); }
+.side nav a.on, .side nav .portal-btn.on { background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 14%, var(--selected)), var(--selected)); box-shadow: var(--elev-1); }
+.side nav a.on::before, .side nav .portal-btn.on::before {
+  content: ''; position: absolute; left: -6px; top: 22%; bottom: 22%; width: 3px; border-radius: 3px;
+  background: var(--cyan); box-shadow: 0 0 12px color-mix(in srgb, var(--cyan) 80%, transparent); animation: nav-mark var(--dur-slow) var(--spring);
+}
+@keyframes nav-mark { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@media (hover: hover) { .side nav a:not(.on):hover, .side nav .portal-btn:not(.on):hover { transform: translateX(2px); } }
+.portal-pop { box-shadow: var(--elev-3); animation: pop-in var(--dur) var(--spring); }
+.top { box-shadow: 0 1px 0 color-mix(in srgb, var(--hi) 4%, transparent) inset, 0 8px 24px -18px rgba(0, 0, 0, 0.6); }
+
+/* ---------- Accesos rápidos: tarjetas con inclinación 3D (solo con mouse) ---------- */
+.quick-action { background: var(--surface); box-shadow: var(--elev-1); transform: perspective(700px) rotateX(0) translateZ(0); transition: transform var(--dur) var(--spring), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+.qa-icon { background: linear-gradient(145deg, color-mix(in srgb, var(--tone, var(--cyan)) 30%, transparent), color-mix(in srgb, var(--tone, var(--cyan)) 10%, transparent)); box-shadow: 0 1px 0 color-mix(in srgb, var(--hi) 12%, transparent) inset, 0 6px 16px -10px var(--tone, var(--cyan)); }
+@media (hover: hover) {
+  .quick-action:hover { transform: perspective(700px) rotateX(4deg) translateY(-3px); box-shadow: var(--elev-3); border-color: color-mix(in srgb, var(--tone, var(--cyan)) 45%, var(--line)); }
+}
+.quick-action:active { transform: scale(0.98); }
+
+/* ---------- Entrada escalonada de paneles (una sola vez, sin bloquear toques) ---------- */
+.screen-in .dash-kpis > *, .screen-in .rep-kpis > *, .screen-in .kpis > *, .screen-in .quick-actions > * { animation: rise-in var(--dur-slow) var(--spring) both; }
+.screen-in .dash-kpis > :nth-child(2), .screen-in .kpis > :nth-child(2), .screen-in .quick-actions > :nth-child(2), .screen-in .rep-kpis > :nth-child(2) { animation-delay: 40ms; }
+.screen-in .dash-kpis > :nth-child(3), .screen-in .kpis > :nth-child(3), .screen-in .quick-actions > :nth-child(3), .screen-in .rep-kpis > :nth-child(3) { animation-delay: 80ms; }
+.screen-in .dash-kpis > :nth-child(4), .screen-in .kpis > :nth-child(4), .screen-in .quick-actions > :nth-child(4), .screen-in .rep-kpis > :nth-child(4) { animation-delay: 120ms; }
+.screen-in .dash-kpis > :nth-child(n + 5), .screen-in .quick-actions > :nth-child(n + 5), .screen-in .rep-kpis > :nth-child(n + 5) { animation-delay: 150ms; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
+
+/* ---------- Tablas ---------- */
+table.list tbody tr { transition: background var(--dur-fast) var(--ease); }
+@media (hover: hover) { table.list tbody tr:hover { background: color-mix(in srgb, var(--cyan) 5%, transparent); } }
+.pill { box-shadow: 0 1px 0 color-mix(in srgb, var(--hi) 6%, transparent) inset; }
+
+/* ---------- Pestañas: subrayado que se desliza ---------- */
+.subtabs button { position: relative; }
+.subtabs button.on { border-bottom-color: transparent; }
+.subtabs button.on::after { content: ''; position: absolute; left: 10%; right: 10%; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--cyan); box-shadow: 0 -2px 12px color-mix(in srgb, var(--cyan) 60%, transparent); animation: tab-in var(--dur) var(--spring); }
+@keyframes tab-in { from { transform: scaleX(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+.tabs button.on, .seg button.on { box-shadow: var(--elev-1), 0 0 0 1px color-mix(in srgb, var(--cyan) 40%, transparent); }
+
+/* ---------- Paneles laterales y ventanas: entrada con resorte, fondo de vidrio ---------- */
+.modal { backdrop-filter: blur(8px) saturate(1.1); -webkit-backdrop-filter: blur(8px) saturate(1.1); animation: fade-in var(--dur) var(--ease); }
+.modal.sheet > .sheet-panel, .modal.sheet > .card { box-shadow: var(--elev-3); animation: sheet-in var(--dur-slow) var(--spring); }
+.card.dialog { box-shadow: var(--elev-3); }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-in { from { transform: translateX(28px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+
+/* ---------- Gráficas ---------- */
+.chart rect, .trend-chart .b-in, .trend-chart .b-out { transform-box: fill-box; transform-origin: bottom; animation: grow-up 0.55s var(--spring) both; }
+.trend-chart g:nth-child(odd) .b-in, .trend-chart g:nth-child(odd) .b-out { animation-delay: 40ms; }
+@keyframes grow-up { from { transform: scaleY(0.02); } to { transform: scaleY(1); } }
+.spark polyline { stroke-dasharray: 400; stroke-dashoffset: 0; animation: draw-line 0.9s var(--ease) both; filter: drop-shadow(0 3px 6px color-mix(in srgb, currentColor 30%, transparent)); }
+@keyframes draw-line { from { stroke-dashoffset: 400; } to { stroke-dashoffset: 0; } }
+@media (hover: hover) { .chart g:hover rect { filter: brightness(1.12); } .trend-chart g:hover .hit { fill: color-mix(in srgb, var(--cyan) 8%, transparent); } }
+.bar-track { background: var(--surface-sunken); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) inset; }
+.bar-fill { background-image: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16)); transition: width 0.6s var(--spring); }
+
+/* ---------- Caja: confirmaciones cortas, nada que estorbe ---------- */
+.pos-total b, .pos-total .big { font-variant-numeric: tabular-nums; }
+.pos-side .card, .pos-side { box-shadow: var(--elev-2); }
+.ticket-table tbody tr:last-child td, .cart tbody tr:last-child td { animation: added 0.16s ease-out; }
+@keyframes added { from { background: color-mix(in srgb, var(--ok) 18%, transparent); } to { background: transparent; } }
+
+/* ---------- Avisos ---------- */
+.bell-count { box-shadow: 0 0 0 2px var(--bg), 0 4px 10px -2px color-mix(in srgb, var(--danger) 80%, transparent); animation: bump 0.35s var(--spring); }
+@keyframes bump { 0% { transform: scale(0.6); } 70% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.notice-toast { box-shadow: var(--elev-3); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); background: color-mix(in srgb, var(--card) 88%, transparent); }
+
+/* ---------- Respeto a «reducir movimiento» y a equipos lentos ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; }
+  .quick-action:hover { transform: none; }
+}
+/* Impresión: sin efectos. */
+@media print { .card, .dkpi, .quick-action { box-shadow: none !important; background: #fff !important; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+.spark-area { animation: fade-in 0.9s var(--ease) both; }
+.goal-arc { animation: goal-fill 0.9s var(--spring) both; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 50%, transparent)); }
+@keyframes goal-fill { from { stroke-dashoffset: var(--arc); } to { stroke-dashoffset: 0; } }
+/* El fondo base de la página sigue al producto (index.html trae el oscuro para que no parpadee en blanco al cargar). */
+html { background: var(--bg) !important; }

@@ -66,6 +66,7 @@ const KEY = 'nx_product'
 /** Aplica la identidad visual (también en la pantalla de acceso, recordando la última usada en este equipo). */
 export function applyProduct(p: Product) {
   document.documentElement.dataset.product = p.id
+  document.documentElement.style.background = ''
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.themeColor)
   try { localStorage.setItem(KEY, p.id) } catch { /* sin almacenamiento */ }
 }

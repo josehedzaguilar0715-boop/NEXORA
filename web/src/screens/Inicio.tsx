@@ -261,7 +261,15 @@ function Spark({ data, color }: { data: number[]; color: string }) {
   if (data.length < 2) return <svg className="spark" viewBox="0 0 120 32" aria-hidden />
   const lo = Math.min(0, ...data), hi = Math.max(1, ...data)
   const pts = data.map((v, i) => `${(i / (data.length - 1)) * 120},${30 - ((v - lo) / (hi - lo || 1)) * 28}`).join(' ')
-  return <svg className="spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden><polyline points={pts} fill="none" style={{ stroke: color }} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" /></svg>
+  // Línea con un área de degradado debajo (se ve el volumen del mes de un vistazo).
+  const id = `sp${Math.abs(data.reduce((h, v) => (h * 31 + Math.round(v)) | 0, 7))}`
+  return (
+    <svg className="spark" viewBox="0 0 120 32" preserveAspectRatio="none" aria-hidden>
+      <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: color, stopOpacity: 0.28 }} /><stop offset="1" style={{ stopColor: color, stopOpacity: 0 }} /></linearGradient></defs>
+      <polygon className="spark-area" points={`0,32 ${pts} 120,32`} fill={`url(#${id})`} />
+      <polyline points={pts} fill="none" style={{ stroke: color, color }} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 /** Anillo de avance contra la meta del día. */
@@ -270,9 +278,9 @@ function GoalRing({ value, goal }: { value: number; goal: number }) {
   const r = 18, c = 2 * Math.PI * r
   return (
     <svg width="48" height="48" viewBox="0 0 48 48" aria-label={`${Math.round(p * 100)}% de la meta`}>
-      <circle cx="24" cy="24" r={r} fill="none" stroke="var(--line)" strokeWidth="5" />
-      <circle cx="24" cy="24" r={r} fill="none" stroke={p >= 1 ? 'var(--ok)' : 'var(--accent)'} strokeWidth="5" strokeDasharray={`${c * p} ${c}`} strokeLinecap="round" transform="rotate(-90 24 24)" />
-      <text x="24" y="28" textAnchor="middle" fontSize="11" fontWeight="800" fill="var(--ink)">{Math.round(p * 100)}%</text>
+      <circle cx="24" cy="24" r={r} fill="none" style={{ stroke: 'var(--line)' }} strokeWidth="5" />
+      <circle className="goal-arc" cx="24" cy="24" r={r} fill="none" style={{ stroke: p >= 1 ? 'var(--ok)' : 'var(--accent)', strokeDasharray: `${c * p} ${c}`, ['--arc' as string]: `${c}` }} strokeWidth="5" strokeLinecap="round" transform="rotate(-90 24 24)" />
+      <text x="24" y="28" textAnchor="middle" fontSize="11" fontWeight="800" style={{ fill: 'var(--ink)' }}>{Math.round(p * 100)}%</text>
     </svg>
   )
 }

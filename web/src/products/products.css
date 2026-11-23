@@ -116,3 +116,44 @@
 
 /* Vidrio: se apaga en equipos que piden menos efectos (y nunca va en la caja). */
 @media (prefers-reduced-transparency: reduce) { :root { --glass-blur: 0px; } }
+
+/* ============================================================================
+   Acabado premium por producto (sobre premium.css)
+   ============================================================================ */
+
+/* Barber: latón pulido en el botón principal, cuero con luz cálida en las tarjetas. */
+:root[data-product='barber'] {
+  --btn-primary: linear-gradient(180deg, #f0d58f 0%, #c99a3e 45%, #a27628 75%, #c99a3e 100%);
+  --btn-primary-glow: 0 10px 26px -12px rgba(209, 169, 84, 0.75);
+  --surface: linear-gradient(180deg, #211c17 0%, var(--card) 42%);
+}
+[data-product='barber'] button.primary { text-shadow: 0 1px 0 rgba(255, 240, 200, 0.35); }
+[data-product='barber'] .dkpi::before, [data-product='barber'] .kpi::before { background: linear-gradient(90deg, transparent, #e9c983, transparent); }
+
+/* Nails: porcelana nacarada, sombras rosadas muy suaves, sin oscurecer nada. */
+:root[data-product='nails'] {
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(150, 60, 95, 0.06), 0 8px 20px -14px rgba(150, 60, 95, 0.22);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 2px 6px rgba(150, 60, 95, 0.06), 0 22px 44px -26px rgba(150, 60, 95, 0.32);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 1) inset, 0 8px 18px rgba(150, 60, 95, 0.08), 0 34px 64px -30px rgba(150, 60, 95, 0.4);
+  --surface: linear-gradient(180deg, #ffffff 0%, #fffafb 60%, #fdf5f6 100%);
+  --surface-sunken: linear-gradient(180deg, #fbeef0, #fdf4f3);
+  --btn-primary: linear-gradient(180deg, #c45685 0%, #a83c66 55%, #923259 100%);
+  --btn-primary-glow: 0 10px 24px -12px rgba(168, 60, 102, 0.55);
+}
+[data-product='nails'] .card { border-color: rgba(228, 201, 207, 0.7); }
+[data-product='nails'] .dkpi::before, [data-product='nails'] .kpi::before { background: linear-gradient(90deg, transparent, #e7a1bd, #c9b6f0, transparent); height: 3px; }
+[data-product='nails'] .dkpi-value, [data-product='nails'] .kpi .value { text-shadow: none; }
+
+/* Tienda: nítida y rápida. Casi sin vidrio, sombras cortas, etiqueta amarilla en los indicadores. */
+:root[data-product='market'] {
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(19, 34, 25, 0.06), 0 6px 14px -10px rgba(19, 34, 25, 0.2);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 1px 3px rgba(19, 34, 25, 0.07), 0 14px 30px -22px rgba(19, 34, 25, 0.35);
+  --elev-3: 0 1px 0 #fff inset, 0 6px 14px rgba(19, 34, 25, 0.08), 0 26px 50px -26px rgba(19, 34, 25, 0.4);
+  --surface: linear-gradient(180deg, #ffffff, #fbfcf8);
+  --surface-sunken: linear-gradient(180deg, #f1f3ec, #f7f8f3);
+  --btn-primary: linear-gradient(180deg, #1a8a4c 0%, #12743f 60%, #0e6334 100%);
+  --btn-primary-glow: 0 8px 18px -10px rgba(18, 116, 63, 0.6);
+  --glass-blur: 6px;
+}
+[data-product='market'] .dkpi::before, [data-product='market'] .kpi::before { background: linear-gradient(90deg, #f6c33b, #f6c33b 40%, transparent); height: 3px; opacity: 1; }
+[data-product='market'] .dkpi-value, [data-product='market'] .kpi .value { text-shadow: none; }

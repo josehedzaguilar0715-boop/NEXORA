@@ -4,6 +4,7 @@ import { App } from './App'
 import { DialogHost } from './Dialog'
 import './fonts.css'
 import './styles.css'
+import './premium.css'
 import './products/products.css'
 import { applyProduct, lastProduct } from './products'
 
