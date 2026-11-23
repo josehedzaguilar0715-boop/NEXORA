@@ -300,6 +300,8 @@ try {
   await adm.getByLabel('Usuario').fill('soporte')
   await adm.getByLabel('Contraseña').fill('superpanel1')
   await adm.getByRole('button', { name: 'Entrar' }).click()
+  // El super panel abre en «Resumen»; los negocios están en su pestaña.
+  await adm.getByRole('link', { name: 'Negocios' }).click()
   await adm.getByRole('cell', { name: /Abarrotes La Esquina/ }).click()
   adm.on('dialog', (d: any) => void d.accept('1'))
   await adm.getByRole('button', { name: 'Registrar pago' }).click()
