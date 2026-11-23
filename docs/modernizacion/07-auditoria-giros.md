@@ -77,3 +77,34 @@ Estado: ✅ completo y probado · 🟡 funciona, con huecos · 🔴 falta algo i
 1. **Pago de comisiones y propinas** (barbería, uñas, perfumería, palapa y restaurante). Es lo más importante para los negocios reales.
 2. Devolución a proveedor y anulación de compra.
 3. Anulación de abono de fiado.
+
+## 6. Avance de la Fase 3 (mismo día)
+
+**Pago de comisiones y propinas: implementado.**
+
+Pantalla: *Dinero → Comisiones*. En restaurante y palapa se llama *Propinas*.
+
+* **Por pagar.** Lo pendiente por persona: comisiones + propinas − lo que se le pagó de ventas que luego se cancelaron.
+* **Pagar.** Botón con dos opciones:
+  * *Efectivo de mi caja*: sale de la caja con la verificación de efectivo.
+  * *Transferencia*.
+* **Pagos hechos.** El historial. Cada quien ve solo los suyos.
+
+Reglas:
+
+* Cada renglón se paga **una sola vez**. Un reenvío sin señal (mismo id) no paga doble.
+* Lo registra el dueño, o el encargado con el código del dueño. El barbero no se puede pagar a sí mismo.
+* El pago queda en la bitácora (`personal.pago`).
+* En el libro de dinero sale **solo la comisión**: la propina es del personal, no del negocio.
+* El balance ya no cuenta como del negocio las propinas en efectivo que siguen en la caja; las ya pagadas tampoco.
+
+Datos y pruebas:
+
+* Migración **40**, que solo agrega: la tabla `staff_payouts` y las columnas `payout_id` y `clawback_id`.
+* «Empezar de cero» también limpia estos pagos de prueba.
+* Pruebas: `test/pago-personal.test.ts` (4 casos) y navegador (barbería y restaurante, en computadora y celular, sin errores ni desbordes).
+
+| Giro | Antes | Ahora |
+|---|---|---|
+| Barbería, Uñas | 🟡 | ✅ |
+| Perfumería, Palapa, Restaurante | 🟡 | ✅ |

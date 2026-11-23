@@ -21,6 +21,7 @@ import { hardware } from './hardware.js'
 import { services } from './services.js'
 import { agenda, publicAgenda } from './agenda.js'
 import { commissions } from './commissions.js'
+import { payouts } from './payouts.js'
 import { settings } from './settings.js'
 import { perfume } from './perfume.js'
 import { baths } from './baths.js'
@@ -65,6 +66,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', services)
   protectedApp.route('/', agenda)
   protectedApp.route('/', commissions)
+  protectedApp.route('/', payouts)
   protectedApp.route('/', settings)
   protectedApp.route('/', perfume)
   protectedApp.route('/', baths)

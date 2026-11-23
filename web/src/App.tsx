@@ -104,7 +104,8 @@ function descFor(me: Me, key: string): string | undefined {
     case 'agenda': return `Citas del día y por ${v.staff}`
     case 'mesas': return hasGiro(me, 'palapa') ? 'Cuentas por mesa, reservas y rentas' : 'Cuentas por mesa y reservas'
     case 'clientes': return [v.fiado ? 'Lista y saldo de fiado' : 'Lista de clientes', mods.includes('fidelidad') ? 'sellos y su QR' : mods.includes('membresias') ? 'membresías' : ''].filter(Boolean).join(', ')
-    case 'comisiones': return v.tips ? 'Comisiones y propinas del personal' : 'Comisiones del personal'
+    case 'comisiones': if (!hasGiro(me, 'barberia', 'unas', 'perfumeria')) return 'Propinas por mesero: por pagar y pagadas'
+      return v.tips ? 'Comisiones y propinas del personal' : 'Comisiones del personal'
     case 'configurar': return v.food ? 'Mesas, estaciones de cocina y catálogo' : v.agenda ? 'Servicios, horarios y catálogo' : hasGiro(me, 'banos', 'turistico') ? 'Tarifas, servicios y catálogo' : 'Catálogo, categorías y opciones'
     case 'escanear': { const s = [mods.includes('fidelidad') && 'dar sello', mods.includes('asistencia') && 'registrar entrada', mods.includes('membresias') && 'usar membresía'].filter(Boolean).join(', '); return s ? s[0]!.toUpperCase() + s.slice(1) : DESC[key] }
     case 'lealtad': return mods.includes('fidelidad') ? 'Tarjeta de sellos, premios y promociones' : 'Membresías y promociones'
@@ -148,7 +149,7 @@ const SCREENS: Screen[] = [
   { key: 'lealtad', label: 'Membresías y promos', perm: 'owner', C: Lealtad, group: 'Clientes', icon: Gift },
   { key: 'finanzas', label: 'Finanzas', perm: 'view_reports', C: Finanzas, group: 'Finanzas', icon: Landmark, ownTitle: true },
   { key: 'reportes', label: 'Ventas y retiro', perm: 'view_reports', C: Reportes, group: 'Finanzas', icon: ChartColumn },
-  { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria'], group: 'Finanzas', icon: Percent },
+  { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions|cancel_discount', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria', 'palapa', 'restaurante'], group: 'Finanzas', icon: Percent },
   { key: 'configurar', label: 'Configurar negocio', perm: 'configure_catalog', C: Configurar, group: 'Administración', icon: SlidersHorizontal },
   { key: 'asistencia', label: 'Mi asistencia', perm: 'attendance', C: MiAsistencia, group: 'Administración', icon: Clock },
   { key: 'usuarios', label: 'Personal', perm: 'create_employees', C: Usuarios, group: 'Administración', icon: UserCog },
@@ -216,6 +217,7 @@ export function screensFor(me: Me): Screen[] {
   const rename = (s: Screen): Screen =>
     s.key === 'clientes' ? { ...s, label: fiado ? 'Clientes y fiado' : 'Clientes' }
     : s.key === 'menu' ? { ...s, label: hasGiro(me, 'comedor', 'restaurante') ? 'Menú del día' : 'Guisados del día' }
+    : s.key === 'comisiones' && !hasGiro(me, 'barberia', 'unas', 'perfumeria') ? { ...s, label: 'Propinas' }
     : s.key === 'precios' ? { ...s, label: hasGiro(me, 'verduleria') ? 'Precio del día' : 'Precio por kilo' }
     : s.key === 'lealtad' ? { ...s, label: me.modules?.includes('fidelidad') ? 'Sellos y promociones' : 'Membresías y promos' }
     : s

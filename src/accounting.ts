@@ -76,6 +76,7 @@ export function cashFlow(db: Db, businessId: string, from: string, to: string) {
     ...(db.prepare("SELECT 'devoluciones' category, refund_method method, SUM(amount) amount FROM returns WHERE business_id = ? AND refund_method <> 'saldo' AND created_at >= ? AND created_at < ? GROUP BY refund_method").all(businessId, start, end) as Flow[]),
     ...(db.prepare("SELECT 'devoluciones' category, lp.method method, -SUM(lp.amount) amount FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND lp.amount < 0 AND lp.created_at >= ? AND lp.created_at < ? GROUP BY lp.method").all(businessId, start, end) as Flow[]),
     ...(db.prepare("SELECT 'retiros' category, 'efectivo' method, SUM(m.amount) amount FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? AND m.origin = 'manual' AND m.type = 'retiro' AND m.created_at >= ? AND m.created_at < ?").all(businessId, start, end) as Flow[]),
+    ...(db.prepare("SELECT 'personal' category, method, SUM(amount - tips) amount FROM staff_payouts WHERE business_id = ? AND created_at >= ? AND created_at < ? GROUP BY method").all(businessId, start, end) as Flow[]),
   ].filter((r) => r.amount > 0)
   const sum = (rows: Flow[]) => rows.reduce((a, r) => a + r.amount, 0)
   const totalIn = sum(inflows), totalOut = sum(outflows)
@@ -94,7 +95,9 @@ export function balanceSheet(db: Db, businessId: string) {
       SELECT p.items_total + p.freight_total - COALESCE((SELECT SUM(amount) FROM supplier_payments WHERE purchase_id = p.id),0) owed FROM purchases p WHERE p.business_id = ?
     ) WHERE owed > 0`).get(businessId) as { v: number }).v
   const shifts = db.prepare("SELECT * FROM shifts WHERE business_id = ? AND status = 'abierto'").all(businessId) as ShiftRow[]
-  const cashInRegisters = shifts.reduce((a, s) => a + shiftTotals(db, s).expectedCash - shiftTotals(db, s).tipsCash, 0)
+  // Las propinas en efectivo que siguen en la caja son del personal, no del negocio (las ya pagadas ya salieron).
+  const unpaidTips = (id: string) => (db.prepare("SELECT COALESCE(SUM(amount),0) v FROM tips WHERE shift_id = ? AND method = 'efectivo' AND status = 'vigente' AND payout_id IS NULL").get(id) as { v: number }).v
+  const cashInRegisters = shifts.reduce((a, s) => a + shiftTotals(db, s).expectedCash - unpaidTips(s.id), 0)
   const assets = cashInRegisters + inventory + receivables
   // Anticipos de apartados abiertos: dinero recibido por mercancía que aún no se entrega.
   const layawayDeposits = (db.prepare("SELECT COALESCE(SUM(lp.amount),0) v FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND l.status = 'abierto'").get(businessId) as { v: number }).v
@@ -116,6 +119,8 @@ export function ledger(db: Db, businessId: string, from: string, to: string): En
     [`SELECT m.created_at, CASE m.type WHEN 'deposito' THEN 'Depósito a caja' ELSE 'Retiro de caja' END, m.reason, 'efectivo', CASE m.type WHEN 'deposito' THEN m.amount ELSE 0 END, CASE m.type WHEN 'retiro' THEN m.amount ELSE 0 END FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? AND m.origin = 'manual' AND m.created_at >= ? AND m.created_at < ?`, [b, start, end]],
     [`SELECT sp.created_at, 'Pago a proveedor', COALESCE(s.name, 'Proveedor') || COALESCE(' · folio ' || p.ticket_ref, ''), sp.method, 0, sp.amount FROM supplier_payments sp JOIN purchases p ON p.id = sp.purchase_id LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? AND sp.created_at >= ? AND sp.created_at < ?`, [b, start, end]],
     [`SELECT e.date || 'T12:00:00.000Z', 'Gasto', e.concept, e.method, 0, e.amount FROM expenses e WHERE e.business_id = ? AND e.voided_at IS NULL AND e.date BETWEEN ? AND ?`, [b, from, to]],
+    // Pago de comisiones al personal (las propinas no son dinero del negocio: no entran ni salen del libro).
+    [`SELECT p.created_at, 'Pago a personal', 'Comisiones de ' || u.name, p.method, 0, p.amount - p.tips FROM staff_payouts p JOIN users u ON u.id = p.staff_id WHERE p.business_id = ? AND p.amount - p.tips > 0 AND p.created_at >= ? AND p.created_at < ?`, [b, start, end]],
     [`SELECT r.created_at, 'Devolución', r.reason, r.refund_method, 0, r.amount FROM returns r WHERE r.business_id = ? AND r.refund_method <> 'saldo' AND r.created_at >= ? AND r.created_at < ?`, [b, start, end]],
   ]
   // La lista de columnas del WITH les pone nombre fijo a todas, aunque cada consulta las calcule distinto.

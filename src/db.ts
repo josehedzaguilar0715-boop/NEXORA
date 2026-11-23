@@ -1445,6 +1445,29 @@ const MIGRATIONS: Migration[] = [
   `ALTER TABLE expenses ADD COLUMN voided_at TEXT;
   ALTER TABLE expenses ADD COLUMN voided_by TEXT;
   ALTER TABLE expenses ADD COLUMN void_reason TEXT;`,
+  // Pago de comisiones y propinas al personal: cada renglón se paga una sola vez; si la venta se cancela
+  // después de pagada, se descuenta en el siguiente pago (clawback).
+  `CREATE TABLE staff_payouts (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL,
+    staff_id TEXT NOT NULL REFERENCES users(id),
+    commission INTEGER NOT NULL,
+    tips INTEGER NOT NULL,
+    adjustments INTEGER NOT NULL DEFAULT 0,
+    amount INTEGER NOT NULL,
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia')),
+    shift_id TEXT REFERENCES shifts(id),
+    note TEXT,
+    authorized_by TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX staff_payouts_business ON staff_payouts(business_id, created_at);
+  CREATE TRIGGER staff_payouts_no_delete BEFORE DELETE ON staff_payouts BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;
+  ALTER TABLE sale_commissions ADD COLUMN payout_id TEXT;
+  ALTER TABLE sale_commissions ADD COLUMN clawback_id TEXT;
+  ALTER TABLE tips ADD COLUMN payout_id TEXT;
+  ALTER TABLE tips ADD COLUMN clawback_id TEXT;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */
