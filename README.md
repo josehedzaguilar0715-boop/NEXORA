@@ -2,6 +2,8 @@
 
 Sistema de punto de venta por giro con base común. Especificación: ver `NEXORA_SPEC.md` (v1, 2026-11-16).
 
+> **Modernización (nov 2026):** auditoría, privacidad de enlaces, productos por giro y documento de continuidad en [`docs/modernizacion/`](docs/modernizacion/04-continuidad.md). Rama `modernizacion`.
+
 ## Estado
 
 - **Bloque 1 (base)**: cuentas, acceso y roles, código de autorización, caja y corte, bitácora inmutable, tickets. ✅ con pruebas.
