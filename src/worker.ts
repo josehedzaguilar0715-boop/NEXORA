@@ -52,7 +52,7 @@ export class Nexora extends DurableObject<Env> {
   constructor(ctx: ConstructorParameters<typeof DurableObject>[0], env: Env) {
     super(ctx, env)
     const vars = env as unknown as Record<string, string | undefined>
-    const deps: Deps = { db: doDb(ctx.storage), now: () => new Date(), notifier: createNotifier(vars), backups: env.BACKUPS ? kvStore(env.BACKUPS) : undefined, defer: (p) => ctx.waitUntil(p) }
+    const deps: Deps = { db: doDb(ctx.storage), now: () => new Date(), notifier: createNotifier(vars), backups: env.BACKUPS ? kvStore(env.BACKUPS) : undefined, backupKey: vars.BACKUP_KEY || undefined, defer: (p) => ctx.waitUntil(p) }
     this.deps = deps
     // Primer arranque: crea el usuario del super panel con los secretos ADMIN_* (no viven en el repositorio).
     const hasAdmin = deps.db.prepare('SELECT 1 FROM admins LIMIT 1').get()

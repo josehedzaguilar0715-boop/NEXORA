@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
-import { runBackup, type BackupStore } from '../src/backup.js'
+import { decryptBackup, isEncrypted, runBackup, type BackupStore } from '../src/backup.js'
 import { negocioListo } from './helpers.js'
 
 const memory = (): BackupStore & { files: Map<string, Uint8Array> } => {
@@ -42,6 +42,33 @@ describe('respaldos automáticos', () => {
     expect((db.prepare('SELECT COUNT(*) n FROM audit_log').get() as any).n).toBeGreaterThan(3)
     db.close()
   }, 30_000)
+
+  it('con BACKUP_KEY el respaldo va cifrado: sin la llave no se lee; con ella se restaura completo', async () => {
+    const n = await negocioListo()
+    const p = await n.product({ name: 'Frijol', unit: 'kg', price: 3800 })
+    await n.buy([{ productId: p.id, quantity: 5, cost: 10000 }])
+    const store = memory()
+    const key = Buffer.from(Array.from({ length: 32 }, (_, i) => i * 7)).toString('base64')
+    const deps = { db: n.s.db, now: () => new Date('2026-11-17T09:17:00Z'), notifier: { sendCode: () => {} }, backupKey: key }
+    const r = await runBackup(deps, store)
+    expect(r.name).toBe('nexora-2026-11-17T09-17.json.gz.enc')
+    const bytes = store.files.get(r.name)!
+    expect(isEncrypted(bytes)).toBe(true)
+    // No contiene texto legible (ni comprimido reconocible).
+    expect(Buffer.from(bytes).includes('Frijol')).toBe(false)
+    expect(bytes[4] === 0x1f && bytes[5] === 0x8b).toBe(false)
+    // Otra llave no abre.
+    await expect(decryptBackup(bytes, Buffer.alloc(32, 1).toString('base64'))).rejects.toThrow()
+    // Restaurar: sin llave avisa; con llave queda igual.
+    const dir = mkdtempSync(join(tmpdir(), 'nx-'))
+    const file = join(dir, r.name)
+    writeFileSync(file, bytes)
+    expect(() => execFileSync('npx', ['tsx', 'scripts/restore.ts', file, join(dir, 'x.db')], { stdio: 'pipe', env: { ...process.env, NEXORA_BACKUP_KEY: '' } })).toThrow()
+    execFileSync('npx', ['tsx', 'scripts/restore.ts', file, join(dir, 'nueva.db')], { stdio: 'pipe', env: { ...process.env, NEXORA_BACKUP_KEY: key } })
+    const db = new Database(join(dir, 'nueva.db'), { readonly: true })
+    expect((db.prepare('SELECT name FROM products').get() as any).name).toBe('Frijol')
+    db.close()
+  }, 60_000)
 
   it('el super panel ve, descarga y crea respaldos; un dueño no', async () => {
     const n = await negocioListo()

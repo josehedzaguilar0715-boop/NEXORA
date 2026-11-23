@@ -1,15 +1,21 @@
 // Reconstruye una base SQLite completa a partir de un respaldo (.json.gz o .json).
-// Uso: tsx scripts/restore.ts respaldo.json.gz nueva.db
+// Uso: tsx scripts/restore.ts respaldo.json.gz nueva.db   (cifrado: NEXORA_BACKUP_KEY=... tsx scripts/restore.ts respaldo.json.gz.enc nueva.db)
 import Database from 'better-sqlite3'
 import { existsSync, readFileSync } from 'node:fs'
 import { gunzipSync } from 'node:zlib'
 import { openDb } from '../src/db-node.js'
+import { decryptBackup, isEncrypted } from '../src/backup.js'
 
 const [src, dest] = process.argv.slice(2)
 if (!src || !dest) throw new Error('Uso: tsx scripts/restore.ts <respaldo.json.gz> <nueva.db>')
 if (existsSync(dest)) throw new Error(`${dest} ya existe; elige otro nombre (nunca se sobrescribe una base).`)
-const raw = readFileSync(src)
-const data = JSON.parse((src.endsWith('.gz') ? gunzipSync(raw) : raw).toString('utf8')) as { version: number; tables: Record<string, Record<string, unknown>[]> }
+let raw: Buffer = readFileSync(src)
+// Respaldo cifrado (.enc): se necesita la llave en NEXORA_BACKUP_KEY (la misma del secreto BACKUP_KEY).
+if (isEncrypted(raw)) {
+  if (!process.env.NEXORA_BACKUP_KEY) throw new Error('Este respaldo está cifrado: pon la llave en NEXORA_BACKUP_KEY.')
+  raw = Buffer.from(await decryptBackup(raw, process.env.NEXORA_BACKUP_KEY))
+}
+const data = JSON.parse((src.replace(/\.enc$/, '').endsWith('.gz') ? gunzipSync(raw) : raw).toString('utf8')) as { version: number; tables: Record<string, Record<string, unknown>[]> }
 restore(data, dest)
 console.log(`Base restaurada en ${dest} (respaldo versión ${data.version}).`)
 

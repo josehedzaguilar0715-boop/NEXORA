@@ -35,6 +35,7 @@ import { sales } from './sales.js'
 import { idempotency, sync } from './sync.js'
 import { users } from './users.js'
 import { AppError } from './util.js'
+import { rateLimiter } from './ratelimit.js'
 
 export function createApp(deps: Deps) {
   const app = new Hono<Env>()
@@ -43,6 +44,7 @@ export function createApp(deps: Deps) {
     await next()
   })
   app.get('/health', (c) => c.json({ ok: true }))
+  app.use('*', rateLimiter(deps.now))
   app.route('/', publicAuth)
   app.route('/', publicCommon)
   app.route('/', publicCampaigns)

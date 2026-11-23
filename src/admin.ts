@@ -405,11 +405,11 @@ admin.post('/admin/backups', async (c) => {
 admin.get('/admin/backups/:name', async (c) => {
   const store = c.get('deps').backups
   const name = c.req.param('name')
-  if (!store || !/^nexora-[\d-T]+\.json\.gz$/.test(name)) throw notFound()
+  if (!store || !/^nexora-[\d-T]+\.json\.gz(\.enc)?$/.test(name)) throw notFound()
   const bytes = await store.get(name)
   if (!bytes) throw notFound('Ese respaldo ya no existe.')
   audit(c.get('deps').db, c.get('deps').now, { businessId: null, userId: c.get('admin').id, action: 'admin.descarga_respaldo', newValue: { name } })
-  return new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': 'application/gzip', 'content-disposition': `attachment; filename="${name}"` } })
+  return new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': name.endsWith('.enc') ? 'application/octet-stream' : 'application/gzip', 'content-disposition': `attachment; filename="${name}"` } })
 })
 
 /** Cambiar la contraseña propia del super panel (cierra las demás sesiones). */

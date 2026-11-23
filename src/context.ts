@@ -24,6 +24,8 @@ export interface Deps {
   notifier: Notifier
   /** Donde se guardan los respaldos automáticos (opcional). */
   backups?: import('./backup.js').BackupStore
+  /** Llave (base64, 32 bytes) para cifrar los respaldos. Secreto BACKUP_KEY; sin ella se guardan solo comprimidos. */
+  backupKey?: string
   now: Clock
   /** Mantiene vivo el trabajo en segundo plano (push) después de responder; en Cloudflare es waitUntil. */
   defer?: (p: Promise<unknown>) => void
