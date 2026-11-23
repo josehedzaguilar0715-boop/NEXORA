@@ -58,6 +58,11 @@ export function shiftTotals(db: import('./db.js').Db, shift: ShiftRow) {
  * No puede salir de la caja más efectivo del que hay (compras, abonos a proveedores, gastos y devoluciones pagadas
  * de la caja). Igual que el retiro manual: así el corte nunca espera un efectivo negativo.
  */
+export function cashOf(db: import('./db.js').Db, shiftId: string): number {
+  const s = db.prepare('SELECT * FROM shifts WHERE id = ?').get(shiftId) as ShiftRow | undefined
+  return s ? shiftTotals(db, s).expectedCash : 0
+}
+
 export function assertCashAvailable(db: import('./db.js').Db, shiftId: string, amount: number, what: string) {
   const s = db.prepare('SELECT * FROM shifts WHERE id = ?').get(shiftId) as ShiftRow | undefined
   if (!s) return

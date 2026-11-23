@@ -8,6 +8,7 @@ import { body, hasPerm, parse, requirePerm, type C, type Deps, type Env, type Us
 import { consume, currentPrice, getProduct, priceFor, restore, stockOf, toMilli, type MoveCtx } from './inventory.js'
 import { saleCancelledNotice, stockAlerts } from './notifications.js'
 import { bad, conflict, forbidden, iso, newId, notFound } from './util.js'
+import { assertCashAvailable, cashOf } from './cash.js'
 
 export const sales = new Hono<Env>()
 
@@ -341,12 +342,16 @@ sales.post('/sales/:id/cancel', requirePerm('cancel_discount'), async (c) => {
   const shift = db.prepare('SELECT status FROM shifts WHERE id = ?').get(s.shift_id) as { status: string }
   if (shift.status !== 'abierto') throw conflict('El turno de esa venta ya tiene corte; no se puede cancelar.', 'turno_cerrado')
   const auth = authorize(deps, u, d.authCode, 'cancel_discount', 'cancelación')
+  const cashBefore = cashOf(db, s.shift_id)
   db.transaction(() => {
     db.prepare("UPDATE sales SET status='cancelada', cancelled_by=?, cancel_authorized_by=?, cancel_reason=?, cancelled_at=? WHERE id=?").run(u.id, auth.id, d.reason, iso(now()), s.id)
     reverseSalePoints(db, now, u.business_id, u.id, s.id)
     restore({ db, now, businessId: u.business_id, branchId: s.branch_id, userId: u.id }, s.id, 'cancelacion')
     if (s.payment_method === 'fiado' && s.customer_id) db.prepare("INSERT INTO credit_ledger (id, business_id, customer_id, delta, kind, sale_id, created_by, created_at) VALUES (?,?,?,?,'cancelacion',?,?,?)").run(newId(), u.business_id, s.customer_id, -s.total, s.id, u.id, iso(now()))
     for (const h of cancelHooks) h({ deps, user: u, saleId: s.id })
+    // Si ese efectivo ya salió de la caja (retiros, gastos), la caja no puede quedar esperando dinero negativo.
+    // Solo cuenta si esta cancelación baja el efectivo (una venta por transferencia no se detiene).
+    if (cashOf(db, s.shift_id) < cashBefore) assertCashAvailable(db, s.shift_id, 0, 'cancelar esta venta (su efectivo ya no está en la caja)')
   })()
   audit(db, now, {
     businessId: u.business_id, userId: u.id, action: 'venta.cancelacion', entity: 'sale', entityId: s.id,

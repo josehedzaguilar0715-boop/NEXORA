@@ -198,3 +198,23 @@ describe('dos días seguidos', () => {
     expect([r2.sales.total, r2.refunds]).toEqual([0, 120000])
   })
 })
+
+describe('cancelar cuando el efectivo ya salió', () => {
+  it('no deja la caja esperando dinero negativo; una venta por transferencia sí se cancela', async () => {
+    const { s, T, product, buy, sell, open } = await negocioListo()
+    const p = await product({ name: 'Garrafón', unit: 'pieza', price: 5000 })
+    await buy([{ productId: p.id, quantity: 10, cost: 20000 }])
+    const sh = (await open(0)).json.shift
+    const v = (await sell([{ productId: p.id, quantity: 2 }])).json.sale // 100 efectivo
+    const tr = (await sell([{ productId: p.id, quantity: 1 }], { paymentMethod: 'transferencia' })).json.sale
+    await s.call('POST', `/shifts/${sh.id}/movements`, { token: T, body: { type: 'retiro', amount: 10000, reason: 'Al banco' } })
+    const r = await s.call('POST', `/sales/${v.id}/cancel`, { token: T, body: { reason: 'Error de cobro', authCode: '4321' } })
+    expect(r.json.error.code).toBe('efectivo_insuficiente')
+    expect((await s.call('GET', `/sales/${v.id}`, { token: T })).json.sale.status).toBe('completada') // no cambió nada
+    expect((await s.call('POST', `/sales/${tr.id}/cancel`, { token: T, body: { reason: 'Error de cobro', authCode: '4321' } })).status).toBe(200)
+    // Con un depósito ya se puede.
+    await s.call('POST', `/shifts/${sh.id}/movements`, { token: T, body: { type: 'deposito', amount: 10000, reason: 'Regreso del banco' } })
+    expect((await s.call('POST', `/sales/${v.id}/cancel`, { token: T, body: { reason: 'Error de cobro', authCode: '4321' } })).status).toBe(200)
+    expect((await s.call('GET', `/shifts/${sh.id}`, { token: T })).json.totals.expectedCash).toBe(0)
+  })
+})
