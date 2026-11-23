@@ -1,4 +1,11 @@
 import type { Notifier } from './context.js'
+import { AppError } from './util.js'
+
+/** El proveedor falló (caído, número inválido, saldo): mensaje claro en vez de «Ocurrió un error». */
+const failed = (what: 'sms' | 'correo', detail: string) => {
+  console.error(`[${what}] ${detail}`)
+  return new AppError(502, what === 'sms' ? 'sms_no_enviado' : 'correo_no_enviado', what === 'sms' ? 'No pudimos enviar el SMS. Revisa el número o inténtalo en unos minutos.' : 'No pudimos enviar el correo. Inténtalo en unos minutos.')
+}
 
 /**
  * Avisos al usuario: códigos por SMS (Twilio) y correo (Resend).
@@ -23,10 +30,10 @@ export function createNotifier(env: Record<string, string | undefined> = process
       const to = phone.startsWith('+') ? phone : `+52${phone}`
       const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`, {
         method: 'POST',
-        headers: { authorization: `Basic ${Buffer.from(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`).toString('base64')}`, 'content-type': 'application/x-www-form-urlencoded' },
+        headers: { authorization: `Basic ${btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`)}`, 'content-type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ To: to, From: env.TWILIO_FROM!, Body: body }),
-      })
-      if (!res.ok) throw new Error(`No se pudo enviar el SMS (${res.status}).`)
+      }).catch((e: Error) => { throw failed('sms', `sin conexión con Twilio: ${e.message}`) })
+      if (!res.ok) throw failed('sms', `Twilio respondió ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`)
       return true
     },
     async sendEmail(to, subject, text, attachments) {
@@ -38,8 +45,8 @@ export function createNotifier(env: Record<string, string | undefined> = process
         method: 'POST',
         headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
         body: JSON.stringify({ from: env.MAIL_FROM, to: [to], subject, text, ...(attachments?.length ? { attachments } : {}) }),
-      })
-      if (!res.ok) throw new Error(`No se pudo enviar el correo (${res.status}).`)
+      }).catch((e: Error) => { throw failed('correo', `sin conexión con Resend: ${e.message}`) })
+      if (!res.ok) throw failed('correo', `Resend respondió ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`)
       return true
     },
   }

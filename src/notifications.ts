@@ -92,11 +92,14 @@ export const allowedEndpoint = (e: string) => {
 
 async function sendPushes(deps: Deps, subs: { id: string; endpoint: string }[]) {
   const { db, now } = deps
-  await Promise.all(subs.map(async (s) => {
+  // Uno que falle (red, servicio caído) no detiene a los demás.
+  const results = await Promise.allSettled(subs.map(async (s) => {
     const res = await fetch(s.endpoint, { method: 'POST', headers: { authorization: await vapidAuth(db, s.endpoint, now().getTime()), ttl: '86400', urgency: 'high', 'content-length': '0' } })
     // 404/410: el celular ya no tiene esa suscripción.
     if (res.status === 404 || res.status === 410) db.prepare('DELETE FROM push_subscriptions WHERE id = ?').run(s.id)
+    else if (!res.ok) throw new Error(`${new URL(s.endpoint).hostname} respondió ${res.status}`)
   }))
+  for (const r of results) if (r.status === 'rejected') console.error('[push]', (r.reason as Error).message)
 }
 
 // ---------- Rutas ----------
