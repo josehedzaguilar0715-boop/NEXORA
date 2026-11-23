@@ -47,7 +47,7 @@
   color-scheme: light;
   --bg: #fbf6f4; --card: #ffffff; --input: #fdf3f1;
   --cyan: #b0436e; --violet: #d98fac; --accent: #c2851a;
-  --ink: #2b1d23; --muted: #86707a; --muted-2: #a8929b;
+  --ink: #2b1d23; --muted: #7a646e; --muted-2: #a8929b;
   --ok: #2c8a68; --danger: #c43d3d;
   --line: #f0e0e2; --line-strong: #e4c9cf;
   --primary: #a83c66; --primary-hover: #8f3155; --on-primary: #ffffff;
@@ -157,3 +157,289 @@
 }
 [data-product='market'] .dkpi::before, [data-product='market'] .kpi::before { background: linear-gradient(90deg, #f6c33b, #f6c33b 40%, transparent); height: 3px; opacity: 1; }
 [data-product='market'] .dkpi-value, [data-product='market'] .kpi .value { text-shadow: none; }
+
+/* ============================================================================
+   Los otros 10 giros. Cada uno con su paleta, letra y forma, pensadas para su mostrador.
+   Las combinaciones de color pasan contraste AA (ver test/productos.test.ts).
+   ============================================================================ */
+
+/* ---------- Ferretería · «Taller» ----------
+   Grafito y naranja de seguridad: se lee bajo cualquier luz, esquinas rectas como una herramienta. */
+:root[data-product='tools'] {
+  color-scheme: dark;
+  --bg: #121417; --card: #1b1e23; --input: #22262c;
+  --cyan: #f59a3c; --violet: #8a929c; --accent: #f5c518;
+  --ink: #eef0f2; --muted: #a1a8b1; --muted-2: #7b838d;
+  --ok: #6cc47a; --danger: #f2765f;
+  --line: #2b3037; --line-strong: #3f4650;
+  --primary: #f28c28; --primary-hover: #dc7a1a; --on-primary: #1a1006;
+  --selected: #262a30; --selected-line: #4a4136;
+  --hi: #ffffff;
+  --gradient: linear-gradient(135deg, #f7b267, #e0661a);
+  --brand-text: linear-gradient(135deg, #eef0f2, #f59a3c);
+  --body-glow: radial-gradient(900px 500px at 90% -12%, rgba(242, 140, 40, 0.06), transparent 60%);
+  --glass: rgba(27, 30, 35, 0.8); --glass-blur: 10px;
+  --focus-ring: 0 0 0 3px rgba(242, 140, 40, 0.35);
+  --font-display: 'Bricolage Grotesque', 'Inter Variable', system-ui, sans-serif;
+  --radius: 8px; --radius-md: 8px; --radius-lg: 12px;
+  --chart-in: #f59a3c; --chart-out: #f2765f; --chart-profit: #6cc47a;
+  --chart-bar-1: #f5c518; --chart-bar-2: #f28c28; --chart-grid: #2b3037;
+  --logo-1: #f7b267; --logo-2: #c85a12; --logo-ink: #1a1006; --logo-dot: #f5c518;
+  --tone-main: #f59a3c; --tone-op: #f59a3c; --tone-inv: #f5c518; --tone-cli: #7fb3e6; --tone-fin: #b39ddb; --tone-adm: #8a929c;
+  --btn-primary: linear-gradient(180deg, #f7a24e 0%, #f28c28 60%, #d9761a 100%);
+  --btn-primary-glow: 0 8px 20px -12px rgba(242, 140, 40, 0.7);
+}
+[data-product='tools'] h1 { font-weight: 800; letter-spacing: -0.02em; }
+[data-product='tools'] .dkpi::before, [data-product='tools'] .kpi::before { background: repeating-linear-gradient(135deg, #f5c518 0 8px, #1b1e23 8px 16px); height: 3px; opacity: 0.9; }
+
+/* ---------- Papelería · «Cuaderno» ----------
+   Papel, tinta índigo y marca textos amarillo: ordenado como un cuaderno nuevo. */
+:root[data-product='paper'] {
+  color-scheme: light;
+  --bg: #f7f5ef; --card: #ffffff; --input: #faf8f3;
+  --cyan: #3437b8; --violet: #6b6fe0; --accent: #b08a00;
+  --ink: #1d2133; --muted: #5d6275; --muted-2: #7f8496;
+  --ok: #1f7a4d; --danger: #c43333;
+  --line: #e6e2d6; --line-strong: #cfc9b8;
+  --primary: #3437b8; --primary-hover: #2a2d9a; --on-primary: #ffffff;
+  --selected: #ecedfb; --selected-line: #c3c5f0;
+  --hi: #12143a;
+  --gradient: linear-gradient(135deg, #f5d90a, #3437b8);
+  --brand-text: linear-gradient(135deg, #1d2133, #3437b8);
+  --body-glow: radial-gradient(900px 500px at 90% -12%, rgba(245, 217, 10, 0.14), transparent 60%);
+  --glass: rgba(255, 255, 255, 0.82); --glass-blur: 10px;
+  --glow: 0 10px 26px -18px rgba(29, 33, 51, 0.35);
+  --focus-ring: 0 0 0 3px rgba(52, 55, 184, 0.25);
+  --font-display: 'Fraunces', Georgia, serif;
+  --radius: 10px; --radius-md: 8px; --radius-lg: 14px;
+  --chart-in: #3437b8; --chart-out: #c43333; --chart-profit: #1f7a4d;
+  --chart-bar-1: #f5d90a; --chart-bar-2: #3437b8; --chart-grid: #ebe7dc;
+  --logo-1: #f5d90a; --logo-2: #3437b8; --logo-ink: #ffffff; --logo-dot: #1d2133;
+  --tone-main: #3437b8; --tone-op: #3437b8; --tone-inv: #9a7400; --tone-cli: #1f7a8c; --tone-fin: #7a3fb0; --tone-adm: #5d6275;
+  --surface: linear-gradient(180deg, #ffffff, #fdfcf8);
+  --surface-sunken: linear-gradient(180deg, #f2efe6, #f8f6f0);
+  --btn-primary: linear-gradient(180deg, #4245cc 0%, #3437b8 60%, #2a2d9a 100%);
+  --btn-primary-glow: 0 8px 18px -10px rgba(52, 55, 184, 0.55);
+}
+[data-product='paper'] .dkpi::before, [data-product='paper'] .kpi::before { background: linear-gradient(90deg, #f5d90a, #f5d90a 55%, transparent); height: 4px; opacity: 0.9; }
+
+/* ---------- Perfumería · «Frasco» ----------
+   Berenjena profunda y oro rosa, serif de revista: la vitrina de una boutique. */
+:root[data-product='scent'] {
+  color-scheme: dark;
+  --bg: #140f16; --card: #1e1621; --input: #261d2a;
+  --cyan: #e6b3a3; --violet: #b48bc4; --accent: #e8c27a;
+  --ink: #f5ecef; --muted: #b5a3b0; --muted-2: #8a7a87;
+  --ok: #8fcb9b; --danger: #ef8a7a;
+  --line: #2f2433; --line-strong: #4a3a4f;
+  --primary: #d9a08e; --primary-hover: #c88b78; --on-primary: #24120d;
+  --selected: #2a1f2e; --selected-line: #56404f;
+  --hi: #fff1ec;
+  --gradient: linear-gradient(135deg, #f1c9bb, #a8687a);
+  --brand-text: linear-gradient(135deg, #f5ecef, #e6b3a3);
+  --body-glow: radial-gradient(1000px 560px at 85% -12%, rgba(230, 179, 163, 0.08), transparent 60%);
+  --glass: rgba(30, 22, 33, 0.78); --glass-blur: 16px;
+  --focus-ring: 0 0 0 3px rgba(230, 179, 163, 0.35);
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --radius: 20px; --radius-md: 16px; --radius-lg: 26px;
+  --chart-in: #e6b3a3; --chart-out: #ef8a7a; --chart-profit: #8fcb9b;
+  --chart-bar-1: #f1c9bb; --chart-bar-2: #a8687a; --chart-grid: #2f2433;
+  --logo-1: #f1c9bb; --logo-2: #8c4e62; --logo-ink: #24120d; --logo-dot: #f1c9bb;
+  --tone-main: #e6b3a3; --tone-op: #e6b3a3; --tone-inv: #e8c27a; --tone-cli: #d79bb4; --tone-fin: #b48bc4; --tone-adm: #8a7a87;
+  --surface: linear-gradient(180deg, #261c29 0%, var(--card) 45%);
+  --btn-primary: linear-gradient(180deg, #f0c4b4 0%, #d9a08e 55%, #c08471 100%);
+  --btn-primary-glow: 0 10px 26px -12px rgba(230, 179, 163, 0.6);
+}
+[data-product='scent'] h1, [data-product='scent'] h2 { font-weight: 400; letter-spacing: 0; }
+[data-product='scent'] h1 { font-size: 2rem; }
+[data-product='scent'] h2 { font-size: 1.45rem; }
+
+/* ---------- Baños públicos · «Agua» ----------
+   Azul limpio sobre blanco frío: higiene y orden a primera vista. */
+:root[data-product='access'] {
+  color-scheme: light;
+  --bg: #f1f5fa; --card: #ffffff; --input: #f5f8fc;
+  --cyan: #1d5fa8; --violet: #4f9fd8; --accent: #b07a00;
+  --ink: #142033; --muted: #56647a; --muted-2: #7b889c;
+  --ok: #1d7a55; --danger: #c43535;
+  --line: #dde5ef; --line-strong: #c2cfdf;
+  --primary: #1d5fa8; --primary-hover: #174d8a; --on-primary: #ffffff;
+  --selected: #e6effa; --selected-line: #b8d0ec;
+  --hi: #0b1f3a;
+  --gradient: linear-gradient(135deg, #7cc4f0, #1d5fa8);
+  --brand-text: linear-gradient(135deg, #142033, #1d5fa8);
+  --body-glow: radial-gradient(900px 500px at 90% -12%, rgba(124, 196, 240, 0.2), transparent 60%);
+  --glass: rgba(255, 255, 255, 0.82); --glass-blur: 12px;
+  --glow: 0 10px 26px -18px rgba(20, 32, 51, 0.3);
+  --focus-ring: 0 0 0 3px rgba(29, 95, 168, 0.25);
+  --font-display: 'Bricolage Grotesque', 'Inter Variable', system-ui, sans-serif;
+  --radius: 16px; --radius-md: 12px; --radius-lg: 20px;
+  --chart-in: #1d5fa8; --chart-out: #c43535; --chart-profit: #1d7a55;
+  --chart-bar-1: #7cc4f0; --chart-bar-2: #1d5fa8; --chart-grid: #e2e9f2;
+  --logo-1: #7cc4f0; --logo-2: #1d5fa8; --logo-ink: #ffffff; --logo-dot: #f1f5fa;
+  --tone-main: #1d5fa8; --tone-op: #1d5fa8; --tone-inv: #9a6a00; --tone-cli: #157a8a; --tone-fin: #6a4fb0; --tone-adm: #56647a;
+  --surface: linear-gradient(180deg, #ffffff, #fafcfe);
+  --surface-sunken: linear-gradient(180deg, #eef3f9, #f6f9fc);
+  --btn-primary: linear-gradient(180deg, #2a70bd 0%, #1d5fa8 60%, #174d8a 100%);
+  --btn-primary-glow: 0 8px 18px -10px rgba(29, 95, 168, 0.55);
+}
+
+/* ---------- Lugar turístico · «Selva» ----------
+   Arena, verde selva y naranja de atardecer: el lugar se antoja desde la taquilla. */
+:root[data-product='tour'] {
+  color-scheme: light;
+  --bg: #f5f1e6; --card: #fffdf8; --input: #f9f6ee;
+  --cyan: #0f6b57; --violet: #d9692a; --accent: #b86a00;
+  --ink: #1b2620; --muted: #5b6760; --muted-2: #7f8a83;
+  --ok: #1f7a4d; --danger: #c23b2f;
+  --line: #e6dfcd; --line-strong: #cfc6ae;
+  --primary: #0f6b57; --primary-hover: #0b5747; --on-primary: #ffffff;
+  --selected: #e4f0ea; --selected-line: #b3d3c5;
+  --hi: #0a2a20;
+  --gradient: linear-gradient(135deg, #f0a04b, #0f6b57);
+  --brand-text: linear-gradient(135deg, #1b2620, #0f6b57);
+  --body-glow: radial-gradient(900px 520px at 90% -12%, rgba(240, 160, 75, 0.18), transparent 60%);
+  --glass: rgba(255, 253, 248, 0.82); --glass-blur: 12px;
+  --glow: 0 10px 26px -18px rgba(27, 38, 32, 0.35);
+  --focus-ring: 0 0 0 3px rgba(15, 107, 87, 0.25);
+  --font-display: 'Fraunces', Georgia, serif;
+  --radius: 18px; --radius-md: 14px; --radius-lg: 24px;
+  --chart-in: #0f6b57; --chart-out: #c23b2f; --chart-profit: #1f7a4d;
+  --chart-bar-1: #f0a04b; --chart-bar-2: #0f6b57; --chart-grid: #e9e2d0;
+  --logo-1: #f0a04b; --logo-2: #0f6b57; --logo-ink: #ffffff; --logo-dot: #f5f1e6;
+  --tone-main: #0f6b57; --tone-op: #0f6b57; --tone-inv: #a85d00; --tone-cli: #2b6aa8; --tone-fin: #7a4fb0; --tone-adm: #5b6760;
+  --surface: linear-gradient(180deg, #fffdf8, #fcf9f1);
+  --surface-sunken: linear-gradient(180deg, #f1ecdf, #f7f3ea);
+  --btn-primary: linear-gradient(180deg, #16806a 0%, #0f6b57 60%, #0b5747 100%);
+  --btn-primary-glow: 0 8px 18px -10px rgba(15, 107, 87, 0.55);
+}
+[data-product='tour'] .dkpi::before, [data-product='tour'] .kpi::before { background: linear-gradient(90deg, #f0a04b, #d9692a 50%, transparent); height: 3px; opacity: 1; }
+
+/* ---------- Palapa · «Mar» ----------
+   Arena clara, turquesa de mar y coral: fresco, relajado, legible al sol. */
+:root[data-product='beach'] {
+  color-scheme: light;
+  --bg: #fbf6ec; --card: #ffffff; --input: #fdf9f1;
+  --cyan: #0a6f86; --violet: #e8735a; --accent: #b47100;
+  --ink: #13262c; --muted: #546a70; --muted-2: #7a8f94;
+  --ok: #1f7a4d; --danger: #c43a2c;
+  --line: #ece3d0; --line-strong: #d6c9ac;
+  --primary: #0a6f86; --primary-hover: #085b6e; --on-primary: #ffffff;
+  --selected: #e2f2f4; --selected-line: #a9d6de;
+  --hi: #062a33;
+  --gradient: linear-gradient(135deg, #f2b06a, #0a6f86);
+  --brand-text: linear-gradient(135deg, #13262c, #0a6f86);
+  --body-glow: radial-gradient(900px 520px at 90% -12%, rgba(64, 196, 210, 0.18), transparent 60%);
+  --glass: rgba(255, 255, 255, 0.8); --glass-blur: 14px;
+  --glow: 0 10px 26px -18px rgba(19, 38, 44, 0.3);
+  --focus-ring: 0 0 0 3px rgba(10, 111, 134, 0.25);
+  --font-display: 'Bricolage Grotesque', 'Inter Variable', system-ui, sans-serif;
+  --radius: 20px; --radius-md: 14px; --radius-lg: 26px;
+  --chart-in: #0a6f86; --chart-out: #c43a2c; --chart-profit: #1f7a4d;
+  --chart-bar-1: #6fd0dc; --chart-bar-2: #0a6f86; --chart-grid: #efe7d6;
+  --logo-1: #6fd0dc; --logo-2: #0a6f86; --logo-ink: #ffffff; --logo-dot: #f2b06a;
+  --tone-main: #0a6f86; --tone-op: #0a6f86; --tone-inv: #a86200; --tone-cli: #c2533c; --tone-fin: #6a4fb0; --tone-adm: #546a70;
+  --surface: linear-gradient(180deg, #ffffff, #fffcf6);
+  --surface-sunken: linear-gradient(180deg, #f6efe0, #fbf7ef);
+  --btn-primary: linear-gradient(180deg, #0f8299 0%, #0a6f86 60%, #085b6e 100%);
+  --btn-primary-glow: 0 8px 18px -10px rgba(10, 111, 134, 0.55);
+}
+[data-product='beach'] .dkpi::before, [data-product='beach'] .kpi::before { background: linear-gradient(90deg, #6fd0dc, #f2b06a 60%, transparent); height: 3px; opacity: 1; }
+
+/* ---------- Restaurante y Comedor · «Mantel» ----------
+   Crema de mantel, vino tinto y serif clásico: un comedor bien puesto. */
+:root[data-product='dining'], :root[data-product='fonda'] {
+  color-scheme: light;
+  --bg: #faf6f0; --card: #ffffff; --input: #fcf9f4;
+  --cyan: #8e2b3a; --violet: #c9895a; --accent: #a87000;
+  --ink: #2a1a1c; --muted: #6e5d5f; --muted-2: #938385;
+  --ok: #2c7a4b; --danger: #c0392b;
+  --line: #ece2d6; --line-strong: #d8c9b6;
+  --primary: #8e2b3a; --primary-hover: #76222f; --on-primary: #ffffff;
+  --selected: #f7e8ea; --selected-line: #e3bcc3;
+  --hi: #3d0f17;
+  --gradient: linear-gradient(135deg, #e3b07a, #8e2b3a);
+  --brand-text: linear-gradient(135deg, #2a1a1c, #8e2b3a);
+  --body-glow: radial-gradient(900px 520px at 90% -12%, rgba(227, 176, 122, 0.16), transparent 60%);
+  --glass: rgba(255, 255, 255, 0.82); --glass-blur: 12px;
+  --glow: 0 10px 26px -18px rgba(42, 26, 28, 0.3);
+  --focus-ring: 0 0 0 3px rgba(142, 43, 58, 0.22);
+  --font-display: 'Fraunces', Georgia, serif;
+  --radius: 14px; --radius-md: 12px; --radius-lg: 18px;
+  --chart-in: #8e2b3a; --chart-out: #c0392b; --chart-profit: #2c7a4b;
+  --chart-bar-1: #e3b07a; --chart-bar-2: #8e2b3a; --chart-grid: #efe6db;
+  --logo-1: #e3b07a; --logo-2: #8e2b3a; --logo-ink: #ffffff; --logo-dot: #faf6f0;
+  --tone-main: #8e2b3a; --tone-op: #8e2b3a; --tone-inv: #a06400; --tone-cli: #2b6a8a; --tone-fin: #6a4fb0; --tone-adm: #6e5d5f;
+  --surface: linear-gradient(180deg, #ffffff, #fffcf8);
+  --surface-sunken: linear-gradient(180deg, #f4ede3, #faf6f0);
+  --btn-primary: linear-gradient(180deg, #a3364a 0%, #8e2b3a 60%, #76222f 100%);
+  --btn-primary-glow: 0 8px 18px -10px rgba(142, 43, 58, 0.5);
+}
+
+/* ---------- Taquería · «Trompo» ----------
+   Carbón, rojo chile y limón: de noche, con prisa y con antojo. */
+:root[data-product='taco'] {
+  color-scheme: dark;
+  --bg: #151110; --card: #201a18; --input: #29211e;
+  --cyan: #ff7a59; --violet: #a7d14b; --accent: #f2c14e;
+  --ink: #f7efe9; --muted: #b3a59c; --muted-2: #877a72;
+  --ok: #a7d14b; --danger: #ff6b5a;
+  --line: #322825; --line-strong: #4b3d38;
+  --primary: #ff6a45; --primary-hover: #f25a34; --on-primary: #1f0a04;
+  --selected: #2b221f; --selected-line: #5a3f34;
+  --hi: #fff3ec;
+  --gradient: linear-gradient(135deg, #f2c14e, #e2402a);
+  --brand-text: linear-gradient(135deg, #f7efe9, #ff7a59);
+  --body-glow: radial-gradient(1000px 540px at 90% -12%, rgba(255, 106, 69, 0.08), transparent 60%);
+  --glass: rgba(32, 26, 24, 0.8); --glass-blur: 12px;
+  --focus-ring: 0 0 0 3px rgba(255, 106, 69, 0.35);
+  --font-display: 'Bricolage Grotesque', 'Inter Variable', system-ui, sans-serif;
+  --radius: 14px; --radius-md: 12px; --radius-lg: 18px;
+  --chart-in: #ff7a59; --chart-out: #ff6b5a; --chart-profit: #a7d14b;
+  --chart-bar-1: #f2c14e; --chart-bar-2: #e2402a; --chart-grid: #322825;
+  --logo-1: #f2c14e; --logo-2: #e2402a; --logo-ink: #1f0a04; --logo-dot: #a7d14b;
+  --tone-main: #ff7a59; --tone-op: #ff7a59; --tone-inv: #f2c14e; --tone-cli: #a7d14b; --tone-fin: #c9a0dc; --tone-adm: #877a72;
+  --surface: linear-gradient(180deg, #2a211e 0%, var(--card) 45%);
+  --btn-primary: linear-gradient(180deg, #ff8a66 0%, #ff6a45 55%, #ea532f 100%);
+  --btn-primary-glow: 0 10px 24px -12px rgba(255, 106, 69, 0.7);
+}
+[data-product='taco'] h1 { font-weight: 800; letter-spacing: -0.02em; }
+
+/* ---------- Verdulería · «Mercado» ----------
+   Naranja zanahoria y verde hoja sobre blanco de báscula: precios del día que se ven de lejos. */
+:root[data-product='greens'] {
+  color-scheme: light;
+  --bg: #f6f7f0; --card: #ffffff; --input: #f8f9f3;
+  --cyan: #b54a0c; --violet: #4f8a2b; --accent: #4f8a2b;
+  --ink: #1f2416; --muted: #5d6552; --muted-2: #818a75;
+  --ok: #2f7d1f; --danger: #c3332a;
+  --line: #e2e6d6; --line-strong: #c9d0b8;
+  --primary: #b54a0c; --primary-hover: #983d08; --on-primary: #ffffff;
+  --selected: #fbeee4; --selected-line: #f0c9ab;
+  --hi: #3a1803;
+  --gradient: linear-gradient(135deg, #8cc152, #e06a1b);
+  --brand-text: linear-gradient(135deg, #1f2416, #b54a0c);
+  --body-glow: radial-gradient(900px 500px at 90% -12%, rgba(140, 193, 82, 0.18), transparent 60%);
+  --glass: rgba(255, 255, 255, 0.84); --glass-blur: 8px;
+  --glow: 0 10px 26px -18px rgba(31, 36, 22, 0.32);
+  --focus-ring: 0 0 0 3px rgba(181, 74, 12, 0.25);
+  --font-display: 'Bricolage Grotesque', 'Inter Variable', system-ui, sans-serif;
+  --radius: 14px; --radius-md: 12px; --radius-lg: 18px;
+  --chart-in: #2f7d1f; --chart-out: #c3332a; --chart-profit: #2f7d1f;
+  --chart-bar-1: #8cc152; --chart-bar-2: #e06a1b; --chart-grid: #e6e9dc;
+  --logo-1: #8cc152; --logo-2: #e06a1b; --logo-ink: #ffffff; --logo-dot: #1f2416;
+  --tone-main: #b54a0c; --tone-op: #b54a0c; --tone-inv: #2f7d1f; --tone-cli: #1d6fb8; --tone-fin: #6a4fb0; --tone-adm: #5d6552;
+  --surface: linear-gradient(180deg, #ffffff, #fcfdf8);
+  --surface-sunken: linear-gradient(180deg, #f0f2e8, #f7f8f2);
+  --btn-primary: linear-gradient(180deg, #c95812 0%, #b54a0c 60%, #983d08 100%);
+  --btn-primary-glow: 0 8px 18px -10px rgba(181, 74, 12, 0.55);
+}
+[data-product='greens'] h1 { font-weight: 800; letter-spacing: -0.03em; }
+[data-product='greens'] .dkpi::before, [data-product='greens'] .kpi::before { background: linear-gradient(90deg, #8cc152, #8cc152 45%, transparent); height: 3px; opacity: 1; }
+
+/* Comunes a los productos claros nuevos (igual que nails y market). */
+:root:is([data-product='paper'], [data-product='access'], [data-product='tour'], [data-product='beach'], [data-product='dining'], [data-product='fonda'], [data-product='greens']) .modal.sheet { background: rgba(20, 20, 20, 0.28); }
+:root:is([data-product='paper'], [data-product='access'], [data-product='tour'], [data-product='beach'], [data-product='dining'], [data-product='fonda'], [data-product='greens']) .side { box-shadow: 1px 0 0 var(--line); }
+:root:is([data-product='paper'], [data-product='access'], [data-product='tour'], [data-product='beach'], [data-product='dining'], [data-product='fonda'], [data-product='greens']) .bar-fill.cost { background: #b8b2ad; }
+:root:is([data-product='paper'], [data-product='access'], [data-product='tour'], [data-product='beach'], [data-product='dining'], [data-product='fonda'], [data-product='greens']) :is(.dkpi-value, .kpi .value) { text-shadow: none; }
+[data-product='scent'] .brand .product-name { font-style: italic; text-transform: none; letter-spacing: 0.04em; font-size: 1rem; font-weight: 400; }

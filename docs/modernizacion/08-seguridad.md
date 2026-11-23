@@ -59,7 +59,7 @@ Notas:
 | Activar `BACKUP_KEY` en producción | Alta | Es configuración de producción: requiere autorización y que el propietario guarde la llave. |
 | Regla WAF de Cloudflare | Media | Configuración de la cuenta. |
 | Ensayo de «restaurar a producción» | Media | Hoy se restaura a una base nueva (probado). Falta un procedimiento para cargarla en un Durable Object; se ensayaría primero en staging. |
-| Super panel con usuario y contraseña sin segundo factor | Media | Agregar código por SMS al entrar; costo por SMS. |
+| Confirmar que el super panel de producción tiene **segundo paso** activo | Media | El código ya lo tiene: pide un código por SMS o correo si el usuario de soporte tiene teléfono o correo y hay proveedor configurado. No se pudo comprobar la configuración de producción (solo lectura y sin abrir datos); el propietario lo ve al entrar: si le pide código, está activo. |
 | El aviso de privacidad (`docs/aviso-de-privacidad.md`) tiene el **correo personal** del propietario y el repositorio es público | Baja | Es correcto que tenga un contacto; el propietario decide si usa un correo del negocio. |
 
 ## 5. Base compartida: análisis, opciones y costos
