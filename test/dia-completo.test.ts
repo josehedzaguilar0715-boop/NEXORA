@@ -247,3 +247,46 @@ describe('corregir un gasto capturado por error', () => {
     void g2
   })
 })
+
+describe('fiado: corregir un abono y saldo a favor', () => {
+  it('anular un abono: la deuda vuelve, el dinero sale de la caja, el cobro sale de reportes; una sola vez', async () => {
+    const { s, o, T, product, buy, sell, open } = await negocioListo()
+    const p = await product({ name: 'Arroz', unit: 'pieza', price: 3000 })
+    await buy([{ productId: p.id, quantity: 10, cost: 15000 }])
+    const sh = (await open(10000)).json.shift
+    const cli = (await s.call('POST', '/customers', { token: T, body: { name: 'Don Pepe' } })).json.customer
+    await s.call('PUT', `/customers/${cli.id}/credit-limit`, { token: T, body: { limit: 50000 } })
+    await sell([{ productId: p.id, quantity: 3 }], { paymentMethod: 'fiado', customerId: cli.id })
+    await s.call('POST', `/customers/${cli.id}/credit-payments`, { token: T, body: { amount: 5000, method: 'efectivo' } })
+    const ab = (await s.call('GET', `/customers/${cli.id}/credit`, { token: T })).json.ledger.find((l: any) => l.kind === 'abono')
+    const enc = await s.createStaff(T, o.business.code, 'enc', 'encargado')
+    await s.call('POST', '/auth/change-password', { token: enc.token, body: { currentPassword: 'inicial123', newPassword: 'nueva12345' } })
+    expect((await s.call('POST', `/credit-ledger/${ab.id}/void`, { token: enc.token, body: { reason: 'Se capturó dos veces' } })).json.error.code).toBe('codigo_requerido')
+    const r = await s.call('POST', `/credit-ledger/${ab.id}/void`, { token: enc.token, body: { reason: 'Se capturó dos veces', authCode: '4321' } })
+    expect(r.json.balance).toBe(9000)
+    expect((await s.call('POST', `/credit-ledger/${ab.id}/void`, { token: T, body: { reason: 'otra' } })).json.error.code).toBe('ya_anulado')
+    expect((await s.call('GET', `/shifts/${sh.id}`, { token: T })).json.totals.expectedCash).toBe(10000)
+    const cf = (await s.call('GET', '/accounting/cash-flow', { token: T })).json
+    expect(cf.inflows.filter((x: any) => x.category === 'cobranza').reduce((a: number, x: any) => a + x.amount, 0)).toBe(0)
+    expect((await s.call('GET', '/dashboard/panel', { token: T })).json.real.abonos).toBe(0)
+    const led = (await s.call('GET', `/customers/${cli.id}/credit`, { token: T })).json.ledger
+    expect(led.find((l: any) => l.id === ab.id).voided).toBe(1)
+    expect((await s.call('GET', '/audit', { token: T })).json.entries.some((e: any) => e.action === 'fiado.abono_anulado')).toBe(true)
+  })
+
+  it('devolución como saldo a favor no cuenta como dinero cobrado', async () => {
+    const { s, T, product, buy, sell, open } = await negocioListo()
+    s.setGiro('ferreteria')
+    const p = await product({ name: 'Martillo', unit: 'pieza', price: 20000 })
+    await buy([{ productId: p.id, quantity: 5, cost: 50000 }])
+    await open(0)
+    const cli = (await s.call('POST', '/customers', { token: T, body: { name: 'Taller Ruiz' } })).json.customer
+    const v = (await sell([{ productId: p.id, quantity: 1 }], { customerId: cli.id, paymentMethod: 'transferencia' })).json.sale
+    const saleItemId = (s.db.prepare('SELECT id FROM sale_items WHERE sale_id = ?').get(v.id) as any).id
+    expect((await s.call('POST', '/returns', { token: T, body: { saleId: v.id, items: [{ saleItemId, quantity: 1 }], refundMethod: 'saldo', reason: 'Cambio por otro', authCode: '4321' } })).status).toBe(201)
+    const cf = (await s.call('GET', '/accounting/cash-flow', { token: T })).json
+    expect(cf.inflows.filter((x: any) => x.category === 'cobranza')).toHaveLength(0)
+    expect((await s.call('GET', '/dashboard/panel', { token: T })).json.real.abonos).toBe(0)
+    expect((await s.call('GET', '/accounting/ledger', { token: T })).json.totalIn).toBe(20000)
+  })
+})

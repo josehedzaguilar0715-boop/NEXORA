@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
-import { confirmAsk } from '../Dialog'
+import { ask, askCode, confirmAsk } from '../Dialog'
 import { can, FIADO_GIROS, hasGiro, type Me } from '../App'
 import { cardWhatsApp } from './MiTarjeta'
 import { Sheet } from '../Sheet'
@@ -120,6 +120,13 @@ function Cuenta({ me, c, onChanged }: { me: Me; c: any; onChanged: () => void })
   const load = async () => setCredit(await api('GET', `/customers/${c.id}/credit`))
   useEffect(() => { void load().catch(() => {}) }, [c.id])
   const run = (fn: () => Promise<unknown>, ok: string) => async () => { try { await fn(); setMsg({ ok }); await load(); onChanged() } catch (e) { setMsg({ err: (e as Error).message }) } }
+  const voidAbono = async (l: any) => {
+    const reason = await ask({ title: `Anular abono de ${mxn(-l.delta)}`, hint: l.method === 'efectivo' ? 'Se capturó por error. La deuda vuelve a subir y el dinero sale de la caja donde entró.' : 'Se capturó por error. La deuda vuelve a subir; queda en sus movimientos y en la bitácora.', label: 'Motivo', placeholder: 'Ej. se capturó dos veces', confirmLabel: 'Continuar', danger: true })
+    if (!reason) return
+    const authCode = me.user.role === 'owner' ? undefined : await askCode('Para anular un abono se necesita el código del dueño.')
+    if (me.user.role !== 'owner' && !authCode) return
+    await run(() => api('POST', `/credit-ledger/${l.id}/void`, { reason, authCode }), 'Abono anulado.')()
+  }
   if (!credit) return <p className="muted">Cargando…</p>
   return (
     <div>
@@ -153,7 +160,7 @@ function Cuenta({ me, c, onChanged }: { me: Me; c: any; onChanged: () => void })
       {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
       <h3 style={{ marginTop: 14 }}>Movimientos</h3>
       <div className="table-wrap"><table className="list"><tbody>
-        {credit.ledger.map((l: any, i: number) => <tr key={i}><td>{KIND[l.kind] ?? l.kind}{l.method ? ` · ${METHOD[l.method] ?? l.method}` : ''}{l.note ? <><br /><small className="muted">{l.note}</small></> : null}<br /><small className="muted">{new Date(l.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })}</small></td><td className={`num ${l.delta > 0 ? 'neg' : 'pos'}`}>{mxn(l.delta)}</td></tr>)}
+        {credit.ledger.map((l: any, i: number) => <tr key={i}><td>{l.reversesId ? 'Abono anulado' : (KIND[l.kind] ?? l.kind)}{l.voided ? ' (anulado)' : ''}{l.method ? ` · ${METHOD[l.method] ?? l.method}` : ''}{l.note ? <><br /><small className="muted">{l.note}</small></> : null}<br /><small className="muted">{new Date(l.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })}</small></td><td className={`num ${l.delta > 0 ? 'neg' : 'pos'}`}>{l.voided ? <s>{mxn(l.delta)}</s> : mxn(l.delta)}{l.kind === 'abono' && l.method && !l.voided && <><br /><button className="link small" onClick={() => voidAbono(l)}>Anular</button></>}</td></tr>)}
         {credit.ledger.length === 0 && <tr><td className="muted">Sin movimientos.</td></tr>}
       </tbody></table></div>
     </div>

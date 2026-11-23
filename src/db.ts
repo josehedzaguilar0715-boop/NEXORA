@@ -1468,6 +1468,9 @@ const MIGRATIONS: Migration[] = [
   ALTER TABLE sale_commissions ADD COLUMN clawback_id TEXT;
   ALTER TABLE tips ADD COLUMN payout_id TEXT;
   ALTER TABLE tips ADD COLUMN clawback_id TEXT;`,
+  // Abono de fiado capturado por error: se anula con un movimiento contrario que apunta al original (nunca se borra).
+  `ALTER TABLE credit_ledger ADD COLUMN reverses_id TEXT;
+  CREATE UNIQUE INDEX credit_ledger_reverses ON credit_ledger(reverses_id) WHERE reverses_id IS NOT NULL;`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

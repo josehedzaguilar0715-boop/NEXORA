@@ -32,7 +32,7 @@ finance.get('/customers/:id/credit', requirePerm('customers_credit'), (c) => {
   const { db } = c.get('deps')
   const cu = loadCustomer(c)
   const limit = (db.prepare('SELECT credit_limit FROM customers WHERE id = ?').get(cu.id) as { credit_limit: number }).credit_limit
-  const ledger = db.prepare('SELECT delta, kind, method, sale_id AS saleId, note, created_at AS createdAt FROM credit_ledger WHERE customer_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 500').all(cu.id)
+  const ledger = db.prepare('SELECT l.id, l.delta, l.kind, l.method, l.sale_id AS saleId, l.note, l.reverses_id AS reversesId, l.created_at AS createdAt, EXISTS (SELECT 1 FROM credit_ledger r WHERE r.reverses_id = l.id) AS voided FROM credit_ledger l WHERE l.customer_id = ? ORDER BY l.created_at DESC, l.rowid DESC LIMIT 500').all(cu.id)
   const balance = customerBalance(db, cu.id)
   return c.json({ balance, limit, available: Math.max(0, limit - balance), ledger })
 })
@@ -56,6 +56,33 @@ finance.post('/customers/:id/credit-payments', requirePerm('customers_credit'), 
     audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fiado.abono', entity: 'customer', entityId: cu.id, newValue: { amount: d.amount, method: d.method } })
   })()
   return c.json({ balance: customerBalance(db, cu.id) }, 201)
+})
+
+/**
+ * Anular un abono capturado por error: movimiento contrario que apunta al original (nada se borra).
+ * Si fue en efectivo, el dinero sale de la caja donde entró; por eso solo mientras ese turno siga abierto.
+ */
+finance.post('/credit-ledger/:id/void', requirePerm('customers_credit'), async (c) => {
+  const deps = c.get('deps')
+  const { db, now } = deps
+  const u = c.get('session').user
+  const l = db.prepare('SELECT l.*, c.name FROM credit_ledger l JOIN customers c ON c.id = l.customer_id WHERE l.id = ? AND l.business_id = ?').get(c.req.param('id'), u.business_id) as { id: string; customer_id: string; name: string; delta: number; kind: string; method: string | null; shift_id: string | null } | undefined
+  if (!l) throw notFound()
+  const d = parse(z.object({ reason: z.string().trim().min(3, 'Escribe el motivo').max(200), authCode: z.string().optional() }), await body(c))
+  if (l.kind !== 'abono' || !l.method) throw bad('Solo se puede anular un abono recibido (con forma de pago).')
+  if (db.prepare('SELECT 1 FROM credit_ledger WHERE reverses_id = ?').get(l.id)) throw conflict('Ese abono ya estaba anulado.', 'ya_anulado')
+  const amount = -l.delta
+  const shift = l.method === 'efectivo' && l.shift_id ? (db.prepare('SELECT id, status FROM shifts WHERE id = ?').get(l.shift_id) as { id: string; status: string }) : null
+  if (l.method === 'efectivo' && shift?.status !== 'abierto') throw conflict('Ese abono entró a una caja que ya tiene corte; no se puede anular.', 'turno_cerrado')
+  const auth = u.role === 'owner' ? null : authorize(deps, u, d.authCode, 'customers_credit', 'anular abono', { ownerOnly: true })
+  db.transaction(() => {
+    if (shift) assertCashAvailable(db, shift.id, amount, 'anular este abono')
+    db.prepare("INSERT INTO credit_ledger (id, business_id, customer_id, delta, kind, method, shift_id, note, reverses_id, created_by, created_at) VALUES (?,?,?,?,'cancelacion',?,?,?,?,?,?)").run(
+      newId(), u.business_id, l.customer_id, amount, l.method, l.shift_id, `Abono anulado: ${d.reason}`, l.id, u.id, iso(now()))
+    if (shift) db.prepare("INSERT INTO cash_movements (id, shift_id, type, amount, reason, created_by, created_at) VALUES (?,?,'retiro',?,?,?,?)").run(newId(), shift.id, amount, `Abono anulado de ${l.name}`, u.id, iso(now()))
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'fiado.abono_anulado', entity: 'customer', entityId: l.customer_id, oldValue: { amount, method: l.method }, reason: d.reason, ...(auth ? { authorizedBy: auth.id } : {}) })
+  })()
+  return c.json({ balance: customerBalance(db, l.customer_id) })
 })
 
 /**

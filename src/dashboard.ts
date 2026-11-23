@@ -22,7 +22,7 @@ export function realMoney(db: Db, businessId: string, from: string, to: string) 
   const { start, end } = range(from, to)
   const byMethod = db.prepare("SELECT p.method, COALESCE(SUM(p.amount),0) a FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? GROUP BY p.method").all(businessId, start, end) as { method: string; a: number }[]
   const m = (k: string) => byMethod.find((x) => x.method === k)?.a ?? 0
-  const abonos = -(db.prepare("SELECT COALESCE(SUM(delta),0) v FROM credit_ledger WHERE business_id = ? AND kind = 'abono' AND created_at >= ? AND created_at < ?").get(businessId, start, end) as { v: number }).v
+  const abonos = -(db.prepare("SELECT COALESCE(SUM(delta),0) v FROM credit_ledger WHERE business_id = ? AND ((kind = 'abono' AND method IS NOT NULL) OR (kind = 'cancelacion' AND reverses_id IS NOT NULL)) AND created_at >= ? AND created_at < ?").get(businessId, start, end) as { v: number }).v
   const layaway = (db.prepare("SELECT COALESCE(SUM(lp.amount),0) v FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND lp.created_at >= ? AND lp.created_at < ?").get(businessId, start, end) as { v: number }).v
   const s = periodSummary(db, businessId, from, to)
   const efectivo = m('efectivo'), transferencia = m('transferencia'), tarjeta = m('tarjeta')
