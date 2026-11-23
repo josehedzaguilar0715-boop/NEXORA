@@ -15,7 +15,7 @@
 |---|---|
 | Rama de trabajo de esta etapa | **`modernizacion`** (sale de `claude/new-session-pqpyhl` en `efb75ff`) |
 | Código en producción | commit `efb75ff` (Cloudflare versión `2c16921e`, Worker `nexora`) |
-| Staging | rama `modernizacion` hasta `a02a5ec`+, Worker `nexora-staging`, versión `9ef95ad2` (23 nov) |
+| Staging | rama `modernizacion` en `53a192a`, Worker `nexora-staging`, versión `20695830` (23 nov, etapa 2) |
 | Producción con lo de esta etapa | **NO publicado**. Pendiente de autorización |
 
 ## 2. Arquitectura encontrada (resumen; detalle en `01-auditoria.md`)
@@ -84,3 +84,30 @@ npm run check                      # debe dar 215+ pruebas OK y e2e OK
 * Los enlaces de reservas mostrados en la app cambian al identificador nuevo; **los viejos siguen funcionando** (no hay que reenviar nada).
 * Migración 38: agrega columna `public_slug` e índice único parcial. Probada sobre base con datos en workerd.
 * Reversión: volver a publicar `efb75ff` (`git checkout efb75ff && npm run deploy:prod`). La columna nueva queda sin uso y no estorba a la versión anterior.
+
+## 9. Etapa 2 (23 nov): acabado premium, notificaciones y limpieza
+
+Detalle completo en `05-acabado-y-limpieza.md`.
+
+| # | Cambio | Archivos | Prueba |
+|---|---|---|---|
+| 9 | Avisos al celular que **no hay que reactivar** (re-suscripción automática con permiso ya dado; al salir solo se desliga la cuenta; `pushsubscriptionchange`) | `web/src/Avisos.tsx`, `web/public/sw.js` | `test/avisos.test.ts` + navegador con push simulado |
+| 10 | **Acabado premium** (profundidad, vidrio, degradados, microinteracciones, gráficas animadas) para todos, con variante por producto | `web/src/premium.css` (nuevo), `web/src/products/products.css`, `web/src/screens/Inicio.tsx`, `web/src/main.tsx`, `web/src/products/index.ts` | capturas + medición de velocidad de la caja |
+| 11 | **Limpieza**: componente, estilos y SVG sin uso; íconos sin pérdida; paquetes sobrantes; temporales del entorno (≈ 1.05 GB liberados en desarrollo; producción intacta) | `web/src/Brand.tsx`, `web/src/styles.css`, `web/public/*` | build + pruebas después de limpiar |
+| 12 | Scripts de verificación en el repositorio | `scripts/verificacion/` | se usaron para la verificación final |
+| 13 | Respondedor automático de ventanas en pruebas sin ciclos encimados (causaba una falla intermitente **de la prueba**, no de la app) | `test/e2e/caja.e2e.ts`, `scripts/verificacion/giros6.cjs` | palapa 6/6 |
+
+### Pruebas finales (etapa 2, 23 nov)
+
+| Prueba | Resultado |
+|---|---|
+| `npm run check` (tipos, 216 pruebas, build, e2e) | **Pasa** |
+| Recorrido profundo 13 giros × dueño/empleado × celular/computadora (296 pantallas) | **Sin hallazgos** |
+| Flujos de 6 giros (`giros6.cjs`) computadora y celular | **43/43 y 43/43** |
+| 13 demos en workerd con la compilación final | **Todo OK** |
+| Velocidad de caja con CPU 4× lenta (antes/ahora) | abrir 539→547 ms, agregar 67→58 ms |
+| Staging | desplegado `20695830`; no se puede abrir desde este entorno |
+| Push en teléfono real | **no verificado** (requiere celular y el servicio de Google) |
+
+### Reversión de esta etapa
+Publicar el commit anterior que se quiera conservar (`git checkout <commit> && npm run deploy:prod`, con autorización). Ningún cambio de esta etapa toca la base de datos.
