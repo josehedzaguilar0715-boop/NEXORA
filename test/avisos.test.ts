@@ -91,4 +91,24 @@ describe('avisos al dueño y al personal', () => {
       expect(n.body).toContain('4:00 p.m.')
     }
   })
+
+  it('los avisos al celular no se pierden al salir y volver a entrar; en un celular compartido llegan a quien está dentro', async () => {
+    const { s, o, T } = await negocioListo()
+    const ep = 'https://fcm.googleapis.com/fcm/send/celular-1'
+    const has = async (tok: string) => (await s.call('GET', '/notifications', { token: tok })).json.push
+    expect((await s.call('POST', '/push/subscribe', { token: T, body: { endpoint: ep } })).status).toBe(201)
+    expect(await has(T)).toBe(true)
+    // Sale: el celular deja de recibir los avisos de esta cuenta.
+    await s.call('POST', '/push/unsubscribe', { token: T, body: { endpoint: ep } })
+    expect(await has(T)).toBe(false)
+    // Vuelve a entrar: la app manda la misma suscripción sola (sin pedir permiso) y vuelve a quedar activa.
+    expect((await s.call('POST', '/push/subscribe', { token: T, body: { endpoint: ep } })).status).toBe(201)
+    expect((await s.call('POST', '/push/subscribe', { token: T, body: { endpoint: ep } })).status).toBe(201) // repetir no duplica
+    expect(s.db.prepare('SELECT COUNT(*) n FROM push_subscriptions WHERE endpoint = ?').get(ep)).toMatchObject({ n: 1 })
+    // Celular compartido: entra la cajera; los avisos de ese celular ahora son de ella, no del dueño.
+    const caj = await s.createStaff(T, o.business.code, 'cajera9', 'cajero')
+    await s.call('POST', '/push/subscribe', { token: caj.token, body: { endpoint: ep } })
+    expect(await has(caj.token)).toBe(true)
+    expect(await has(T)).toBe(false)
+  })
 })

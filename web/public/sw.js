@@ -1,5 +1,5 @@
 // Guarda la app para abrirla sin internet. Las llamadas a la API no se guardan aquí (las maneja la cola local).
-const CACHE = 'nexora-v2'
+const CACHE = 'nexora-v3'
 const SHELL = (p) => p === '/' || p === '/index.html' || p.startsWith('/assets/')
 self.addEventListener('install', (e) => {
   self.skipWaiting()
@@ -45,4 +45,24 @@ self.addEventListener('notificationclick', (e) => {
     for (const c of list) if ('focus' in c) { if ('navigate' in c) c.navigate(url).catch(() => {}); return c.focus() }
     return self.clients.openWindow(url)
   }))
+})
+
+// El navegador renueva la suscripción de vez en cuando: se vuelve a registrar sola, sin que nadie tenga que activar nada.
+self.addEventListener('pushsubscriptionchange', (e) => {
+  e.waitUntil((async () => {
+    try {
+      const r = await (await caches.open('nx-auth')).match('/__nx_token')
+      const token = r && (await r.text())
+      if (!token) return
+      const auth = { authorization: 'Bearer ' + token }
+      let key = e.oldSubscription && e.oldSubscription.options && e.oldSubscription.options.applicationServerKey
+      if (!key) {
+        const k = await (await fetch('/api/push/key', { headers: auth })).json()
+        const b64 = k.publicKey.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (k.publicKey.length % 4)) % 4)
+        key = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+      }
+      const sub = e.newSubscription || (await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }))
+      await fetch('/api/push/subscribe', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) })
+    } catch (_) { /* se reintenta la próxima vez que se abra la app */ }
+  })())
 })

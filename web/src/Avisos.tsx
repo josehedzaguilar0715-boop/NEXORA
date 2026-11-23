@@ -18,12 +18,15 @@ async function shareTokenWithWorker() {
   try { await (await caches.open(AUTH_CACHE)).put(TOKEN_URL, new Response(auth.token)) } catch { /* sin Cache Storage */ }
 }
 
-/** Al salir: el celular deja de recibir avisos de esta cuenta. */
+/**
+ * Al salir: el celular deja de recibir los avisos de ESTA cuenta (el servidor la desliga del celular).
+ * El permiso y la suscripción del navegador se conservan: al volver a entrar, los avisos se reactivan solos.
+ */
 export async function forgetPush() {
   try {
     const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : undefined
     const sub = await reg?.pushManager?.getSubscription()
-    if (sub) { await api('POST', '/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe().catch(() => {}) }
+    if (sub) await api('POST', '/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {})
     if ('caches' in window) await caches.delete(AUTH_CACHE)
   } catch { /* nada que limpiar */ }
 }
@@ -39,6 +42,27 @@ export const pushSupport = (): 'ok' | 'instalar' | 'no' => {
 const toKey = (b64: string) => {
   const s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (b64.length % 4)) % 4))
   return Uint8Array.from(s, (c) => c.charCodeAt(0))
+}
+
+/**
+ * Si este celular ya dio permiso alguna vez, se vuelve a suscribir solo (sin preguntar) al entrar o abrir la app.
+ * Así nadie tiene que «activar» las notificaciones cada vez: cerrar sesión, una suscripción vencida o renovada
+ * por el navegador se arreglan solas.
+ */
+export async function syncPush(): Promise<boolean> {
+  try {
+    if (pushSupport() !== 'ok' || Notification.permission !== 'granted' || !auth.token) return false
+    const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register('/sw.js'))
+    await navigator.serviceWorker.ready
+    let sub = await reg.pushManager.getSubscription()
+    if (!sub) {
+      const { publicKey } = await api<{ publicKey: string }>('GET', '/push/key')
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toKey(publicKey) })
+    }
+    await shareTokenWithWorker()
+    await api('POST', '/push/subscribe', { endpoint: sub.endpoint })
+    return true
+  } catch { return false }
 }
 
 export async function enablePush() {
@@ -73,7 +97,8 @@ export function useNotices(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return
     lastSeen.current = null
-    void load().catch(() => {})
+    // Avisos al celular: si ya hay permiso, se reactivan solos antes de la primera consulta.
+    void syncPush().finally(() => void load().catch(() => {}))
     const t = setInterval(() => void load().catch(() => {}), 30_000)
     return () => clearInterval(t)
   }, [userId])
