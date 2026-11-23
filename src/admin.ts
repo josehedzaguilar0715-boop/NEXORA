@@ -8,7 +8,7 @@ import { consumeChallenge, createChallenge, extraOf, forgetDevices } from './aut
 import { resetDemoData } from './reset.js'
 import { demoAccess, demoApp, DEMOS, seedDemo } from './demo.js'
 import { ticketView } from './support.js'
-import { exportAll, runBackup } from './backup.js'
+import { exportAll, importAll, keyFingerprint, readBackup, runBackup } from './backup.js'
 import {
   bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone, notFound, numericCode, sha256, unauthorized, verifySecret, localDate } from './util.js'
 
@@ -441,7 +441,9 @@ admin.get('/admin/backups', async (c) => {
   const store = c.get('deps').backups
   if (!store) return c.json({ backups: [], enabled: false })
   const list = (await store.list()).sort((x, y) => (x.name < y.name ? 1 : -1))
-  return c.json({ backups: list, enabled: true })
+  const key = c.get('deps').backupKey
+  // Si están cifrados, la huella dice QUÉ llave se usa (la llave nunca se muestra).
+  return c.json({ backups: list, enabled: true, encrypted: !!key, keyFingerprint: key ? await keyFingerprint(key) : null })
 })
 
 admin.post('/admin/backups', async (c) => {
@@ -458,6 +460,25 @@ admin.get('/admin/backups/:name', async (c) => {
   if (!bytes) throw notFound('Ese respaldo ya no existe.')
   audit(c.get('deps').db, c.get('deps').now, { businessId: null, userId: c.get('admin').id, action: 'admin.descarga_respaldo', newValue: { name } })
   return new Response(bytes as unknown as BodyInit, { status: 200, headers: { 'content-type': name.endsWith('.enc') ? 'application/octet-stream' : 'application/gzip', 'content-disposition': `attachment; filename="${name}"` } })
+})
+
+/**
+ * Recuperación: carga un respaldo descargado en esta base, SOLO si está vacía (sin negocios).
+ * Se usa en un objeto nuevo (DB_OBJECT) o en un ensayo; nunca mezcla ni sobrescribe datos.
+ */
+admin.post('/admin/restore', async (c) => {
+  const deps = c.get('deps')
+  const bytes = new Uint8Array(await c.req.arrayBuffer())
+  if (!bytes.length) throw bad('Envía el archivo del respaldo.')
+  if (bytes.length > 50 * 1024 * 1024) throw bad('El respaldo pasa de 50 MB; restáuralo con el script local.')
+  let r: { tables: number; rows: number }
+  try {
+    r = importAll(deps.db, await readBackup(bytes, deps.backupKey))
+  } catch (e) {
+    throw bad((e as Error).message, 'restauracion_rechazada')
+  }
+  audit(deps.db, deps.now, { businessId: null, userId: c.get('admin').id, action: 'admin.restauracion', newValue: { ...r, bytes: bytes.length } })
+  return c.json(r, 201)
 })
 
 /** Cambiar la contraseña propia del super panel (cierra las demás sesiones). */

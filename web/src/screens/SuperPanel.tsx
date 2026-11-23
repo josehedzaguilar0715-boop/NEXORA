@@ -335,8 +335,9 @@ function Espacio() {
 function Respaldos() {
   const [list, setList] = useState<{ name: string; size: number }[]>([])
   const [enabled, setEnabled] = useState(true)
+  const [crypt, setCrypt] = useState<{ encrypted: boolean; keyFingerprint: string | null } | null>(null)
   const [msg, setMsg] = useState('')
-  const load = () => adm('GET', '/admin/backups').then((r) => { setList(r.backups); setEnabled(r.enabled) }).catch((e) => setMsg(e.message))
+  const load = () => adm('GET', '/admin/backups').then((r) => { setList(r.backups); setEnabled(r.enabled); setCrypt({ encrypted: !!r.encrypted, keyFingerprint: r.keyFingerprint ?? null }) }).catch((e) => setMsg(e.message))
   useEffect(() => { void load() }, [])
   const download = async (name: string) => {
     const res = await fetch(`/api/admin/backups/${name}`, { headers: { authorization: `Bearer ${localStorage.getItem(TOKEN)}` } })
@@ -347,6 +348,9 @@ function Respaldos() {
   return (
     <>
       <p className="muted">Se hace uno solo cada noche (3:17 a. m.) y se guardan 30 días. Si hay correo configurado, también te llega a tu correo.</p>
+      {crypt && (crypt.encrypted
+        ? <p className="okmsg">🔒 Cifrados. Huella de la llave activa: <b>{crypt.keyFingerprint}</b>. Debe coincidir con la de la llave que guardaste (<code>npm run backup:key -- --huella</code>).</p>
+        : <p className="error">Sin cifrar: los respaldos tienen teléfonos y ventas en claro. Para activarlo, ver docs/modernizacion/12-respaldos-y-recuperacion.md.</p>)}
       {enabled && <p><button className="primary" onClick={async () => { try { const r = await adm('POST', '/admin/backups'); setMsg(`Respaldo listo: ${r.name}${r.emailed ? ' (enviado a tu correo)' : ''}`); void load() } catch (e) { setMsg((e as Error).message) } }}>Respaldar ahora</button></p>}
       {msg && <p className="muted">{msg}</p>}
       <div className="table-wrap"><table className="list"><tbody>{list.map((b) => (

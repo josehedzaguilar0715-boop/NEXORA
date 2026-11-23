@@ -55,6 +55,60 @@ export async function decryptBackup(bytes: Uint8Array, keyB64: string): Promise<
   return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(bytes.subarray(4, 16)) }, await keyFrom(keyB64), new Uint8Array(bytes.subarray(16))))
 }
 
+/** Huella de la llave (12 caracteres): permite confirmar QUÉ llave está activa sin mostrarla. */
+export async function keyFingerprint(keyB64: string): Promise<string> {
+  const raw = Uint8Array.from(atob(keyB64.trim()), (ch) => ch.charCodeAt(0))
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', raw))
+  return [...h.slice(0, 6)].map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase().replace(/(.{4})(?=.)/g, '$1-')
+}
+
+type BackupData = { version: number; tables: Record<string, Record<string, unknown>[]> }
+
+/** Abre un respaldo (cifrado o no, comprimido o no) y devuelve su contenido. */
+export async function readBackup(bytes: Uint8Array, keyB64?: string): Promise<BackupData> {
+  let b = bytes
+  if (isEncrypted(b)) {
+    if (!keyB64) throw new Error('Este respaldo está cifrado y no hay llave (BACKUP_KEY).')
+    b = await decryptBackup(b, keyB64)
+  }
+  if (b[0] === 0x1f && b[1] === 0x8b) b = new Uint8Array(await new Response(new Blob([new Uint8Array(b)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
+  const data = JSON.parse(new TextDecoder().decode(b)) as BackupData
+  if (typeof data.version !== 'number' || !data.tables || typeof data.tables !== 'object') throw new Error('El archivo no es un respaldo de NEXORA.')
+  return data
+}
+
+/**
+ * Carga un respaldo completo en una base **vacía** (sin negocios). Nunca mezcla ni sobrescribe datos existentes:
+ * es para recuperar en un objeto nuevo o ensayar la recuperación. Todo o nada (una transacción).
+ */
+export function importAll(db: Db, data: BackupData): { tables: number; rows: number } {
+  const current = (db.prepare('SELECT MAX(version) v FROM _migrations').get() as { v: number }).v
+  if (data.version > current) throw new Error(`El respaldo es de una versión más nueva (${data.version}) que este código (${current}).`)
+  const n = (db.prepare('SELECT COUNT(*) n FROM businesses').get() as { n: number }).n
+  if (n > 0) throw new Error(`Esta base ya tiene ${n} negocios: solo se restaura en una base vacía, para no mezclar ni sobrescribir datos.`)
+  const known = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((r) => r.name))
+  let tables = 0, rows = 0
+  db.transaction(() => {
+    // Las referencias entre tablas se revisan al final (el respaldo viene en orden alfabético).
+    db.pragma('defer_foreign_keys = ON')
+    for (const [table, list] of Object.entries(data.tables)) {
+      if (table === '_migrations' || !list.length || !known.has(table)) continue
+      const cols = Object.keys(list[0]!)
+      const stmt = db.prepare(`INSERT OR REPLACE INTO "${table}" (${cols.map((c) => `"${c}"`).join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
+      for (const r of list) stmt.run(...cols.map((c) => r[c] ?? null))
+      tables++; rows += list.length
+    }
+    // Si el objeto nuevo creó su usuario de soporte al arrancar y el respaldo trae uno con el mismo nombre,
+    // el del respaldo lo reemplaza: las sesiones y códigos de acceso de ese usuario reemplazado (del objeto
+    // vacío, no de ningún negocio) quedan sin dueño y se quitan. Hay que volver a entrar al super panel.
+    db.prepare('DELETE FROM admin_sessions WHERE admin_id NOT IN (SELECT id FROM admins)').run()
+    db.prepare('DELETE FROM admin_challenges WHERE admin_id NOT IN (SELECT id FROM admins)').run()
+    const broken = db.pragma('foreign_key_check') as { table: string; parent: string }[]
+    if (broken.length) throw new Error(`El respaldo tiene ${broken.length} referencias rotas (${[...new Set(broken.map((b) => `${b.table}→${b.parent}`))].join(', ')}); no se cargó nada.`)
+  })()
+  return { tables, rows }
+}
+
 const toBase64 = (bytes: Uint8Array) => {
   let s = ''
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
@@ -81,6 +135,6 @@ export async function runBackup(deps: Deps, store: BackupStore, reason = 'autom�
       if (ok !== false) emailed++
     }
   }
-  audit(db, now, { businessId: null, userId: null, action: 'sistema.respaldo', newValue: { name, bytes: bytes.length, emailed, reason, encrypted: !!deps.backupKey } })
+  audit(db, now, { businessId: null, userId: null, action: 'sistema.respaldo', newValue: { name, bytes: bytes.length, emailed, reason, encrypted: !!deps.backupKey, ...(deps.backupKey ? { keyFingerprint: await keyFingerprint(deps.backupKey) } : {}) } })
   return { name, bytes: bytes.length, emailed }
 }

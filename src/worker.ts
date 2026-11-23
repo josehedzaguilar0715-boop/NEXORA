@@ -85,6 +85,12 @@ function decoded(key: string, b64: string): Uint8Array<ArrayBuffer> {
   return bytes
 }
 
+/**
+ * Objeto de datos con el que trabaja este Worker. Siempre «principal» (producción y staging hoy).
+ * DB_OBJECT solo se usa para ensayar una recuperación en un objeto vacío aparte, sin tocar el principal.
+ */
+const objectName = (env: Env) => (typeof env.DB_OBJECT === 'string' && /^[a-z0-9-]{3,40}$/.test(env.DB_OBJECT) ? env.DB_OBJECT : 'principal')
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url)
@@ -95,7 +101,7 @@ export default {
       // el cliente no la puede inventar. La usa el límite de intentos por IP.
       const inner = new Request(url, req)
       inner.headers.set('x-nexora-ip', req.headers.get('cf-connecting-ip') ?? '')
-      return withSecurityHeaders(await env.NEXORA.get(env.NEXORA.idFromName('principal')).fetch(inner))
+      return withSecurityHeaders(await env.NEXORA.get(env.NEXORA.idFromName(objectName(env))).fetch(inner))
     }
     // Pantallas: archivo exacto o, si no existe, la app (rutas como /admin o /reservar/…).
     const key = ASSETS[url.pathname] ? url.pathname : '/index.html'
@@ -107,7 +113,7 @@ export default {
 
   /** Cron diario: respaldo de toda la base. */
   async scheduled(_event: unknown, env: Env): Promise<void> {
-    const r = await env.NEXORA.get(env.NEXORA.idFromName('principal')).fetch(new Request('https://interno/__interno/respaldo', { method: 'POST' }))
+    const r = await env.NEXORA.get(env.NEXORA.idFromName(objectName(env))).fetch(new Request('https://interno/__interno/respaldo', { method: 'POST' }))
     console.log(`[respaldo] ${r.status} ${await r.text()}`)
   },
 }
