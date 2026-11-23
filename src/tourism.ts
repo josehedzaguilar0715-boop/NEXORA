@@ -304,7 +304,7 @@ publicTourism.get('/public/tickets-shop/:code', (c) => {
   const date = c.req.query('date') ?? localDate(now())
   const types = db.prepare("SELECT id, name, price FROM services WHERE business_id = ? AND active = 1 AND category = 'boleto' ORDER BY price DESC").all(b.id)
   const slots = slotsFor(db, b.id, date).filter((s) => !s.closed && localToIso(date, s.end) > iso(now())).map(({ start, end, available }) => ({ start, end, available }))
-  return c.json({ business: { name: b.name, phone: b.phone }, date, types, slots })
+  return c.json({ business: { name: b.name, phone: b.phone, giro: b.giro }, date, types, slots })
 })
 
 publicTourism.post('/public/tickets-shop/:code', async (c) => {
@@ -326,9 +326,9 @@ publicTourism.post('/public/tickets-shop/:code', async (c) => {
 
 publicTourism.get('/public/tickets/:token', (c) => {
   const { db } = c.get('deps')
-  const rows = db.prepare('SELECT t.code, t.type_name AS type, t.date, t.start, t.status, b.name AS business FROM entry_tickets t JOIN businesses b ON b.id = t.business_id WHERE t.order_token = ?').all(c.req.param('token')) as { business: string }[]
+  const rows = db.prepare('SELECT t.code, t.type_name AS type, t.date, t.start, t.status, b.name AS business, b.giro FROM entry_tickets t JOIN businesses b ON b.id = t.business_id WHERE t.order_token = ?').all(c.req.param('token')) as { business: string; giro: string }[]
   if (!rows.length) throw notFound('No se encontró esa compra.')
-  return c.json({ business: rows[0]!.business, tickets: rows.map(({ business: _, ...r }) => r) })
+  return c.json({ business: rows[0]!.business, giro: (rows[0] as { giro?: string }).giro, tickets: rows.map(({ business: _, giro: __, ...r }) => r) })
 })
 
 /** QR de entrada de cada boleto. */

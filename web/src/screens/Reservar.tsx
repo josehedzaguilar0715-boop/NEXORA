@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { applyPublicProduct } from '../products'
 import { api, h12, mxn } from '../api'
 import { confirmAsk } from '../Dialog'
 
@@ -11,7 +12,7 @@ export function Reservar({ code }: { code: string }) {
   const [f, setF] = useState({ serviceIds: [] as string[], staffId: 'any', date: today(), time: '', name: '', phone: '' })
   const [slots, setSlots] = useState<string[]>([])
   const [err, setErr] = useState('')
-  useEffect(() => { api('GET', `/public/book/${code}`).then(setInfo).catch((e) => setErr(e.message)) }, [code])
+  useEffect(() => { api<any>('GET', `/public/book/${code}`).then((r) => { applyPublicProduct(r.business?.giro); setInfo(r) }).catch((e) => setErr(e.message)) }, [code])
   useEffect(() => {
     if (!f.serviceIds.length) return setSlots([])
     api<any>('GET', `/public/book/${code}/availability?date=${f.date}&serviceIds=${f.serviceIds.join(',')}&staffId=${f.staffId}`).then((r) => setSlots(r.slots)).catch(() => setSlots([]))
@@ -53,7 +54,7 @@ export function Reservar({ code }: { code: string }) {
 export function EstadoCita({ token }: { token: string }) {
   const [d, setD] = useState<any>(null)
   const [err, setErr] = useState('')
-  const load = () => api('GET', `/public/appointments/${token}`).then(setD).catch((e) => setErr(e.message))
+  const load = () => api<any>('GET', `/public/appointments/${token}`).then((r) => { applyPublicProduct(r.business?.giro); setD(r) }).catch((e) => setErr(e.message))
   useEffect(() => { void load() }, [token])
   if (!d) return <main className="login">{err ? <p className="error">{err}</p> : <p className="muted">Cargando…</p>}</main>
   const a = d.appointment

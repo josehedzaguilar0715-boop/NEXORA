@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { applyPublicProduct } from '../products'
 import { api } from '../api'
 import { closeDay } from './Lealtad'
 
@@ -18,7 +19,7 @@ export function MiTarjeta({ code }: { code: string }) {
   const [err, setErr] = useState('')
   const [camp, setCamp] = useState<any>(null)
   useEffect(() => {
-    api('GET', `/public/loyalty/${encodeURIComponent(code)}`).then(setD).catch((e) => setErr(e.message))
+    api<any>('GET', `/public/loyalty/${encodeURIComponent(code)}`).then((r) => { applyPublicProduct(r.giro); setD(r) }).catch((e) => setErr(e.message))
     api<any>('GET', `/public/loyalty/${encodeURIComponent(code)}/campaign`).then((r) => setCamp(r.campaign)).catch(() => {})
   }, [code])
   if (!d) return <main className="login">{err ? <p className="error">{err}</p> : <p className="muted">Cargando…</p>}</main>

@@ -33,8 +33,8 @@ export function ensurePublicSlug(db: Db, businessId: string): string {
 /** Busca el negocio de un enlace público: por identificador público o (enlaces viejos) por código. */
 export function findPublicBusiness(db: Db, codeOrSlug: string) {
   const v = codeOrSlug.trim()
-  return db.prepare('SELECT id, name, phone, status FROM businesses WHERE public_slug = ? OR code = ? LIMIT 1').get(v.toLowerCase(), v.toUpperCase()) as
-    { id: string; name: string; phone: string | null; status: string } | undefined
+  return db.prepare('SELECT id, name, phone, status, giro FROM businesses WHERE public_slug = ? OR code = ? LIMIT 1').get(v.toLowerCase(), v.toUpperCase()) as
+    { id: string; name: string; phone: string | null; status: string; giro: string } | undefined
 }
 
 /** Nombre que ve el público de quien atiende: nombre e inicial del apellido («Luis P.»). */

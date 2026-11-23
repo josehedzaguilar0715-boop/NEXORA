@@ -140,13 +140,13 @@ publicCommon.get('/public/qr/:code', async (c) => {
 /** Tarjeta de sellos/puntos que el cliente ve en su teléfono con su código (sin iniciar sesión). Solo lectura. */
 publicCommon.get('/public/loyalty/:code', (c) => {
   const { db } = c.get('deps')
-  const cu = db.prepare('SELECT c.id, c.name, c.business_id, c.loyalty_enrolled, b.name AS business, b.logo_url FROM customers c JOIN businesses b ON b.id = c.business_id WHERE c.code = ? AND c.active = 1').get(c.req.param('code').toUpperCase()) as { id: string; name: string; business_id: string; loyalty_enrolled: number; business: string; logo_url: string | null } | undefined
+  const cu = db.prepare('SELECT c.id, c.name, c.business_id, c.loyalty_enrolled, b.name AS business, b.logo_url, b.giro FROM customers c JOIN businesses b ON b.id = c.business_id WHERE c.code = ? AND c.active = 1').get(c.req.param('code').toUpperCase()) as { id: string; name: string; business_id: string; loyalty_enrolled: number; business: string; logo_url: string | null; giro: string } | undefined
   if (!cu) throw notFound('No encontramos esa tarjeta.')
   const p = moduleOn(db, cu.business_id, 'fidelidad') ? program(db, cu.business_id) : undefined
   if (!p || !eligible(p, cu)) throw notFound('Este negocio no tiene tarjeta de sellos para ti.')
   const history = db.prepare("SELECT l.delta, l.reason, l.created_at AS at, r.name AS reward FROM loyalty_ledger l LEFT JOIN loyalty_rewards r ON r.id = l.reward_id WHERE l.customer_id = ? ORDER BY l.created_at DESC, l.rowid DESC LIMIT 20").all(cu.id)
   return c.json({
-    business: cu.business, logoUrl: cu.logo_url, name: cu.name.split(' ')[0], unit: p.unit, earnBy: p.earn_by, earnPoints: p.earn_points, dailyCap: p.daily_cap,
+    business: cu.business, giro: cu.giro, logoUrl: cu.logo_url, name: cu.name.split(' ')[0], unit: p.unit, earnBy: p.earn_by, earnPoints: p.earn_points, dailyCap: p.daily_cap,
     balance: balanceOf(db, cu.id),
     rewards: db.prepare('SELECT name, cost FROM loyalty_rewards WHERE business_id = ? AND active = 1 ORDER BY cost').all(cu.business_id),
     history,

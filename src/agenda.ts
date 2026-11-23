@@ -312,7 +312,7 @@ publicAgenda.get('/public/book/:code', (c) => {
   const { db } = c.get('deps')
   const b = publicBusiness(c)
   const services = (db.prepare('SELECT id, name, price, category FROM services WHERE business_id = ? AND active = 1 ORDER BY category, name').all(b.id) as { id: string }[]).map((s) => ({ ...s, duration: serviceDuration(db, s.id) })).filter((s) => s.duration > 0)
-  return c.json({ business: { name: b.name, phone: b.phone }, services, staff: agendaStaff(db, b.id).map((s) => ({ id: s.id, name: publicName(s.name) })) })
+  return c.json({ business: { name: b.name, phone: b.phone, giro: b.giro }, services, staff: agendaStaff(db, b.id).map((s) => ({ id: s.id, name: publicName(s.name) })) })
 })
 
 publicAgenda.get('/public/book/:code/availability', (c) => {
@@ -346,7 +346,7 @@ publicAgenda.get('/public/appointments/:token', (c) => {
   const { db } = c.get('deps')
   const a = db.prepare('SELECT * FROM appointments WHERE public_token = ?').get(c.req.param('token')) as ApptRow | undefined
   if (!a) throw notFound('No se encontró esa reserva.')
-  const biz = db.prepare('SELECT name, phone FROM businesses WHERE id = ?').get(a.business_id)
+  const biz = db.prepare('SELECT name, phone, giro FROM businesses WHERE id = ?').get(a.business_id)
   return c.json({ business: biz, appointment: apptView(db, a, false) })
 })
 

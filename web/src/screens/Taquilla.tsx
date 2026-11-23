@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { applyPublicProduct } from '../products'
 import { ScanButton } from '../Scanner'
 import { api, h12, mxn } from '../api'
 import type { Me } from '../App'
@@ -100,7 +101,7 @@ export function TiendaBoletos({ code }: { code: string }) {
   const [f, setF] = useState({ start: '', name: '', phone: '' })
   const [qty, setQty] = useState<Record<string, number>>({})
   const [err, setErr] = useState('')
-  useEffect(() => { api(`GET`, `/public/tickets-shop/${code}?date=${date}`).then(setInfo).catch((e) => setErr(e.message)) }, [date])
+  useEffect(() => { api<any>(`GET`, `/public/tickets-shop/${code}?date=${date}`).then((r) => { applyPublicProduct(r.business?.giro); setInfo(r) }).catch((e) => setErr(e.message)) }, [date])
   const buy = async () => {
     try {
       const r = await api<any>('POST', `/public/tickets-shop/${code}`, { date, start: f.start, name: f.name, phone: f.phone, items: Object.entries(qty).filter(([, q]) => q > 0).map(([serviceId, quantity]) => ({ serviceId, quantity })) })
@@ -132,7 +133,7 @@ export function TiendaBoletos({ code }: { code: string }) {
 export function MisBoletos({ token }: { token: string }) {
   const [d, setD] = useState<any>(null)
   const [err, setErr] = useState('')
-  useEffect(() => { api('GET', `/public/tickets/${token}`).then(setD).catch((e) => setErr(e.message)) }, [token])
+  useEffect(() => { api<any>('GET', `/public/tickets/${token}`).then((r) => { applyPublicProduct(r.giro); setD(r) }).catch((e) => setErr(e.message)) }, [token])
   if (!d) return <main className="login">{err ? <p className="error">{err}</p> : <p className="muted">Cargando…</p>}</main>
   return (
     <main className="login" style={{ maxWidth: 720 }}>

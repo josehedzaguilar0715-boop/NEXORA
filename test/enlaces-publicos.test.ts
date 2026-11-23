@@ -56,4 +56,14 @@ describe('enlaces públicos sin datos internos', () => {
     const st = (await (await s.app.request(`/public/appointments/${booked.token}`)).json()) as any
     expect(JSON.stringify(st)).not.toContain('Pérez')
   })
+
+  it('la página pública usa la identidad del negocio (su giro) y no expone su id interno', async () => {
+    const { s, T } = await barberia()
+    const { slug } = (await s.call('GET', '/business/public-link', { token: T })).json
+    const info = (await (await s.app.request(`/public/book/${slug}`)).json()) as any
+    expect(info.business).toEqual({ name: 'Fénix Barbería', phone: expect.anything(), giro: 'barberia' })
+    const { productOf } = await import('../web/src/products/index.js')
+    expect(productOf(info.business.giro).id).toBe('barber')
+  })
+
 })

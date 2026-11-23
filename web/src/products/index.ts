@@ -105,12 +105,14 @@ export function productOf(giro: string | undefined | null): Product {
 
 const KEY = 'nx_product'
 /** Aplica la identidad visual (también en la pantalla de acceso, recordando la última usada en este equipo). */
-export function applyProduct(p: Product) {
+export function applyProduct(p: Product, remember = true) {
   document.documentElement.dataset.product = p.id
   document.documentElement.style.background = ''
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.themeColor)
-  try { localStorage.setItem(KEY, p.id) } catch { /* sin almacenamiento */ }
+  if (remember) try { localStorage.setItem(KEY, p.id) } catch { /* sin almacenamiento */ }
 }
+/** Páginas públicas (reservar, boletos, tarjeta): el cliente final ve la identidad del negocio, sin cambiar la que recuerda su equipo. */
+export const applyPublicProduct = (giro: string | undefined | null) => { if (giro) applyProduct(productOf(giro), false) }
 export function lastProduct(): Product {
   try { const id = localStorage.getItem(KEY) as ProductId | null; if (id && PRODUCTS[id]) return PRODUCTS[id] } catch { /* sin almacenamiento */ }
   return PRODUCTS.nexora
