@@ -111,6 +111,30 @@ export function todayTasks(db: Db, u: UserRow, now: Date): Task[] {
         items: ready.slice(0, 8).map((x) => ({ label: x.name, sub: `${x.bal} sellos`, phone: x.phone, message: `Hola ${first(x.name)}, ¡ya juntaste ${x.bal} sellos en ${biz}! Ya puedes canjear tu premio en tu próxima visita.` })) })
     }
   }
+  // Primeros pasos (solo el dueño, los primeros 60 días): lo que falta para empezar a vender, según su giro.
+  if (u.role === 'owner') {
+    const created = (db.prepare('SELECT created_at FROM businesses WHERE id = ?').get(b) as { created_at: string }).created_at
+    if (now.getTime() - Date.parse(created) < 60 * 86_400_000) {
+      const count = (sql: string) => (db.prepare(sql).get(b) as { n: number }).n
+      const steps: (TaskItem & { screen: string; done: boolean })[] = []
+      const agenda = has('barberia', 'unas')
+      steps.push({ label: 'Pon tu código de autorización', sub: 'Lo pide el sistema para cancelar, descontar o cambiar precios.', screen: 'usuarios', done: !!(db.prepare('SELECT auth_code_hash FROM users WHERE id = ?').get(u.id) as { auth_code_hash: string | null }).auth_code_hash })
+      if (agenda) {
+        steps.push({ label: 'Da de alta tus servicios', sub: 'Con su precio y duración.', screen: 'configurar', done: count('SELECT COUNT(*) n FROM services WHERE business_id = ? AND active = 1') > 0 })
+        steps.push({ label: `Marca quién atiende citas y su horario`, sub: 'Sin horario no aparecen horas libres.', screen: 'usuarios', done: count('SELECT COUNT(*) n FROM users WHERE business_id = ? AND active = 1 AND in_agenda = 1') > 0 })
+      } else {
+        steps.push({ label: 'Agrega tus productos', sub: 'Uno por uno, con el lector o importando tu lista.', screen: 'productos', done: count('SELECT COUNT(*) n FROM products WHERE business_id = ? AND active = 1') > 0 })
+      }
+      if (has('palapa', 'restaurante')) steps.push({ label: 'Arma tus mesas', sub: 'Para abrir cuentas por mesa.', screen: 'configurar', done: count('SELECT COUNT(*) n FROM dining_tables WHERE business_id = ?') > 0 })
+      steps.push({ label: 'Haz tu primera venta', sub: 'Abre la caja con tu fondo y cobra.', screen: 'caja', done: count("SELECT COUNT(*) n FROM sales WHERE business_id = ? AND status = 'completada'") > 0 })
+      steps.push({ label: 'Da de alta a tu personal (opcional)', sub: 'Cada quien con su usuario y sus permisos.', screen: 'usuarios', done: count('SELECT COUNT(*) n FROM users WHERE business_id = ? AND active = 1') > 1 })
+      const left = steps.filter((s) => !s.done)
+      if (left.length && left.some((s) => !s.label.includes('opcional'))) {
+        tasks.push({ key: 'primeros_pasos', tone: 'info', title: `Primeros pasos: te ${left.length === 1 ? 'falta 1' : `faltan ${left.length}`} de ${steps.length}`, detail: 'Para dejar tu sistema listo. Esto desaparece cuando terminas.', screen: left[0]!.screen,
+          items: left.map(({ label, sub }) => ({ label, sub })) })
+      }
+    }
+  }
   const order = { urgente: 0, aviso: 1, info: 2 }
   return tasks.sort((a, b) => order[a.tone] - order[b.tone])
 }
