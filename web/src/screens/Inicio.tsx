@@ -4,6 +4,8 @@ import { can, FIADO_GIROS, hasGiro, screensFor, toneStyle, type Me } from '../Ap
 import { vocab } from '../giros'
 import { productOf } from '../products'
 import { Estado, type TipoEstado } from '../Estado'
+import { moduloDe } from '../modulos'
+import { LayoutDashboard, Landmark, PiggyBank, Scale, ShoppingCart, TrendingDown, Users } from 'lucide-react'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const day = (d: string) => new Date(`${d}T12:00:00-06:00`).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
@@ -59,8 +61,9 @@ function InicioNegocio({ me }: { me: Me }) {
     <div>
       <div className="dash-head">
         <div>
+          <span className="screen-chip mod-ventas"><LayoutDashboard size={16} aria-hidden />Inicio</span>
           <h1>Hola, {me.user.name.split(' ')[0]}</h1>
-          <p className="muted" style={{ marginTop: -6 }}>{me.business.name}</p>
+          <p className="muted">{me.business.name}</p>
         </div>
         <div className="dash-status">
           <Clock />
@@ -70,71 +73,50 @@ function InicioNegocio({ me }: { me: Me }) {
       {/* Indicadores del día y del mes, comparados contra ayer y contra el mes anterior. */}
       <div className="dash-kpis">
         <div className="card dkpi">
-          <div className="dkpi-top"><span className="dkpi-label">Ventas de hoy</span>{T?.goal ? <GoalRing value={T.sales} goal={T.goal} /> : owner && <button className="link goal-link" onClick={setGoal}>+ Meta</button>}</div>
+          <div className="dkpi-top"><span className="kpi-ic mod-ventas"><ShoppingCart size={18} aria-hidden /></span><span className="dkpi-label">Ventas de hoy</span>{T?.goal ? <GoalRing value={T.sales} goal={T.goal} /> : owner && <button className="link goal-link" onClick={setGoal}>+ Meta</button>}</div>
           <div className="dkpi-value pos">{T ? mxn(T.sales) : '—'}</div>
           <div className="dkpi-sub">{T ? `${T.tickets} ${T.tickets === 1 ? 'venta' : 'ventas'}` : ''}</div>
           {T && <Trend pct={T.vsYesterday} label="vs ayer" />}
           {T?.goal ? <div className="dkpi-sub">Meta {mxn(T.goal)} · {Math.min(999, Math.round((T.sales / T.goal) * 100))}%{owner && <> · <button className="link" onClick={setGoal}>cambiar</button></>}</div> : null}
         </div>
         <div className="card dkpi">
-          <div className="dkpi-top"><span className="dkpi-label">Ingresos del mes</span></div>
+          <div className="dkpi-top"><span className="kpi-ic mod-dinero"><Landmark size={18} aria-hidden /></span><span className="dkpi-label">Ingresos del mes</span></div>
           <div className="dkpi-value">{M ? mxn(M.sales) : '—'}</div>
           {M && <Trend pct={M.vsPrev.sales} label="vs mes anterior" />}
           <Spark data={db?.series.map((x: any) => x.sales) ?? []} color="var(--chart-in)" />
         </div>
         <div className="card dkpi">
-          <div className="dkpi-top"><span className="dkpi-label">Egresos del mes</span></div>
+          <div className="dkpi-top"><span className="kpi-ic mod-reportes"><TrendingDown size={18} aria-hidden /></span><span className="dkpi-label">Egresos del mes</span></div>
           <div className="dkpi-value neg">{M ? mxn(M.out) : '—'}</div>
           {M && <Trend pct={M.vsPrev.out} label="vs mes anterior" inverse />}
           <Spark data={db?.series.map((x: any) => x.out) ?? []} color="var(--chart-out)" />
         </div>
         <div className="card dkpi">
-          <div className="dkpi-top"><span className="dkpi-label">Utilidad del mes</span></div>
+          <div className="dkpi-top"><span className="kpi-ic mod-dinero"><PiggyBank size={18} aria-hidden /></span><span className="dkpi-label">Utilidad del mes</span></div>
           <div className={`dkpi-value ${M && M.profit < 0 ? 'neg' : 'pos'}`}>{M ? mxn(M.profit) : '—'}</div>
           {M && <Trend pct={M.vsPrev.profit} label="vs mes anterior" />}
           <Spark data={db?.series.map((x: any) => x.profit) ?? []} color="var(--chart-profit)" />
         </div>
         {T?.bulk != null && (
           <div className="card dkpi">
-            <div className="dkpi-top"><span className="dkpi-label">{vocab(me).bulk} hoy</span></div>
+            <div className="dkpi-top"><span className="kpi-ic mod-inventario"><Scale size={18} aria-hidden /></span><span className="dkpi-label">{vocab(me).bulk} hoy</span></div>
             <div className="dkpi-value" style={{ color: 'var(--accent)' }}>{mxn(T.bulk)}</div>
             <div className="dkpi-sub">por kilo, litro o metro</div>
           </div>
         )}
         {rec != null && rec > 0 && (
           <div className="card dkpi">
-            <div className="dkpi-top"><span className="dkpi-label">Por cobrar (fiado)</span></div>
+            <div className="dkpi-top"><span className="kpi-ic mod-clientes"><Users size={18} aria-hidden /></span><span className="dkpi-label">Por cobrar (fiado)</span></div>
             <div className="dkpi-value">{mxn(rec)}</div>
             <div className="dkpi-sub"><a href="#/clientes">ver clientes</a></div>
           </div>
         )}
       </div>
-      <Pendientes />
-      {/* Barbería y uñas: lo más importante del día es la agenda. */}
-      {productOf(me.business.giro).home === 'agenda' && <AgendaHoy me={me} />}
-      {/* Ganancia real: lo que de verdad entró, por forma de pago, menos costos y egresos. */}
-      {R && (
-        <GananciaReal R={R} title="Ganancia real del mes" />
-      )}
-      <QuickActions me={me} />
-      <div className="grid2 dash-grid">
-        <section className="card seccion mod-reportes">
-          <h2>Lo que más ganancia dejó hoy</h2>
-          <div className="table-wrap"><table className="list"><tbody>
-            {db?.topProfit.map((p: any) => <tr key={p.name}><td>{p.name}<br /><small className="muted">{Math.round(p.qty * 1000) / 1000} vendidos · {mxn(p.sales)}</small></td><td className="num pos">{mxn(p.profit)}</td></tr>)}
-            {db && db.topProfit.length === 0 && <tr><td className="muted">Todavía no hay ventas hoy.</td></tr>}
-          </tbody></table></div>
-        </section>
-        <section className="card seccion mod-inventario">
-          <div className="card-head"><h2>Stock bajo</h2>{db?.lowStockCount > 0 && <a className="mini-link" href="#/productos">Armar pedido</a>}</div>
-          <div className="table-wrap"><table className="list"><tbody>
-            {db?.lowStock.map((p: any) => <tr key={p.name}><td>{p.name}</td><td className="num"><span className="stock-badge">{p.stock} {p.unit === 'pieza' ? 'pzas' : p.unit}</span></td></tr>)}
-            {db && db.lowStock.length === 0 && <tr><td className="pos">Todo surtido ✓</td></tr>}
-          </tbody></table></div>
-        </section>
-      </div>
-      <div className="grid2 dash-grid" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
-        <section className="card seccion mod-ventas">
+      <div className="layout2">
+        <div className="col-main">
+          {/* Barbería y uñas: lo más importante del día es la agenda. */}
+          {productOf(me.business.giro).home === 'agenda' && <AgendaHoy me={me} />}
+        <section className="card">
           <div className="card-head"><h2>{periodo === 7 ? 'Ventas de la semana' : 'Ventas de 30 días'}</h2>
             <div className="periodo" role="group" aria-label="Periodo de la gráfica">
               {([7, 30] as const).map((n) => <button key={n} type="button" aria-pressed={periodo === n} className={periodo === n ? 'on' : ''} onClick={() => setPeriodo(n)}>{n === 7 ? '7 días' : '30 días'}</button>)}
@@ -159,7 +141,9 @@ function InicioNegocio({ me }: { me: Me }) {
           </svg>
           <p className="muted">Total de {periodo === 7 ? 'la semana' : 'los 30 días'}: <b style={{ color: 'var(--ink)' }}>{mxn(days.reduce((a, d) => a + d.total, 0))}</b></p>
         </section>
-        <section className="card seccion mod-ventas">
+          {/* Ganancia real: lo que de verdad entró, por forma de pago, menos costos y egresos. */}
+          {R && <GananciaReal R={R} title="Ganancia real del mes" />}
+        <section className="card">
           <h2>Movimientos recientes</h2>
           <div className="table-wrap"><table className="list"><tbody>{moves.map((m, i) => (
             <tr key={i}>
@@ -169,6 +153,25 @@ function InicioNegocio({ me }: { me: Me }) {
           ))}</tbody></table></div>
           {moves.length === 0 && <p className="muted">Todavía no hay movimientos.</p>}
         </section>
+        </div>
+        <div className="col-side">
+          <QuickActions me={me} />
+          <Pendientes />
+        <section className="card">
+          <h2>Lo que más ganancia dejó hoy</h2>
+          <div className="table-wrap"><table className="list"><tbody>
+            {db?.topProfit.map((p: any) => <tr key={p.name}><td>{p.name}<br /><small className="muted">{Math.round(p.qty * 1000) / 1000} vendidos · {mxn(p.sales)}</small></td><td className="num pos">{mxn(p.profit)}</td></tr>)}
+            {db && db.topProfit.length === 0 && <tr><td className="muted">Todavía no hay ventas hoy.</td></tr>}
+          </tbody></table></div>
+        </section>
+        <section className="card">
+          <div className="card-head"><h2>Stock bajo</h2>{db?.lowStockCount > 0 && <a className="mini-link" href="#/productos">Armar pedido</a>}</div>
+          <div className="table-wrap"><table className="list"><tbody>
+            {db?.lowStock.map((p: any) => <tr key={p.name}><td>{p.name}</td><td className="num"><span className="stock-badge">{p.stock} {p.unit === 'pieza' ? 'pzas' : p.unit}</span></td></tr>)}
+            {db && db.lowStock.length === 0 && <tr><td className="pos">Todo surtido ✓</td></tr>}
+          </tbody></table></div>
+        </section>
+        </div>
       </div>
       {goalOpen && <MetaDiaria current={T?.goal ?? null} avg={M?.tickets ? Math.round(M.sales / Math.max(1, Number(T.date.slice(8, 10)))) : 0} onClose={() => setGoalOpen(false)} onSaved={() => { setGoalOpen(false); void load() }} />}
     </div>
@@ -216,15 +219,17 @@ function QuickActions({ me }: { me: Me }) {
   const list = keys.map((k) => allowed.find((s) => s.key === k)).filter((s): s is NonNullable<typeof s> => !!s).slice(0, 6)
   if (!list.length) return null
   return (
+    <section className="card acciones">
+      <h2>Acciones rápidas</h2>
     <div className="quick-actions">
-      {list.map((s) => (
-        <a key={s.key} href={`#/${s.key}`} className="quick-action" style={toneStyle(s.group)}>
-          <span className="qa-icon"><s.icon size={26} strokeWidth={1.9} aria-hidden /></span>
+      {list.map((s, n) => (
+        <a key={s.key} href={`#/${s.key}`} className={`quick-action ${n === 0 ? 'primaria' : ''}`} style={{ '--mc': `var(--m-${moduloDe(s.key)})` } as React.CSSProperties}>
+          <span className={`qa-icon mod-ico mod-${moduloDe(s.key)}`}><s.icon size={22} strokeWidth={2} aria-hidden /></span>
           <b>{s.label}</b>
-          {s.desc && <small>{s.desc}</small>}
         </a>
       ))}
     </div>
+    </section>
   )
 }
 

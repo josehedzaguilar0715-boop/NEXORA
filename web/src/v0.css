@@ -1,0 +1,45 @@
+/* ============================================================================
+   NEXORA · lenguaje visual de v0 (diseno-v0) aplicado a toda la aplicación.
+   Superficies planas con borde fino, jerarquía clara, controles de 48 px, color solo con significado.
+   La identidad de cada producto se conserva en: color de marca (--primary, --cyan), letra de los títulos y logotipo.
+   Se carga al final: iguala o supera la especificidad de products.css (por eso las reglas con :root).
+   ============================================================================ */
+:root body { background: var(--bg); background-attachment: scroll; }
+
+/* Títulos */
+:root h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+:root h2 { font-family: var(--font-body); font-size: 1.15rem; font-weight: 650; letter-spacing: -0.01em; }
+:root h3 { font-size: 1.05rem; font-weight: 650; }
+@media (min-width: 900px) { :root h1 { font-size: 1.7rem; } }
+
+/* Tarjetas: planas, con borde fino y sombra mínima */
+:root .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-sm); padding: 16px; }
+:root .card .card, :root .modal .card .card { box-shadow: none; background: var(--card); }
+:root .dkpi::before, :root .kpi::before { display: none; }
+:root .modal .card { box-shadow: var(--shadow-lg); }
+
+/* Botones: uno principal por pantalla; el resto, blancos con borde */
+:root button, :root a.button { min-height: 48px; padding: 8px 16px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); box-shadow: none; text-shadow: none; font-weight: 600; }
+:root button:hover:not(:disabled), :root a.button:hover { background: var(--input); border-color: var(--line-strong); }
+:root button.primary, :root a.button.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); background-image: none; box-shadow: none; }
+:root button.primary:hover:not(:disabled), :root a.button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+:root button.danger { background: var(--card); color: var(--st-danger); border-color: var(--st-danger-line); background-image: none; }
+:root button.danger:hover:not(:disabled) { background: var(--st-danger-bg); }
+
+/* Campos: 48 px, borde visible, foco claro */
+:root input, :root select, :root textarea { min-height: 48px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--card); box-shadow: none; }
+:root input:focus, :root select:focus, :root textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
+:root input[type=checkbox], :root input[type=radio] { min-height: 0; width: 22px; height: 22px; }
+
+/* Tablas: encabezado discreto, renglones con línea */
+:root table.list th { font-size: max(var(--fs-min), 0.8rem); font-weight: 700; color: var(--muted); text-transform: none; letter-spacing: 0; }
+:root table.list td, :root table.list th { border-bottom: 1px solid var(--line); }
+
+/* Encabezado de pantalla y pestañas de sección */
+:root .page-head { margin: 0 0 14px; }
+:root .page-head h1 { margin-bottom: 6px; }
+:root .portal-tabs { margin: 0 0 16px; }
+:root .portal-tabs a { min-height: 44px; border: 1px solid var(--line); background: var(--card); }
+
+/* Menú anterior (ya no se usa): fuera de la vista */
+.side, .top, .portal-pop { display: none !important; }

@@ -1,0 +1,72 @@
+/* ============================================================================
+   NEXORA · cascarón al estilo v0 (diseno-v0)
+   Barra superior fija con buscador, menú de módulos con iconos de color (computadora)
+   y barra inferior de cinco botones (celular). Todo el color sale de tokens.css.
+   ============================================================================ */
+.app2 { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); }
+.solo-movil, .icon-btn2.solo-movil { display: none; }
+
+/* ---------- Barra superior ---------- */
+.topbar { position: sticky; top: 0; z-index: 30; background: var(--card); border-bottom: 1px solid var(--line); }
+.topbar-in { max-width: 1440px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 14px; }
+.brand2 { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); min-width: 0; flex: 0 0 auto; }
+.brand2-txt { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.brand2-txt b { font-family: var(--font-display); font-size: 1.05rem; letter-spacing: 0.02em; white-space: nowrap; }
+.brand2-txt small { color: var(--muted); font-size: max(var(--fs-min), 0.8rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
+.topbar-search { flex: 1 1 auto; max-width: 560px; margin: 0 auto; min-width: 0; }
+.topbar-search .buscador { margin: 0; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: 0 0 auto; }
+.icon-btn2, .avatar-btn { width: 48px; min-height: 48px; padding: 0; display: grid; place-items: center; border-radius: 12px; background: var(--card); border: 1px solid var(--line); color: var(--ink); }
+.avatar-btn { border-radius: 50%; }
+.topbar-search-movil { padding: 0 16px 12px; }
+.topbar-search-movil .buscador { margin: 0; }
+.topbar .bell-btn svg { width: 22px; height: 22px; }
+.topbar .bell-btn { width: 48px; min-height: 48px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+
+.menu-usuario { position: relative; }
+.menu-usuario-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 50; width: 260px; display: grid; gap: 10px; padding: 14px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: var(--shadow-lg); }
+
+/* ---------- Menú de módulos (computadora) ---------- */
+.shell2 { flex: 1; display: grid; grid-template-columns: 272px minmax(0, 1fr); width: 100%; max-width: 1440px; margin: 0 auto; align-items: start; }
+.rail { position: sticky; top: 73px; max-height: calc(100vh - 73px); overflow-y: auto; padding: 16px 12px 28px 16px; }
+.rail-nav { display: flex; flex-direction: column; gap: 2px; }
+.rail-grupo { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
+.rail-titulo { margin: 0; padding: 0 10px 6px; font-size: max(var(--fs-min), 0.8rem); font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.rail-item { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 5px 10px; border-radius: 12px; text-decoration: none; color: var(--ink); font-weight: 600; font-size: var(--fs-body); border: 1px solid transparent; }
+.rail-item:hover { background: var(--input); }
+.rail-item.on { background: color-mix(in srgb, var(--mc) 10%, var(--card)); border-color: color-mix(in srgb, var(--mc) 32%, var(--card)); }
+.rail-item .mod-ico { width: 36px; height: 36px; }
+.rail-nombre { flex: 1; min-width: 0; }
+.rail-item .nav-badge { margin-left: auto; }
+.shell2 > main { padding: 24px 24px 40px 8px; max-width: none; margin: 0; min-width: 0; }
+
+/* ---------- Barra inferior y hoja «Más» (celular y tableta) ---------- */
+.bottom { display: none; }
+.hoja-fondo { position: fixed; inset: 0; z-index: 60; background: rgba(15, 20, 30, 0.45); display: flex; align-items: flex-end; }
+.hoja { width: 100%; max-height: 88vh; overflow-y: auto; background: var(--card); border-radius: 22px 22px 0 0; padding: 14px 14px calc(18px + env(safe-area-inset-bottom)); box-shadow: var(--shadow-lg); animation: hoja-sube 0.22s var(--ease); }
+@keyframes hoja-sube { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+.hoja-cab { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 8px; font-size: var(--fs-subtitle); }
+.hoja-pie { display: grid; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.hoja .rail-grupo { margin-top: 10px; }
+
+@media (max-width: 899px) {
+  .solo-movil, .icon-btn2.solo-movil { display: grid; }
+  .topbar .pending.ok { display: none; }
+  .topbar-in { gap: 8px; padding: 8px 12px; }
+  .solo-compu { display: none; }
+  .shell2 { grid-template-columns: minmax(0, 1fr); }
+  .rail { display: none; }
+  .topbar-search { display: none; }
+  .brand2-txt small { max-width: 150px; }
+  .shell2 > main { padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); }
+  .bottom { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--card); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+  .bottom ul { list-style: none; margin: 0 auto; padding: 0; display: flex; max-width: 640px; }
+  .bottom li { flex: 1; min-width: 0; }
+:root .bottom-btn { border: 0; background: none; box-shadow: none; }
+  .bottom-btn { width: 100%; min-height: 60px; padding: 4px 2px; border: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none;
+    font: inherit; font-size: max(var(--fs-min), 0.78rem); font-weight: 600; color: var(--muted); border-radius: 12px; }
+  .bottom-ico { position: relative; display: grid; place-items: center; width: 54px; height: 30px; border-radius: 999px; }
+  .bottom-btn.on { color: var(--mc); font-weight: 700; }
+  .bottom-btn.on .bottom-ico { background: color-mix(in srgb, var(--mc) var(--m-bg-mix), var(--card)); }
+  .bottom-ico .nav-badge { position: absolute; top: -4px; right: 2px; min-width: 20px; height: 20px; font-size: 0.7rem; }
+}

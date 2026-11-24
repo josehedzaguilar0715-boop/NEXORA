@@ -11,7 +11,7 @@ import { Buscador } from './Buscador'
 import { MODULOS, moduloDe } from './modulos'
 import {
   Archive, Armchair, Boxes, CalendarDays, ChevronRight, ChartColumn, ChefHat, ClipboardCheck, Clock, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
-  LifeBuoy, LogOut, Menu, Moon, Search, Sun, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
+  LifeBuoy, LogOut, Menu, Moon, Search, Sun, X, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
 } from 'lucide-react'
 
 /**
@@ -267,9 +267,9 @@ function Privada() {
   const [me, setMe] = useState<Me | null>(cache.get<Me | null>('me', null))
   const [checking, setChecking] = useState(!!auth.token)
   const hash = useHash()
-  const [menu, setMenu] = useState(false)
+  const [masAbierto, setMasAbierto] = useState(false)
+  const [buscarMovil, setBuscarMovil] = useState(false)
   const [senalBuscar, setSenalBuscar] = useState(0)
-  const [portal, setPortal] = useState<{ group: string; top: number } | null>(null)
   // Cuántos pendientes hay hoy (se ve junto a «Inicio» desde cualquier pantalla).
   const [pending, setPending] = useState(0)
   const notices = useNotices(me?.user.id)
@@ -279,7 +279,7 @@ function Privada() {
     const load = () => api<{ tasks: { tone: string }[] }>('GET', '/today').then((r) => setPending(r.tasks.filter((t) => t.tone !== 'info').length)).catch(() => {})
     void load(); return everyVisible(load, 120_000)
   }, [me?.user.id, hash])
-  useEffect(() => { setPortal(null) }, [hash])
+  useEffect(() => { setMasAbierto(false); setBuscarMovil(false) }, [hash])
   // Identidad visual del producto de este negocio.
   useEffect(() => { if (me) applyProduct(productOf(me.business.giro)) }, [me?.business.giro])
   // Con la sesión abierta, el resto de las pantallas se descarga en segundo plano (para trabajar sin internet).
@@ -294,13 +294,6 @@ function Privada() {
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
   }, [])
-  useEffect(() => {
-    if (!portal) return
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setPortal(null)
-    const out = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.portal-pop, .portal-btn, .portal-inline')) setPortal(null) }
-    window.addEventListener('keydown', esc); window.addEventListener('mousedown', out)
-    return () => { window.removeEventListener('keydown', esc); window.removeEventListener('mousedown', out) }
-  }, [portal])
 
   useEffect(() => {
     if (!auth.token) return
@@ -332,67 +325,23 @@ function Privada() {
   const current = allowed.find((s) => s.key === hash) ?? (me.user.role === 'staff' ? ['caja', 'cocina', 'agenda'].map((k) => allowed.find((s) => s.key === k)).find(Boolean) : undefined) ?? allowed[0]
   const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'
   return (
-    <div className="app">
-      <header className="top">
-        <button className="menu-btn" aria-label="Abrir menú" onClick={() => setMenu(true)}><Menu size={22} aria-hidden /></button>
-        <Logo size={26} />
-        <span style={{ flex: 1 }} />
-        <button className="menu-btn" aria-label="Buscar" onClick={() => { setMenu(true); setSenalBuscar((v) => v + 1) }}><Search size={22} aria-hidden /></button>
-        <BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} />
-        <PendingBadge />
-      </header>
-      <aside className={`side ${menu ? 'open' : ''}`} onClick={() => setMenu(false)}>
-        <div className="brand"><Logo size={36} /><span className="word-wrap"><span className="word">NEXORA</span>{product.short && <span className="product-name">{product.short}</span>}</span><span style={{ flex: 1 }} /><BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} /></div>
-        <div className="biz">{me.business.name}</div>
-        <div onClick={(e) => e.stopPropagation()}><Buscador pantallas={allowed} rapidas={product.quick} senal={senalBuscar} onIr={(k) => { location.hash = `#/${k}`; setMenu(false) }} /></div>
-        {/* Un permiso no marcado no aparece en pantalla. */}
-        <nav>
-          {allowed.filter((s) => s.group === '').map((s) => (
-            <a key={s.key} href={`#/${s.key}`} style={toneStyle('')} className={current?.key === s.key ? 'on' : ''} aria-current={current?.key === s.key ? 'page' : undefined}>
-              <s.icon size={20} strokeWidth={1.9} aria-hidden />{s.label}{s.key === 'inicio' && pending > 0 && <span className="nav-badge" aria-label={`${pending} pendientes`}>{pending}</span>}
-            </a>
-          ))}
-          {PORTALS.map((p) => {
-            const items = allowed.filter((s) => s.group === p.group)
-            if (!items.length) return null
-            const on = current?.group === p.group
-            const open = portal?.group === p.group
-            // Un portal con una sola opción lleva directo a ella.
-            if (items.length === 1) return (
-              <a key={p.group} href={`#/${items[0]!.key}`} style={toneStyle(p.group)} className={`portal-btn ${on ? 'on' : ''}`}><p.icon size={20} strokeWidth={1.9} aria-hidden />{p.label}</a>
-            )
-            return (
-              <div key={p.group} className="nav-group" style={toneStyle(p.group)}>
-                <button type="button" className={`portal-btn ${on ? 'on' : ''} ${open ? 'open' : ''}`} aria-expanded={open}
-                  onClick={(e) => { e.stopPropagation(); setPortal(open ? null : { group: p.group, top: e.currentTarget.getBoundingClientRect().top }) }}>
-                  <p.icon size={20} strokeWidth={1.9} aria-hidden /><span>{p.label}</span><ChevronRight size={16} aria-hidden className="chev" />
-                </button>
-                {/* En celular el panel se abre debajo del portal, dentro del menú. */}
-                {open && <div className="portal-inline">{items.map((s) => <PortalItem key={s.key} s={s} on={current?.key === s.key} />)}</div>}
-              </div>
-            )
-          })}
-        </nav>
-        <div className="foot">
-          <PendingBadge main />
-          <div className="who"><span className="avatar" aria-hidden>{me.user.name.trim().charAt(0).toUpperCase()}</span><span><b>{me.user.name}</b><small className="muted">{me.user.role === 'owner' ? 'Dueño' : me.user.position === 'encargado' ? 'Encargado' : 'Empleado'}</small></span></div>
-          <ModoBoton />
-          <button className="logout" onClick={logout}><LogOut size={18} aria-hidden />Salir</button>
-        </div>
-      </aside>
-      {portal && (() => {
-        const p = PORTALS.find((x) => x.group === portal.group)!
-        const items = allowed.filter((s) => s.group === portal.group)
-        return (
-          <div className="portal-pop" role="menu" style={{ ...toneStyle(portal.group), top: Math.max(12, Math.min(portal.top - 12, window.innerHeight - 80 - items.length * 64)) }}>
-            <div className="portal-head"><p.icon size={18} aria-hidden />{p.label}</div>
-            {items.map((s) => <PortalItem key={s.key} s={s} on={current?.key === s.key} />)}
+    <div className="app2">
+      <header className="topbar">
+        <div className="topbar-in">
+          <a className="brand2" href="#/inicio" aria-label="Ir al inicio"><Logo size={34} /><span className="brand2-txt"><b>NEXORA{product.short ? ` ${product.short}` : ''}</b><small>{me.business.name}</small></span></a>
+          <div className="topbar-search"><Buscador pantallas={allowed} rapidas={product.quick} senal={senalBuscar} onIr={(k) => { location.hash = `#/${k}`; setMasAbierto(false) }} /></div>
+          <div className="topbar-actions">
+            <button className="icon-btn2 solo-movil" aria-label="Buscar" onClick={() => { setBuscarMovil((v) => !v); setSenalBuscar((v) => v + 1) }}><Search size={22} aria-hidden /></button>
+            <PendingBadge />
+            <BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} />
+            <MenuUsuario me={me} logout={logout} />
           </div>
-        )
-      })()}
-      {avisos && <AvisosPanel data={notices.data} reload={notices.reload} onClose={() => { setAvisos(false); void notices.reload().catch(() => {}) }} />}
-      {notices.toast && !avisos && <NoticeToast n={notices.toast} onClose={notices.closeToast} onOpen={() => { const l = notices.toast?.link; notices.closeToast(); if (l) location.hash = l }} />}
-      <main>
+        </div>
+        {buscarMovil && <div className="topbar-search-movil solo-movil"><Buscador pantallas={allowed} rapidas={product.quick} senal={senalBuscar} onIr={(k) => { location.hash = `#/${k}`; setBuscarMovil(false) }} /></div>}
+      </header>
+      <div className="shell2">
+        <aside className="rail" aria-label="Módulos"><NavModulos allowed={allowed} current={current} pending={pending} /></aside>
+        <main>
         {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
         {me.user.role === 'owner' && !blocked && <RenewNotice b={me.business} />}
         {/* Pantallas del mismo portal a un toque, sin abrir el menú. */}
@@ -407,7 +356,109 @@ function Privada() {
         })()}
         {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <span className={`screen-chip mod-${moduloDe(current.key)}`}><current.icon size={16} aria-hidden />{MODULOS[moduloDe(current.key)].nombre}</span>}</div></header>}
         <Suspense fallback={<ScreenLoading />}>{hash === 'guia-visual' ? <div className="screen-in"><GuiaVisual /></div> : current ? <div key={current.key} className="screen-in"><current.C me={me} /></div> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}</Suspense>
-      </main>
+        </main>
+      </div>
+      <BarraInferior allowed={allowed} current={current} product={product} pending={pending} onMas={() => setMasAbierto(true)} />
+      {masAbierto && <HojaMas allowed={allowed} current={current} pending={pending} me={me} logout={logout} onClose={() => setMasAbierto(false)} />}
+      {avisos && <AvisosPanel data={notices.data} reload={notices.reload} onClose={() => { setAvisos(false); void notices.reload().catch(() => {}) }} />}
+      {notices.toast && !avisos && <NoticeToast n={notices.toast} onClose={notices.closeToast} onOpen={() => { const l = notices.toast?.link; notices.closeToast(); if (l) location.hash = l }} />}
+    </div>
+  )
+}
+
+/** Una opción del menú de módulos: icono de color + nombre. */
+function ItemModulo({ s, on, pending }: { s: Screen; on: boolean; pending: number }) {
+  const m = moduloDe(s.key)
+  return (
+    <a href={`#/${s.key}`} className={`rail-item ${on ? 'on' : ''}`} style={{ '--mc': `var(--m-${m})` } as CSSProperties} aria-current={on ? 'page' : undefined}>
+      <span className={`mod-ico mod-${m}`}><s.icon size={20} strokeWidth={2} aria-hidden /></span>
+      <span className="rail-nombre">{s.label}</span>
+      {s.key === 'inicio' && pending > 0 && <span className="nav-badge" aria-label={`${pending} pendientes`}>{pending}</span>}
+    </a>
+  )
+}
+
+/** Menú de módulos agrupado (computadora y hoja «Más» del celular): todo a la vista, sin menús escondidos. */
+function NavModulos({ allowed, current, pending }: { allowed: Screen[]; current: Screen | undefined; pending: number }) {
+  return (
+    <nav className="rail-nav">
+      {allowed.filter((s) => s.group === '').map((s) => <ItemModulo key={s.key} s={s} on={current?.key === s.key} pending={pending} />)}
+      {PORTALS.map((p) => {
+        const items = allowed.filter((s) => s.group === p.group)
+        if (!items.length) return null
+        return (
+          <div key={p.group} className="rail-grupo" role="group" aria-label={p.label}>
+            <h3 className="rail-titulo">{p.label}</h3>
+            {items.map((s) => <ItemModulo key={s.key} s={s} on={current?.key === s.key} pending={0} />)}
+          </div>
+        )
+      })}
+    </nav>
+  )
+}
+
+/** Barra inferior del celular: lo de todos los días a un toque; el resto en «Más». */
+function BarraInferior({ allowed, current, product, pending, onMas }: { allowed: Screen[]; current: Screen | undefined; product: ReturnType<typeof productOf>; pending: number; onMas: () => void }) {
+  const items: { k: string; label: string; icon: Icon; href: string; on: boolean; mod: string; badge?: number }[] = []
+  const inicio = allowed.find((s) => s.key === 'inicio')
+  if (inicio) items.push({ k: 'inicio', label: 'Inicio', icon: LayoutDashboard, href: '#/inicio', on: current?.key === 'inicio', mod: 'ventas', badge: pending })
+  for (const p of PORTALS.slice(0, 3)) {
+    const its = allowed.filter((s) => s.group === p.group)
+    if (!its.length) continue
+    const meta = product.quick.map((k) => its.find((s) => s.key === k)).find(Boolean) ?? its[0]!
+    items.push({ k: p.group, label: p.label === 'Inventario' ? 'Stock' : p.label, icon: p.icon, href: `#/${meta.key}`, on: current?.group === p.group, mod: moduloDe(meta.key) })
+  }
+  const enMas = !!current && !items.some((i) => i.on)
+  return (
+    <nav className="bottom" aria-label="Navegación principal">
+      <ul>
+        {items.map((i) => (
+          <li key={i.k}>
+            <a href={i.href} className={`bottom-btn ${i.on ? 'on' : ''}`} style={{ '--mc': `var(--m-${i.mod})` } as CSSProperties} aria-current={i.on ? 'page' : undefined}>
+              <span className="bottom-ico"><i.icon size={22} strokeWidth={2} aria-hidden />{!!i.badge && <span className="nav-badge" aria-label={`${i.badge} pendientes`}>{i.badge}</span>}</span>{i.label}
+            </a>
+          </li>
+        ))}
+        <li><button type="button" className={`bottom-btn ${enMas ? 'on' : ''}`} style={{ '--mc': 'var(--m-admin)' } as CSSProperties} onClick={onMas}><span className="bottom-ico"><Menu size={22} strokeWidth={2} aria-hidden /></span>Más</button></li>
+      </ul>
+    </nav>
+  )
+}
+
+/** «Más»: todos los módulos, modo claro/oscuro y salir (celular). */
+function HojaMas({ allowed, current, pending, me, logout, onClose }: { allowed: Screen[]; current: Screen | undefined; pending: number; me: Me; logout: () => void; onClose: () => void }) {
+  return (
+    <div className="hoja-fondo" onClick={onClose}>
+      <div className="hoja" role="dialog" aria-label="Todos los módulos" onClick={(e) => e.stopPropagation()}>
+        <div className="hoja-cab"><b>Todos los módulos</b><button type="button" className="icon-btn2" aria-label="Cerrar" onClick={onClose}><X size={22} aria-hidden /></button></div>
+        <div onClick={onClose}><NavModulos allowed={allowed} current={current} pending={pending} /></div>
+        <div className="hoja-pie"><ModoBoton /><button className="logout" onClick={logout}><LogOut size={18} aria-hidden />Salir</button></div>
+        <p className="muted small" style={{ textAlign: 'center' }}>{me.user.name} · {me.user.role === 'owner' ? 'Dueño' : me.user.position === 'encargado' ? 'Encargado' : 'Empleado'}</p>
+      </div>
+    </div>
+  )
+}
+
+/** Menú de la persona (computadora): nombre, puesto, modo claro/oscuro y salir. */
+function MenuUsuario({ me, logout }: { me: Me; logout: () => void }) {
+  const [abierto, setAbierto] = useState(false)
+  useEffect(() => {
+    if (!abierto) return
+    const fuera = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest('.menu-usuario')) setAbierto(false) }
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setAbierto(false)
+    window.addEventListener('mousedown', fuera); window.addEventListener('keydown', esc)
+    return () => { window.removeEventListener('mousedown', fuera); window.removeEventListener('keydown', esc) }
+  }, [abierto])
+  return (
+    <div className="menu-usuario solo-compu">
+      <button type="button" className="avatar-btn" aria-haspopup="menu" aria-expanded={abierto} aria-label={`Cuenta de ${me.user.name}`} onClick={() => setAbierto((v) => !v)}><span className="avatar" aria-hidden>{me.user.name.trim().charAt(0).toUpperCase()}</span></button>
+      {abierto && (
+        <div className="menu-usuario-pop" role="menu">
+          <div className="who"><span className="avatar" aria-hidden>{me.user.name.trim().charAt(0).toUpperCase()}</span><span><b>{me.user.name}</b><small className="muted">{me.user.role === 'owner' ? 'Dueño' : me.user.position === 'encargado' ? 'Encargado' : 'Empleado'}</small></span></div>
+          <ModoBoton />
+          <button className="logout" onClick={logout}><LogOut size={18} aria-hidden />Salir</button>
+        </div>
+      )}
     </div>
   )
 }
