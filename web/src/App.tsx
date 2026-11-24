@@ -417,9 +417,14 @@ function BarraInferior({ allowed, current, product, pending, onMas }: { allowed:
 
 /** «Más»: todos los módulos, modo claro/oscuro y salir (celular). */
 function HojaMas({ allowed, current, pending, me, logout, onClose }: { allowed: Screen[]; current: Screen | undefined; pending: number; me: Me; logout: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', esc)
+    return () => window.removeEventListener('keydown', esc)
+  }, [onClose])
   return (
     <div className="hoja-fondo" onClick={onClose}>
-      <div className="hoja" role="dialog" aria-label="Todos los módulos" onClick={(e) => e.stopPropagation()}>
+      <div className="hoja" role="dialog" aria-modal="true" aria-label="Todos los módulos" onClick={(e) => e.stopPropagation()}>
         <div className="hoja-cab"><b>Todos los módulos</b><button type="button" className="icon-btn2" aria-label="Cerrar" onClick={onClose}><X size={22} aria-hidden /></button></div>
         <div onClick={onClose}><NavModulos allowed={allowed} current={current} pending={pending} /></div>
         <div className="hoja-pie"><ModoBoton /><button className="logout" onClick={logout}><LogOut size={18} aria-hidden />Salir</button></div>
