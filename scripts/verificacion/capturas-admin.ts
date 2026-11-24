@@ -25,7 +25,11 @@ for (const vp of vps!.split(',')) {
   page.on('pageerror', (e: Error) => errs.push(e.message))
   await page.goto(`${base}/admin`); await page.waitForTimeout(1500)
   for (const tab of ['Resumen', 'Negocios', 'Buzón', 'Alta asistida', 'Demos', 'Ajustes']) {
-    await page.getByRole('link', { name: tab, exact: true }).click(); await page.waitForTimeout(900)
+    const movil = VP[vp]!.width < 900
+    if (!movil) await page.locator('.rail').getByRole('button', { name: tab, exact: true }).click()
+    else if (['Resumen', 'Negocios', 'Buzón'].includes(tab)) await page.locator('.bottom').getByRole('button', { name: tab, exact: true }).click()
+    else { await page.locator('.bottom').getByRole('button', { name: 'Más' }).click(); await page.waitForTimeout(300); await page.locator('.hoja').getByRole('button', { name: tab, exact: true }).click() }
+    await page.waitForTimeout(900)
     await page.screenshot({ path: `${dir}/${vp}-admin-${tab.toLowerCase().replace(/ /g, '-')}-${modo}.png` })
   }
   if (errs.length) console.log('✗', vp, errs[0])

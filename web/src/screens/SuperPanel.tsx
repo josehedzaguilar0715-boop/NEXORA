@@ -3,6 +3,10 @@ import { ApiError, mxn, toCents } from '../api'
 import { downloadUrl, WhatsAppShare } from './Descargar'
 import { Logo } from '../Brand'
 import { GIROS, giroLabel } from '../giros'
+import { Estado, type TipoEstado } from '../Estado'
+import { ModoBoton } from '../ModoBoton'
+import { Activity, AlertTriangle, FlaskConical, Inbox, Landmark, LayoutDashboard, LogOut, Menu, Settings, Store, UserPlus, X } from 'lucide-react'
+import type { CSSProperties } from 'react'
 
 // El super panel tiene su propio acceso, separado del de los negocios.
 const TOKEN = 'nx_admin_token'
@@ -16,21 +20,66 @@ async function adm<T = any>(method: string, path: string, body?: unknown): Promi
 }
 
 const STATUS: Record<string, string> = { prueba: 'Prueba', activo: 'Activo', vencido: 'Vencido', suspendido: 'Suspendido' }
-const COLOR: Record<string, string> = { prueba: '#2563eb', activo: 'var(--ok)', vencido: 'var(--accent)', suspendido: 'var(--danger)' }
 const PLANS: Record<string, string> = { inicial: 'Inicial ($500, 3 usuarios)', crecimiento: 'Crecimiento ($700, 5)', profesional: 'Profesional ($900, 10)' }
+
+type Pestana = 'resumen' | 'negocios' | 'buzon' | 'alta' | 'demos' | 'ajustes'
+/** Módulos del panel: mismo color e icono en el menú, la barra inferior y los encabezados. */
+const PESTANAS: { k: Pestana; label: string; icon: typeof Store; mod: string }[] = [
+  { k: 'resumen', label: 'Resumen', icon: LayoutDashboard, mod: 'reportes' },
+  { k: 'negocios', label: 'Negocios', icon: Store, mod: 'clientes' },
+  { k: 'buzon', label: 'Buzón', icon: Inbox, mod: 'ventas' },
+  { k: 'alta', label: 'Alta asistida', icon: UserPlus, mod: 'agenda' },
+  { k: 'demos', label: 'Demos', icon: FlaskConical, mod: 'inventario' },
+  { k: 'ajustes', label: 'Ajustes', icon: Settings, mod: 'admin' },
+]
 
 export function SuperPanel() {
   const [logged, setLogged] = useState(!!localStorage.getItem(TOKEN))
-  const [tab, setTab] = useState<'resumen' | 'negocios' | 'buzon' | 'alta' | 'demos' | 'ajustes'>('resumen')
+  const [tab, setTab] = useState<Pestana>('resumen')
+  const [mas, setMas] = useState(false)
+  useEffect(() => { document.documentElement.dataset.product = document.documentElement.dataset.product ?? 'nexora' }, [])
   if (!logged) return <AdminLogin onLogin={() => setLogged(true)} />
+  const salir = () => { localStorage.removeItem(TOKEN); setLogged(false) }
+  const ir = (k: Pestana) => { setTab(k); setMas(false); window.scrollTo({ top: 0 }) }
+  const actual = PESTANAS.find((p) => p.k === tab)!
+  const item = (p: (typeof PESTANAS)[number]) => (
+    <button key={p.k} type="button" className={`rail-item ${tab === p.k ? 'on' : ''}`} style={{ '--mc': `var(--m-${p.mod})` } as CSSProperties} aria-current={tab === p.k ? 'page' : undefined} onClick={() => ir(p.k)}>
+      <span className={`mod-ico mod-${p.mod}`}><p.icon size={20} strokeWidth={2} aria-hidden /></span><span className="rail-nombre">{p.label}</span>
+    </button>
+  )
+  const baja = PESTANAS.slice(0, 3)
   return (
-    <div className="admin-app">
-      <header className="adminbar">
-        <span className="brand" style={{ padding: 0 }}><Logo size={28} /><span className="word">NEXORA</span><span className="muted" style={{ letterSpacing: 0, fontWeight: 600 }}>Super panel</span></span>
-        <nav>{(['resumen', 'negocios', 'buzon', 'alta', 'demos', 'ajustes'] as const).map((k) => <a key={k} href="#" className={tab === k ? 'on' : ''} onClick={(e) => { e.preventDefault(); setTab(k) }}>{{ resumen: 'Resumen', negocios: 'Negocios', buzon: 'Buzón', alta: 'Alta asistida', demos: 'Demos', ajustes: 'Ajustes' }[k]}</a>)}</nav>
-        <button onClick={() => { localStorage.removeItem(TOKEN); setLogged(false) }}>Salir</button>
+    <div className="app2 admin2">
+      <header className="topbar">
+        <div className="topbar-in">
+          <span className="brand2"><Logo size={34} /><span className="brand2-txt"><b>NEXORA</b><small>Super panel · soporte</small></span></span>
+          <div className="topbar-actions solo-compu"><span style={{ width: 190 }}><ModoBoton /></span><button type="button" className="logout" onClick={salir}><LogOut size={18} aria-hidden />Salir</button></div>
+        </div>
       </header>
-      <main>{tab === 'resumen' ? <Resumen /> : tab === 'negocios' ? <Negocios /> : tab === 'buzon' ? <BuzonAdmin /> : tab === 'alta' ? <Alta onDone={() => setTab('negocios')} /> : tab === 'demos' ? <Demos /> : <AjustesAdmin />}</main>
+      <div className="shell2">
+        <aside className="rail" aria-label="Módulos del panel"><nav className="rail-nav">{PESTANAS.map(item)}</nav></aside>
+        <main>
+          <header className="page-head"><div><span className={`screen-chip mod-${actual.mod}`}><actual.icon size={16} aria-hidden />{actual.label}</span><h1>{actual.label}</h1></div></header>
+          {tab === 'resumen' ? <Resumen /> : tab === 'negocios' ? <Negocios /> : tab === 'buzon' ? <BuzonAdmin /> : tab === 'alta' ? <Alta onDone={() => setTab('negocios')} /> : tab === 'demos' ? <Demos /> : <AjustesAdmin />}
+        </main>
+      </div>
+      <nav className="bottom" aria-label="Navegación del panel">
+        <ul>
+          {baja.map((p) => (
+            <li key={p.k}><button type="button" className={`bottom-btn ${tab === p.k ? 'on' : ''}`} style={{ '--mc': `var(--m-${p.mod})` } as CSSProperties} aria-current={tab === p.k ? 'page' : undefined} onClick={() => ir(p.k)}><span className="bottom-ico"><p.icon size={22} strokeWidth={2} aria-hidden /></span>{p.label}</button></li>
+          ))}
+          <li><button type="button" className={`bottom-btn ${!baja.some((p) => p.k === tab) ? 'on' : ''}`} style={{ '--mc': 'var(--m-admin)' } as CSSProperties} onClick={() => setMas(true)}><span className="bottom-ico"><Menu size={22} strokeWidth={2} aria-hidden /></span>Más</button></li>
+        </ul>
+      </nav>
+      {mas && (
+        <div className="hoja-fondo" onClick={() => setMas(false)}>
+          <div className="hoja" role="dialog" aria-label="Todos los módulos" onClick={(e) => e.stopPropagation()}>
+            <div className="hoja-cab"><b>Todos los módulos</b><button type="button" className="icon-btn2" aria-label="Cerrar" onClick={() => setMas(false)}><X size={22} aria-hidden /></button></div>
+            <nav className="rail-nav">{PESTANAS.map(item)}</nav>
+            <div className="hoja-pie"><ModoBoton /><button type="button" className="logout" onClick={salir}><LogOut size={18} aria-hidden />Salir</button></div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -50,11 +99,11 @@ function Resumen() {
   )
   return (
     <div className="stack">
-      <div className="kpis">
-        <div className="card kpi" style={{ display: 'grid', gap: 4 }}><span className="muted">Ingreso mensual (pagando)</span><b className="value">{mxn(m.mrr)}</b></div>
-        <div className="card kpi" style={{ display: 'grid', gap: 4 }}><span className="muted">Negocios</span><b className="value">{m.total}</b><small className="muted">{m.byStatus.activo} activos · {m.byStatus.prueba} en prueba · {m.byStatus.gratis} gratis</small></div>
-        <div className="card kpi" style={{ display: 'grid', gap: 4 }}><span className="muted">Usaron el sistema (7 días)</span><b className="value">{m.usedLast7Days}</b><small className="muted">nuevos este mes: {m.newThisMonth}</small></div>
-        <div className="card kpi" style={{ display: 'grid', gap: 4 }}><span className="muted">Vencidos</span><b className="value">{m.byStatus.vencido}</b><small className="muted">suspendidos: {m.byStatus.suspendido}</small></div>
+      <div className="dash-kpis">
+        <div className="card dkpi"><div className="dkpi-top"><span className="kpi-ic mod-dinero"><Landmark size={18} aria-hidden /></span><span className="dkpi-label">Ingreso mensual (pagando)</span></div><div className="dkpi-value pos">{mxn(m.mrr)}</div></div>
+        <div className="card dkpi"><div className="dkpi-top"><span className="kpi-ic mod-clientes"><Store size={18} aria-hidden /></span><span className="dkpi-label">Negocios</span></div><div className="dkpi-value">{m.total}</div><div className="dkpi-sub">{m.byStatus.activo} activos · {m.byStatus.prueba} en prueba · {m.byStatus.gratis} gratis</div></div>
+        <div className="card dkpi"><div className="dkpi-top"><span className="kpi-ic mod-ventas"><Activity size={18} aria-hidden /></span><span className="dkpi-label">Usaron el sistema (7 días)</span></div><div className="dkpi-value">{m.usedLast7Days}</div><div className="dkpi-sub">nuevos este mes: {m.newThisMonth}</div></div>
+        <div className="card dkpi"><div className="dkpi-top"><span className="kpi-ic mod-reportes"><AlertTriangle size={18} aria-hidden /></span><span className="dkpi-label">Vencidos</span></div><div className={`dkpi-value ${m.byStatus.vencido ? 'neg' : ''}`}>{m.byStatus.vencido}</div><div className="dkpi-sub">suspendidos: {m.byStatus.suspendido}</div></div>
       </div>
       {list('Pruebas que terminan en 7 días', m.trialsEnding, (r) => day(r.trialEndsAt))}
       {list('Mensualidades por vencer (7 días)', m.renewalsDue, (r) => `${day(r.paidUntil)} · ${mxn(r.monthlyFee)}`)}
@@ -93,6 +142,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
 function Negocios() {
   const [list, setList] = useState<any[]>([])
   const [filter, setFilter] = useState('')
+  const [q, setQ] = useState('')
   const [sel, setSel] = useState<any>(null)
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = async () => { const r = await adm('GET', `/admin/businesses${filter ? `?status=${filter}` : ''}`); setList(r.businesses); if (sel) setSel(r.businesses.find((b: any) => b.id === sel.id) ?? null) }
@@ -101,11 +151,13 @@ function Negocios() {
   return (
     <div className="grid2">
       <section className="card">
-        <div className="tabs">{['', 'prueba', 'activo', 'vencido', 'suspendido', 'gratis'].map((s) => <button key={s} className={filter === s ? 'on' : ''} onClick={() => setFilter(s)}>{s === 'gratis' ? 'Gratis' : s ? STATUS[s] : 'Todos'}</button>)}</div>
-        <div className="table-wrap"><table className="list"><tbody>{list.map((b) => (
+        <label className="sr-only" htmlFor="buscar-negocio">Buscar negocio</label>
+        <input id="buscar-negocio" type="search" placeholder="Buscar negocio, código o dueño…" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 10 }} />
+        <div className="periodo filtros" role="group" aria-label="Estado">{['', 'prueba', 'activo', 'vencido', 'suspendido', 'gratis'].map((s) => <button key={s} type="button" aria-pressed={filter === s} className={filter === s ? 'on' : ''} onClick={() => setFilter(s)}>{s === 'gratis' ? 'Gratis' : s ? STATUS[s] : 'Todos'}</button>)}</div>
+        <div className="table-wrap"><table className="list"><tbody>{list.filter((b) => !q.trim() || `${b.name} ${b.code} ${b.owner?.name ?? ''} ${b.owner?.phone ?? ''}`.toLowerCase().includes(q.trim().toLowerCase())).map((b) => (
           <tr key={b.id} onClick={() => setSel(b)} style={{ cursor: 'pointer' }}>
             <td><b>{b.name}</b> <small className="muted">{b.code} · {(b.giros ?? [b.giro]).map(giroLabel).join(' + ')}</small><br /><small className="muted">{b.owner?.name} · {b.owner?.phone}{b.unreadTickets ? ` · ✉ ${b.unreadTickets}` : ''}</small></td>
-            <td style={{ color: b.free ? 'var(--cyan)' : COLOR[b.status], fontWeight: 700 }}>{b.free ? 'Gratis' : STATUS[b.status]}{!b.free && b.overdueDays != null ? ` (${b.overdueDays} d)` : ''}</td>
+            <td>{(() => { const tp: TipoEstado = b.free ? 'info' : b.status === 'activo' ? 'ok' : b.status === 'suspendido' ? 'danger' : b.status === 'vencido' ? 'warn' : 'info'; return <Estado tipo={tp}>{b.free ? 'Gratis' : STATUS[b.status]}{!b.free && b.overdueDays != null ? ` (${b.overdueDays} d)` : ''}</Estado> })()}</td>
             <td className="num">{b.free ? '—' : mxn(b.monthlyFee)}</td>
           </tr>
         ))}</tbody></table></div>

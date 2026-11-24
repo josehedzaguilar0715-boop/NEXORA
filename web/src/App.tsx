@@ -6,7 +6,7 @@ import { Inicio } from './screens/Inicio'
 import { Intro, Logo } from './Brand'
 import { Login } from './screens/Login'
 import { GuiaVisual } from './screens/GuiaVisual'
-import { cambiarModo, modoActual, suscribirModo } from './tema'
+import { ModoBoton } from './ModoBoton'
 import { Buscador } from './Buscador'
 import { MODULOS, moduloDe } from './modulos'
 import {
@@ -161,17 +161,6 @@ const SCREENS: Screen[] = [
   { key: 'importar', label: 'Importar datos', perm: 'owner', C: Importar, group: 'Administración', icon: Upload },
   { key: 'ajustes', label: 'Ajustes', perm: 'owner', C: Ajustes, group: 'Administración', icon: Settings },
 ]
-
-/** Claro por defecto; oscuro opcional. Se recuerda en este equipo. */
-function ModoBoton() {
-  const modo = useSyncExternalStore(suscribirModo, modoActual)
-  const oscuro = modo === 'oscuro'
-  return (
-    <button className="logout" onClick={(e) => { e.stopPropagation(); cambiarModo(oscuro ? 'claro' : 'oscuro') }} aria-pressed={oscuro}>
-      {oscuro ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}{oscuro ? 'Modo claro' : 'Modo oscuro'}
-    </button>
-  )
-}
 
 function useHash() {
   const [h, setH] = useState(location.hash.slice(2))

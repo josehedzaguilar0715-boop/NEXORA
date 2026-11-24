@@ -155,3 +155,12 @@ small { font-size: max(var(--fs-min), 0.85rem); }
 .acciones .quick-action.primaria:hover { background: var(--primary-hover); }
 .acciones .quick-action.primaria .qa-icon { background: rgba(255, 255, 255, 0.22); border-color: transparent; color: inherit; }
 .rail-titulo { font-size: max(var(--fs-min), 0.75rem); }
+
+/* ---------- Panel administrativo ---------- */
+.admin2 .page-head h1 { margin-top: 6px; }
+.admin2 .rail-item { width: 100%; background: none; border: 1px solid transparent; text-align: left; cursor: pointer; font: inherit; font-weight: 600; font-size: var(--fs-body); }
+.admin2 .rail-item.on { background: color-mix(in srgb, var(--mc) 10%, var(--card)); border-color: color-mix(in srgb, var(--mc) 32%, var(--card)); }
+.admin2 .topbar-actions .logout { min-height: 44px; padding: 0 14px; }
+.admin2 .periodo.filtros { display: flex; flex-wrap: wrap; border-radius: var(--radius-md); margin-bottom: 8px; }
+.admin2 table.list td { vertical-align: middle; }
+:root .admin2 .hoja .rail-item { width: 100%; }
