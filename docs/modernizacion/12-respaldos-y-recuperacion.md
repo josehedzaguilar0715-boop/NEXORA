@@ -112,3 +112,28 @@ Ver la sección de reversión del informe final. Publicar el commit anterior **n
 
 * Un respaldo es **un solo archivo** en KV (tope de 25 MB por valor). Hoy pesa ~120 KB. El monitor de espacio y la separación por negocio (`13-estrategia-de-crecimiento.md`) lo resuelven antes de llegar al tope.
 * La restauración por el super panel acepta archivos de hasta 50 MB. Uno mayor se restaura con el script local.
+
+## 6. Cierre del 24 nov 2026: respaldos por negocio y ensayo con datos reales
+
+**Qué cambió.** Además del respaldo completo diario, cada noche se guarda **un archivo por negocio** (`negocio-<id>-<fecha>.json.gz[.enc]`, 30 días) con su registro en `backup_log` (fecha, tamaño, huella SHA-256, resultado). Detalle del formato y la restauración por negocio: `18-exportacion-y-restauracion.md`.
+
+**Ensayo de restauración con datos reales de producción** (`scripts/verificacion/ensayo-respaldo.ts`, carpeta aislada; producción no se tocó):
+
+| Respaldo | Archivo | Contenido | Resultado |
+|---|---|---|---|
+| Automático 23 nov 09:17 UTC (versión 34 del esquema) | 118 323 bytes, gzip íntegro | 11 negocios, 22 usuarios, 90 ventas, 17 turnos, 172 productos | ✅ migración en el sitio hasta 42 sin cambiar ninguna fila; integridad `ok`; 0 referencias rotas; cada negocio exportado y restaurado idéntico renglón por renglón (ventas, inventario, fiado y gastos con las mismas sumas; sin secretos) |
+| **Manual 24 nov 06:03 UTC** (versión 41), creado desde el super panel antes de publicar | 121 751 bytes, gzip íntegro | 11 negocios, 22 usuarios, **95 ventas**, 18 turnos, 172 productos | ✅ **mismo resultado**: 11 de 11 negocios idénticos, integridad `ok`, 0 referencias rotas, ninguna fila distinta tras migrar |
+| Mismo respaldo del 23 nov **cifrado** con una llave temporal de ensayo | `NXE1…`, ilegible como texto | igual | ✅ se restaura con la llave correcta; ❌ falla sin llave y con llave equivocada, sin crear ninguna base |
+
+**Hallazgos del ensayo (corregidos):** (1) un cobro del super panel (`one_time_charges`) apunta al usuario de soporte que lo registró: en un servidor sin ese usuario se omite con aviso en vez de fallar; (2) el motor local de Cloudflare crea tablas internas (`__miniflare_*`) que el exportador ya ignora.
+
+**Estado del cifrado en producción: NO activado.** El secreto `BACKUP_KEY` aún no está instalado, así que los respaldos de producción siguen **comprimidos pero sin cifrar**. El cifrado está probado (pruebas automáticas, workerd local y datos reales), pero **no se declara protegido hasta verificarlo en producción** con el procedimiento del §2 (huella igual, siguiente respaldo `.enc`, restauración con la llave y fallo sin ella). Ese cambio lo hace el propietario con su propia llave.
+
+### Comprobación del cifrado una vez instalada la llave (checklist)
+
+1. `npm run backup:key` (en tu computadora) → anota la **huella**; guarda la llave en dos lugares.
+2. `npx wrangler secret put BACKUP_KEY --env production` y pegar la llave.
+3. Super panel → Ajustes → Respaldos: debe decir «🔒 Cifrados» con **la misma huella** del paso 1.
+4. Crear un respaldo manual (botón del mismo panel): el archivo nuevo termina en `.json.gz.enc`.
+5. Descargarlo y restaurarlo con la llave guardada: `NEXORA_BACKUP_KEY=<llave> npx tsx scripts/restore.ts respaldo.json.gz.enc nueva.db` → debe funcionar; con otra llave o sin ella, debe fallar.
+6. Opcional: `npx tsx scripts/verificacion/ensayo-respaldo.ts respaldo.json.gz.enc <carpeta-nueva>` repite la comprobación completa por negocio.
