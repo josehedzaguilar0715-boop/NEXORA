@@ -71,7 +71,7 @@ export function Productos({ me }: { me: Me }) {
       </div>
       {err && <p className="error">{err}</p>}
       <section className="card">
-        <div className="table-wrap cards-sm" style={{ border: 0, margin: 0 }}>
+        <div className="table-wrap no-cards" style={{ border: 0, margin: 0 }}>
           <table className="list products">
             <thead><tr><th>Producto</th><th className="num">Precio</th><th className="num">Existencia</th>{costs && <th className="num hide-sm">Costo</th>}<th /></tr></thead>
             <tbody>

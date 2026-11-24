@@ -78,6 +78,7 @@ export interface Me {
 /** 'owner' = solo el dueño. Un permiso no marcado no aparece en pantalla. */
 /** Giros que manejan fiado o cuenta de crédito (spec: abarrotes, ferretería, papelería, comedor y verdulería). */
 import { FIADO_GIROS, vocab } from './giros'
+import { useTarjetasEnCelular } from './cardsAuto'
 import { applyProduct, productOf } from './products'
 export { FIADO_GIROS }
 
@@ -194,6 +195,9 @@ function PendingBadge({ main = false }: { main?: boolean }) {
     </button>
   )
 }
+
+/** Activa las tarjetas en celular para las pantallas que lo necesitan (ver cardsAuto.ts). */
+function TarjetasAuto({ pantalla }: { pantalla?: string }) { useTarjetasEnCelular(pantalla); return null }
 
 export function App() {
   // Páginas públicas (sin iniciar sesión): reservar y ver el estado de la cita.
@@ -349,6 +353,7 @@ function Privada() {
           )
         })()}
         {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <span className={`screen-chip mod-${moduloDe(current.key)}`}><current.icon size={16} aria-hidden />{MODULOS[moduloDe(current.key)].nombre}</span>}</div></header>}
+        <TarjetasAuto pantalla={hash === 'guia-visual' ? undefined : current?.key} />
         <Suspense fallback={<ScreenLoading />}>{hash === 'guia-visual' ? <div className="screen-in"><GuiaVisual /></div> : current ? <div key={current.key} className="screen-in"><current.C me={me} /></div> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}</Suspense>
         </main>
       </div>

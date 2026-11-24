@@ -1,3 +1,5 @@
+> **Cierre definitivo: ver `39-cierre-definitivo.md`** (pantallas pendientes adaptadas, resultados finales, limitaciones y mejoras futuras).
+
 # 38 · Informe final (rama `diseno-v0`) — decisiones del propietario, fase 4 y cierre
 
 **Nada publicado ni fusionado; producción intacta (72bda7f0); sin datos de clientes tocados; sin servicios contratados ni costos.** Tipos de prueba: A = automatizada · N = navegador (datos de demostración en memoria) · S = migración sobre base con datos. **Sin pruebas con negocios reales ni con impresoras físicas.**
@@ -13,7 +15,7 @@
 
 ## 2. Fase 4 (pantallas operativas) — cambios concretos
 Caja: acciones agrupadas («Esta venta» / «Mi caja»), productos para tocar arriba cuando la venta está vacía y abajo cuando ya hay renglones · Clientes: tarjetas con avatar, filtro «Con saldo pendiente», seguimiento debajo de la lista · Compras e inventario: formulario en 3 pasos, fletes y datos opcionales plegados · Mesas: filtros con conteo (libres, con cuenta, por cobrar, por limpiar) · Cocina: comandas más viejas primero con etiqueta «Urgente/Atención» (no solo color) · Apartados: avance de pago por barra, vencidos primero, tarjetas en celular · Taquilla: pasos 1–4, compra en línea plegada · Agenda: resumen del día (citas, por confirmar, pendientes de cobro) · Productos: formulario por secciones · Finanzas: 7 pestañas ordenadas (Mi dinero, Qué deja ganancia, Reparto, Retiros, Saldos, Gastos, Reportes).
-**Qué NO se rediseñó a fondo (queda pendiente):** Configurar negocio, Personal, Membresías y promos, Cotizaciones, Encargos, Entradas/Acceso, Verdulería (precio del día), Trompo, Menú del día, Devoluciones, Importar, y el detalle de la ficha de Productos (pestañas de existencia/presentaciones). Heredan el estilo azul unificado pero conservan su organización anterior.
+**(Actualización: las pantallas de esta lista se adaptaron en la etapa de cierre definitivo, doc 39.)** Lo que no se rediseñó a fondo entonces: Configurar negocio, Personal, Membresías y promos, Cotizaciones, Encargos, Entradas/Acceso, Verdulería (precio del día), Trompo, Menú del día, Devoluciones, Importar, y el detalle de la ficha de Productos (pestañas de existencia/presentaciones). Heredan el estilo azul unificado pero conservan su organización anterior.
 
 ## 3. Auditoría de los 14 productos
 El informe anterior decía 13 porque la auditoría recorría los 13 giros con demostración. **El producto 14 es la base NEXORA** (negocio sin giro propio). Ahora se audita con `SOLO=nexora` (negocio de prueba con giro desconocido): escritorio+celular claro y oscuro 26/26 pantallas y tableta 13/13, **0 hallazgos**. Resumen total: 13 giros × todas sus pantallas × (escritorio, celular, tableta) × (claro, oscuro) + base NEXORA + guía visual de los 14 (84 combinaciones): **0 hallazgos** tras corregir (en este ciclo) un falso positivo del auditor con contenido de `<details>` cerrado.

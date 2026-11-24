@@ -27,8 +27,11 @@ export function Encargos(_: { me: Me }) {
     <div className="grid2">
       <section className="card">
         <h2>Nuevo encargo</h2>
+        <h3 className="form-h">1 · ¿Para quién?</h3>
         <div className="row"><label>Cliente<input value={f.customerName} onChange={(e) => setF({ ...f, customerName: e.target.value })} /></label><label>Teléfono<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label></div>
-        <label>¿Qué se va a hacer?<input value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
+        <h3 className="form-h">2 · ¿Qué se va a hacer?</h3>
+        <label>Descripción<input value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
+        <h3 className="form-h">3 · Precio y entrega</h3>
         <div className="row"><label>Total<input inputMode="decimal" value={f.total} onChange={(e) => setF({ ...f, total: e.target.value })} /></label><label>Anticipo<input inputMode="decimal" value={f.deposit} onChange={(e) => setF({ ...f, deposit: e.target.value })} /></label></div>
         <div className="row"><label>Entrega<input type="date" value={f.dueDate} onChange={(e) => setF({ ...f, dueDate: e.target.value })} /></label>
           <label>Anticipo en<select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="tarjeta">Tarjeta</option></select></label></div>

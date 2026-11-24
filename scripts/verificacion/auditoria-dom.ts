@@ -38,11 +38,13 @@ export const auditoria = () => {
     if (c < need) bad.push(`${label} contraste ${c.toFixed(2)} < ${need}`)
     if (innerWidth <= 600 && size < 17.95) small.push(label)
   }
+  // Con una ventana abierta (ficha, diálogo) lo de atrás está tapado: solo cuenta lo de la ventana.
+  const capa = document.querySelector('.modal, .sheet, [role=dialog]')
   // Textos encimados: dos textos visibles (que no se contienen) cuyo recuadro se cruza de forma apreciable.
   const hojas: { el: Element; r: DOMRect; rs: DOMRect[]; txt: string }[] = []
   for (const el of seen) {
     const r = el.getBoundingClientRect(); const st = getComputedStyle(el)
-    if (r.width < 4 || r.height < 4 || st.visibility === 'hidden' || el.closest('svg, [aria-hidden=true], .intro, .boot-loading, .buscador-lista, .bottom, .topbar') || (el.closest('details:not([open])') && !el.closest('summary'))) continue
+    if (r.width < 4 || r.height < 4 || st.visibility === 'hidden' || el.closest('svg, [aria-hidden=true], .intro, .boot-loading, .buscador-lista, .bottom, .topbar') || (el.closest('details:not([open])') && !el.closest('summary')) || (capa && !capa.contains(el))) continue
     if (r.bottom < 0 || r.top > innerHeight * 6) continue
     // Contenido que queda recortado dentro de una zona con desplazamiento (no se ve) no cuenta.
     let recortado = false

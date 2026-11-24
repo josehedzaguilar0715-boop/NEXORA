@@ -205,10 +205,26 @@ details.more { margin: 14px 0; border: 1px dashed var(--line-strong); border-rad
 details.more > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--cyan); font-weight: 600; }
 details.more[open] > summary { margin-bottom: 8px; }
 @media (max-width: 640px) { .cards-sm td.row-actions { justify-content: flex-start; gap: 8px; flex-wrap: wrap; } }
-.cards-sm td > .v { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.cards-sm td > .v { min-width: 0; flex: 1; text-align: right; overflow-wrap: break-word; }
 @media (max-width: 640px) { .cards-sm td[data-label] { align-items: flex-start; } }
 
 /* Caja: acciones agrupadas (esta venta / mi caja). */
 .pos-actions .pos-group { grid-column: 1 / -1; margin: 10px 0 0; font-size: var(--fs-sm, 0.9rem); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .pos-actions .pos-group:first-child { margin-top: 0; }
 .agenda-resumen { margin: 4px 0 10px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+/* Tarjetas en celular: celdas sin título (acciones, nombre) en bloque y botones que se acomodan. */
+@media (max-width: 640px) {
+  .cards-sm td:not([data-label]) { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+  .cards-sm td:not([data-label]):first-child { display: block; }
+  .cards-sm td .row-actions, .cards-sm td.num:not([data-label]) { text-align: left; }
+  .cards-sm input, .cards-sm select { max-width: 100%; }
+}
+
+/* Lista de productos en celular: precio, existencia y costo en tres columnas con su título; acciones en su propia fila. */
+@media (max-width: 640px) {
+  table.list.products tbody tr { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  table.list.products tbody td[data-label]:not(:first-child)::before { content: attr(data-label); display: block; color: var(--muted); font-size: var(--fs-sm, 0.9rem); }
+  table.list.products tbody td:last-child { grid-column: 1 / -1; text-align: left; }
+  table.list.products tbody td .v { text-align: left; display: block; }
+}

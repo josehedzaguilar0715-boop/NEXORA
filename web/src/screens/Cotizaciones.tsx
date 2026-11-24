@@ -51,7 +51,9 @@ export function Cotizaciones(_: { me: Me }) {
     <div className="grid2">
       <section className="card">
         <h2>Nueva cotización</h2>
+        <h3 className="form-h">1 · ¿Para quién?</h3>
         <label>Cliente<input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Nombre o empresa" /></label>
+        <h3 className="form-h">2 · ¿Qué lleva?</h3>
         <label>Agregar producto</label>
         <div className="row"><input aria-label="Agregar producto" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') byCode(find.trim()) }} placeholder="Busca o escanea…" /><ScanButton onCode={byCode} /></div>
         <div className="results">
