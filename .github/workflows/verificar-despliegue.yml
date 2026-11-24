@@ -24,3 +24,4 @@ jobs:
         run: |
           if [ "${{ matrix.sitio }}" = produccion ]; then U=https://nexora.josehedzaguilar0715.workers.dev; else U=https://nexora-staging.josehedzaguilar0715.workers.dev; fi
           bash scripts/verificar-despliegue.sh "$U"
+# Última verificación solicitada tras publicar 72bda7f0 (24 nov 2026).
