@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
-import { body, ownerOnly, parse, requirePerm, type Env } from './context.js'
+import { body, ownerOnly, parse, requirePerm, type Env, requireFinance } from './context.js'
 import type { Db } from './db.js'
 import { fromMilli, stockOf } from './inventory.js'
 import { periodSummary, range } from './finance.js'
@@ -47,7 +47,7 @@ dashboard.get('/dashboard/mine', (c) => {
   return c.json({ date: today, tickets: valid.length, total: valid.reduce((a, s) => a + s.total, 0), shift, recent: sales.slice(0, 8) })
 })
 
-dashboard.get('/dashboard/panel', requirePerm('view_reports'), (c) => {
+dashboard.get('/dashboard/panel', requireFinance('dashboard'), (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const b = u.business_id
@@ -114,7 +114,7 @@ dashboard.put('/dashboard/goal', ownerOnly, async (c) => {
 })
 
 /** Ventas por día y por periodo, con filtro por cajero: tarjetas, tickets del día y cajeros. */
-dashboard.get('/reports/board', requirePerm('view_reports'), (c) => {
+dashboard.get('/reports/board', requireFinance('dashboard'), (c) => {
   const { db, now } = c.get('deps')
   const b = c.get('session').user.business_id
   const today = localDate(now())
@@ -149,7 +149,7 @@ const MOVE_LABEL: Record<string, string> = {
 }
 
 /** Bitácora de movimientos de inventario del periodo, con quién lo hizo. Sin ventas por default (ya salen en tickets). */
-dashboard.get('/reports/stock-log', requirePerm('view_reports'), (c) => {
+dashboard.get('/reports/stock-log', requireFinance('dashboard'), (c) => {
   const { db, now } = c.get('deps')
   const b = c.get('session').user.business_id
   const today = localDate(now())
@@ -160,7 +160,7 @@ dashboard.get('/reports/stock-log', requirePerm('view_reports'), (c) => {
 })
 
 /** Tendencia diaria de ingresos contra egresos y la ganancia real por forma de cobro (máximo 62 días por día; más largo, por mes). */
-dashboard.get('/finance/trend', requirePerm('view_reports'), (c) => {
+dashboard.get('/finance/trend', requireFinance('finance'), (c) => {
   const { db, now } = c.get('deps')
   const b = c.get('session').user.business_id
   const today = localDate(now())

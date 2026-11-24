@@ -12,7 +12,7 @@ const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'T
 export function Clientes({ me }: { me: Me }) {
   const fiado = hasGiro(me, ...FIADO_GIROS)
   const [list, setList] = useState<any[]>([])
-  const [rec, setRec] = useState<{ customers: any[]; total: number }>({ customers: [], total: 0 })
+  const [rec, setRec] = useState<{ customers: any[]; total?: number }>({ customers: [], total: 0 })
   const [sel, setSel] = useState<any>(null)
   const [q, setQ] = useState('')
   const [adding, setAdding] = useState(false)
@@ -30,7 +30,7 @@ export function Clientes({ me }: { me: Me }) {
         <div className="row search"><input aria-label="Buscar cliente" placeholder="Buscar por nombre o teléfono…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <button className="primary" onClick={() => setAdding(true)}>+ Nuevo cliente</button>
       </div>
-      {fiado && <div className="kpis mini"><div><span className="muted">Te deben en total</span><b>{mxn(rec.total)}</b></div><div><span className="muted">Clientes con saldo</span><b>{rec.customers.length}</b></div></div>}
+      {fiado && <div className="kpis mini">{rec.total !== undefined && <div><span className="muted">Te deben en total</span><b>{mxn(rec.total)}</b></div>}<div><span className="muted">Clientes con saldo</span><b>{rec.customers.length}</b></div></div>}
       {msg && <p className="error">{msg}</p>}
       <div>
         <section className="card">

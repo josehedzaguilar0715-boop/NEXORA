@@ -3,13 +3,9 @@ import { describe, expect, it } from 'vitest'
 import { GIROS } from '../src/billing.js'
 import { PRODUCTS, productOf } from '../web/src/products/index.js'
 
-const css = readFileSync('web/src/products/products.css', 'utf8')
-/** Bloque de variables de un producto (el selector puede compartirse entre productos). */
-function block(id: string) {
-  const re = new RegExp(`(^|\\n)([^{}]*:root\\[data-product='${id}'\\][^{}]*)\\{([^}]*--bg:[^}]*)\\}`)
-  return css.match(re)?.[3] ?? ''
-}
-const tokens = (b: string) => Object.fromEntries([...b.matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2]!.trim()]))
+const css = readFileSync('web/src/identidad.css', 'utf8')
+const lightBlock = css.match(/:root\s*\{([^}]*)\}/)?.[1] ?? ''
+const tokens = (b: string) => Object.fromEntries([...b.matchAll(/(--[a-z0-9-]+):\s*(#[0-9a-fA-F]{6})/g)].map((m) => [m[1], m[2]!.trim()]))
 const lum = (hex: string) => {
   const n = hex.replace('#', '')
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
@@ -29,25 +25,18 @@ describe('productos por giro', () => {
     expect(new Set(all).size).toBe(all.length)
   })
 
-  it('cada producto tiene su identidad en products.css (colores, letra, forma y gráficas)', () => {
-    for (const p of Object.values(PRODUCTS).filter((x) => x.id !== 'nexora')) {
-      const b = block(p.id)
-      for (const token of ['--bg', '--card', '--ink', '--primary', '--font-display', '--radius', '--chart-in', '--tone-main', '--logo-1']) expect(b, `${p.id} ${token}`).toContain(`${token}:`)
-    }
+  it('identidad visual ÚNICA (decisión del propietario): ningún producto tiene paleta propia y todos conservan nombre y lema', () => {
+    for (const f of ['identidad.css', 'tokens.css', 'shell.css', 'v0.css']) expect(readFileSync(`web/src/${f}`, 'utf8'), f).not.toMatch(/data-product=/)
+    for (const p of Object.values(PRODUCTS)) { expect(p.name.length, p.id).toBeGreaterThan(2); expect(p.tagline.length, p.id).toBeGreaterThan(2) }
   })
 
-  it('contraste AA: texto, texto secundario y botón principal se leen en todos los productos', () => {
+  it('contraste AA de la paleta única (modo claro): texto, texto secundario y botón principal se leen', () => {
+    const t = tokens(lightBlock)
     const bad: string[] = []
-    for (const p of Object.values(PRODUCTS).filter((x) => x.id !== 'nexora')) {
-      const t = tokens(block(p.id))
-      const check = (fg: string, bg: string, min: number) => { const c = contrast(t[fg]!, t[bg]!); if (!(c >= min)) bad.push(`${p.id}: ${fg} sobre ${bg} = ${c.toFixed(2)} (mín. ${min})`) }
-      check('--ink', '--bg', 7)
-      check('--ink', '--card', 7)
-      check('--muted', '--card', 4.5)
-      check('--muted', '--bg', 4.5)
-      check('--on-primary', '--primary', 4.5)
-      check('--cyan', '--card', 3)
-    }
+    const check = (fg: string, bg: string, min: number) => { const c = contrast(t[fg]!, t[bg]!); if (!(c >= min)) bad.push(`${fg} sobre ${bg} = ${c.toFixed(2)} (mín. ${min})`) }
+    check('--ink', '--bg', 7); check('--ink', '--card', 7)
+    check('--muted', '--card', 4.5); check('--muted', '--bg', 4.5)
+    check('--on-primary', '--primary', 4.5)
     expect(bad).toEqual([])
   })
 

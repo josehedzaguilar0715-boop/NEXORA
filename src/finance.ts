@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { audit } from './audit.js'
 import { authorize } from './authcode.js'
 import { loadCustomer } from './common.js'
-import { body, ownerOnly, parse, requirePerm, type Env } from './context.js'
+import { body, ownerOnly, parse, requirePerm, type Env, requireFinance, canFinance } from './context.js'
 import type { Db } from './db.js'
 import { fromMilli, stockOf, type ProductRow } from './inventory.js'
 import { customerBalance } from './sales.js'
@@ -126,7 +126,8 @@ finance.get('/receivables', requirePerm('customers_credit'), (c) => {
   const rows = c.get('deps').db
     .prepare('SELECT c.id, c.name, c.phone, c.credit_limit AS creditLimit, SUM(l.delta) AS balance FROM credit_ledger l JOIN customers c ON c.id = l.customer_id WHERE l.business_id = ? GROUP BY c.id HAVING balance > 0 ORDER BY balance DESC')
     .all(c.get('session').user.business_id) as { balance: number }[]
-  return c.json({ customers: rows, total: rows.reduce((a, r) => a + r.balance, 0) })
+  // El total de lo que le deben al negocio es información financiera: el empleado ve a sus clientes, no la suma.
+  return c.json({ customers: rows, ...(canFinance(c.get('session').user, 'dashboard') ? { total: rows.reduce((a, r) => a + r.balance, 0) } : {}) })
 })
 
 /** Historial de compras de un cliente frecuente. */
@@ -188,7 +189,7 @@ finance.post('/expenses/:id/void', requirePerm('edit_inventory'), async (c) => {
   return c.json({ ok: true })
 })
 
-finance.get('/expenses', requirePerm('view_reports'), (c) => {
+finance.get('/expenses', requireFinance('finance'), (c) => {
   const from = c.req.query('from') ?? '0000-00-00'
   const to = c.req.query('to') ?? '9999-12-31'
   const branch = scopeBranch(c) // dueño: todos (o la que pida); los demás: los de su sucursal
@@ -196,7 +197,7 @@ finance.get('/expenses', requirePerm('view_reports'), (c) => {
   return c.json({ expenses: rows })
 })
 
-finance.get('/fixed-expenses', requirePerm('view_reports'), wholeBusinessOnly, (c) => {
+finance.get('/fixed-expenses', requireFinance('finance'), wholeBusinessOnly, (c) => {
   const { db } = c.get('deps')
   const b = c.get('session').user.business_id
   const rows = db.prepare('SELECT id, concept, monthly_amount AS monthlyAmount, active FROM fixed_expenses WHERE business_id = ? ORDER BY concept').all(b)
@@ -268,7 +269,7 @@ export function periodSummary(db: Db, businessId: string, from: string, to: stri
   return { from, to, sales: s, cancelled, refunds, costOfSales: cogs - restocked, grossProfit, waste, expenses, commissions, profit: grossProfit - waste - expenses - commissions }
 }
 
-finance.get('/reports/summary', requirePerm('view_reports'), (c) => {
+finance.get('/reports/summary', requireFinance('dashboard'), (c) => {
   const { db, now } = c.get('deps')
   const today = localDate(now())
   const from = c.req.query('from') ?? today
@@ -284,7 +285,7 @@ finance.get('/reports/summary', requirePerm('view_reports'), (c) => {
 })
 
 /** Ventas por día (para la gráfica del inicio). */
-finance.get('/reports/daily', requirePerm('view_reports'), (c) => {
+finance.get('/reports/daily', requireFinance('dashboard'), (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const days = Math.min(Math.max(Number(c.req.query('days') ?? 7) || 7, 1), 92)
@@ -298,7 +299,7 @@ finance.get('/reports/daily', requirePerm('view_reports'), (c) => {
 })
 
 /** Movimientos recientes: ventas, cancelaciones, retiros y depósitos de caja, compras y gastos. */
-finance.get('/reports/recent', requirePerm('view_reports'), (c) => {
+finance.get('/reports/recent', requireFinance('dashboard'), (c) => {
   const { db } = c.get('deps')
   const b = c.get('session').user.business_id
   const limit = Math.min(Number(c.req.query('limit') ?? 12) || 12, 50)

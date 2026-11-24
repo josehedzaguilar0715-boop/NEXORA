@@ -66,8 +66,10 @@ const Configurar = lazyNamed(() => import('./screens/Configurar'), 'Configurar')
 const Apartados = lazyNamed(() => import('./screens/Apartados'), 'Apartados')
 
 export interface Me {
-  user: { id: string; name: string; phone?: string | null; role: 'owner' | 'staff'; position?: 'dueno' | 'encargado' | 'empleado'; branchId: string | null; mustChangePassword: boolean }
+  user: { id: string; name: string; phone?: string | null; role: 'owner' | 'staff'; position?: 'dueno' | 'administrador' | 'encargado' | 'empleado'; branchId: string | null; mustChangePassword: boolean }
   permissions: 'todos' | string[]
+  /** Lo que el servidor le deja ver de finanzas: panel general, finanzas, mover dinero, costos. */
+  access?: { dashboard: boolean; finance: boolean; manage: boolean; costs: boolean }
   business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string; giros?: string[]; trialEndsAt?: string | null; paidUntil?: string | null; free?: number }
   settings?: Record<string, any>
   modules?: string[]
@@ -82,7 +84,7 @@ export { FIADO_GIROS }
 export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.business.giro]).some((x) => g.includes(x))
 /** Ver reportes lo tiene todo usuario (solo lectura), igual que en el servidor. */
 /** Acepta varios permisos separados por «|» (basta uno). */
-export const can = (me: Me, p: string): boolean => (p.includes('|') ? p.split('|').some((x) => can(me, x)) : p === 'owner' ? me.user.role === 'owner' : p === 'staff' || me.permissions === 'todos' || me.permissions.includes(p))
+export const can = (me: Me, p: string): boolean => (p.includes('|') ? p.split('|').some((x) => can(me, x)) : p.startsWith('fin:') ? !!me.access?.[p.slice(4) as 'dashboard'] : p === 'owner' ? me.user.role === 'owner' : p === 'staff' || me.permissions === 'todos' || me.permissions.includes(p))
 
 type Icon = import('lucide-react').LucideIcon
 export type Screen = { key: string; label: string; perm: string; C: ComponentType<{ me: Me }>; giros?: string[]; group: string; icon: Icon; ownTitle?: boolean; desc?: string }
@@ -151,8 +153,8 @@ const SCREENS: Screen[] = [
   { key: 'cierre', label: 'Cierre del día', perm: 'edit_inventory', C: CierreDia, giros: ['verduleria', 'abarrotes'], group: 'Inventario', icon: ClipboardCheck },
   { key: 'clientes', label: 'Clientes y fiado', perm: 'customers_credit', C: Clientes, group: 'Clientes', icon: Users },
   { key: 'lealtad', label: 'Membresías y promos', perm: 'owner', C: Lealtad, group: 'Clientes', icon: Gift },
-  { key: 'finanzas', label: 'Finanzas', perm: 'view_reports', C: Finanzas, group: 'Finanzas', icon: Landmark, ownTitle: true },
-  { key: 'reportes', label: 'Ventas y retiro', perm: 'view_reports', C: Reportes, group: 'Finanzas', icon: ChartColumn },
+  { key: 'finanzas', label: 'Finanzas', perm: 'fin:finance', C: Finanzas, group: 'Finanzas', icon: Landmark, ownTitle: true },
+  { key: 'reportes', label: 'Ventas y retiro', perm: 'fin:dashboard', C: Reportes, group: 'Finanzas', icon: ChartColumn },
   { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions|cancel_discount', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria', 'palapa', 'restaurante'], group: 'Finanzas', icon: Percent },
   { key: 'configurar', label: 'Configurar negocio', perm: 'configure_catalog', C: Configurar, group: 'Administración', icon: SlidersHorizontal },
   { key: 'asistencia', label: 'Mi asistencia', perm: 'attendance', C: MiAsistencia, group: 'Administración', icon: Clock },

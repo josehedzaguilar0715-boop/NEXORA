@@ -49,7 +49,9 @@ describe('decisiones de permisos: permisos antiguos no amplían el alcance', () 
     // El dueño lo autoriza expresamente: ahora sí, y queda registrado su puesto.
     expect((await f.call(f.T, 'PATCH', `/users/${f.e1b.id}`, { permissions: ['sell', 'open_close_cash', 'view_reports'] })).status).toBe(200)
     expect((f.s.db.prepare('SELECT position FROM users WHERE id = ?').get(f.e1b.id) as any).position).toBe('empleado')
-    expect((await f.s.call('GET', '/reports/summary', { token: f.e1b.token })).status).toBe(200)
+    // El panel general y las finanzas ya no son de ningún empleado (aunque tenga «ver reportes»); sí ve las ventas de sus compañeros de sucursal.
+    expect((await f.s.call('GET', '/reports/summary', { token: f.e1b.token })).status).toBe(403)
+    expect((await f.s.call('GET', `/sales/${f.sale1a.id}`, { token: f.e1b.token })).status).toBe(200)
     // …pero nunca de otra sucursal.
     expect((await f.s.call('GET', `/sales/${f.sale2.id}`, { token: f.e1b.token })).status).toBe(403)
   })

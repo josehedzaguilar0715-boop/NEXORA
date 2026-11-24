@@ -1,7 +1,7 @@
 import type { Context, MiddlewareHandler } from 'hono'
 import type { ZodType } from 'zod'
 import type { Db } from './db.js'
-import type { Permission } from './permissions.js'
+import { FINANCE_PERMS, type Permission } from './permissions.js'
 import { bad, forbidden, unauthorized, iso, sha256, type Clock } from './util.js'
 
 export interface Notifier {
@@ -48,6 +48,8 @@ export interface UserRow {
   permissions: string
   /** 'encargado' | 'empleado' (null = se deduce de los permisos). El dueño es role = 'owner'. */
   position: string | null
+  /** 1 = Administrador autorizado: ve todo el negocio, pero solo con las funciones que el dueño le marcó. */
+  admin_authorized?: number
   auth_code_hash: string | null
   active: number
   failed_attempts: number
@@ -73,24 +75,55 @@ export const LOCK_MINUTES = 15
  */
 export function hasPerm(u: UserRow, p: Permission): boolean {
   if (u.role === 'owner') return true
+  // Funciones financieras nuevas: solo las puede tener un Administrador autorizado (y solo si el dueño se las marcó).
+  // Un empleado o un encargado nunca las tiene, aunque aparezcan guardadas.
+  if (FINANCE_PERMS.includes(p) && puestoOf(u) !== 'administrador') return false
   // Un empleado anterior al sistema de puestos (sin puesto guardado) no conserva «ver reportes» de antes: ampliaría su alcance.
   // El dueño debe autorizarlo de nuevo (al guardar sus permisos queda registrado su puesto).
   if (p === 'view_reports' && u.position == null && puestoOf(u) === 'empleado') return false
   return (JSON.parse(u.permissions) as string[]).includes(p)
 }
 
-/** Puesto: dueño (todo el negocio), encargado (su sucursal) o empleado (lo propio). */
-export type Puesto = 'dueno' | 'encargado' | 'empleado'
+/** Puesto: dueño (todo el negocio), administrador autorizado (todo el negocio, solo lo que se le marcó), encargado (su sucursal) o empleado (lo propio). */
+export type Puesto = 'dueno' | 'administrador' | 'encargado' | 'empleado'
 export function puestoOf(u: UserRow): Puesto {
   if (u.role === 'owner') return 'dueno'
+  if (u.admin_authorized) return 'administrador'
   if (u.position === 'encargado' || u.position === 'empleado') return u.position
   // Sin puesto guardado (usuarios anteriores): con «cancelar o descontar» es encargado, como siempre.
   return (JSON.parse(u.permissions) as string[]).includes('cancel_discount') ? 'encargado' : 'empleado'
 }
 
-/** Dueño o encargado: quien autoriza cancelaciones y descuentos y ve lo de todo su alcance (no solo lo propio). */
+/** Dueño o encargado: quien autoriza cancelaciones y descuentos y ve lo de todo su alcance (no solo lo propio). El administrador no lo es por serlo: solo hace lo que se le marcó. */
 export function isManager(u: UserRow): boolean {
-  return puestoOf(u) !== 'empleado'
+  const p = puestoOf(u)
+  return p === 'dueno' || p === 'encargado'
+}
+
+/** Dueño o administrador autorizado: ven todas las sucursales (con las funciones que tengan). */
+export const seesWholeBusiness = (u: UserRow) => u.role === 'owner' || puestoOf(u) === 'administrador'
+
+export type FinanceKind = 'dashboard' | 'finance' | 'manage' | 'costs'
+/**
+ * Quién ve el panel general y lo financiero. Decisión del propietario (24 nov 2026): exclusivo del dueño y de
+ * administradores expresamente autorizados. Los encargados actuales conservan lo que ya tenían («ver reportes»),
+ * y un EMPLEADO nunca, aunque el dueño le haya marcado «ver reportes».
+ */
+export function canFinance(u: UserRow, kind: FinanceKind): boolean {
+  const p = puestoOf(u)
+  if (p === 'dueno') return true
+  // Costos: quien compra y edita inventario necesita verlos; el empleado de piso que solo consulta, no.
+  if (p === 'empleado') return kind === 'costs' && hasPerm(u, 'edit_inventory')
+  if (p === 'administrador') return hasPerm(u, ({ dashboard: 'view_dashboard', finance: 'view_finance', manage: 'manage_finance', costs: 'view_costs' } as const)[kind])
+  // Encargado (sin cambios para los actuales): panel y finanzas de su sucursal con «ver reportes»; costos con inventario; mover dinero, no.
+  if (kind === 'manage') return false
+  if (kind === 'costs') return hasPerm(u, 'view_inventory') || hasPerm(u, 'edit_inventory')
+  return hasPerm(u, 'view_reports')
+}
+
+export const requireFinance = (kind: FinanceKind): MiddlewareHandler<Env> => async (c, next) => {
+  if (!canFinance(c.get('session').user, kind)) throw forbidden('Esta información es solo del dueño y de quien él autorice.')
+  await next()
 }
 
 export function parse<T>(schema: ZodType<T>, data: unknown): T {

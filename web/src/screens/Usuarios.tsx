@@ -4,7 +4,8 @@ import { api } from '../api'
 import { ask } from '../Dialog'
 import { hasGiro, type Me } from '../App'
 
-const TEMPLATE_LABEL: Record<string, string> = { cajero: 'Cajero', encargado: 'Encargado', barbero: 'Barbero', empleado_piso: 'Empleado de piso' }
+const FIN_PERMS = ['view_dashboard', 'view_finance', 'manage_finance', 'view_costs']
+const TEMPLATE_LABEL: Record<string, string> = { administrador: 'Administrador autorizado', cajero: 'Cajero', encargado: 'Encargado', barbero: 'Barbero', empleado_piso: 'Empleado de piso' }
 /** El puesto «que atiende» se llama según el giro; en tiendas sin agenda ni comisiones no aparece. */
 function templateLabel(me: Me, key: string): string | null {
   if (key === 'cocina') return hasGiro(me, 'restaurante', 'palapa', 'taqueria', 'comedor') ? 'Cocina (ve comandas y pedidos)' : null
@@ -32,6 +33,7 @@ export function Usuarios({ me }: { me: Me }) {
   const roleOf = (u: any) => {
     if (u.role === 'owner') return 'Dueño'
     if (u.position === 'encargado') return 'Encargado'
+    if (u.position === 'administrador') return 'Administrador autorizado'
     const t = catalog.templates.find((t) => t.permissions.length === u.permissions.length && t.permissions.every((p) => u.permissions.includes(p)))
     return t ? templateLabel(me, t.key) ?? t.label : 'Permisos a la medida'
   }
@@ -50,7 +52,7 @@ export function Usuarios({ me }: { me: Me }) {
             {users.map((u) => (
               <div key={u.id} className={`team-row ${u.role === 'owner' ? '' : 'clickable'}`} onClick={() => u.role !== 'owner' && setSel({ ...u })}>
                 <span className="avatar" aria-hidden>{u.name.trim().charAt(0).toUpperCase()}</span>
-                <span className="team-who"><b>{u.name}</b><small className="muted"><span className="team-role">{u.position === 'encargado' ? 'Encargado' : roleOf(u)}</span> · {u.username ? `usuario: ${u.username}` : 'entra con su teléfono'}{!u.active ? ' · desactivado' : ''}</small></span>
+                <span className="team-who"><b>{u.name}</b><small className="muted"><span className="team-role">{roleOf(u)}</span> · {u.username ? `usuario: ${u.username}` : 'entra con su teléfono'}{!u.active ? ' · desactivado' : ''}</small></span>
                 {u.role !== 'owner' && <button className="mini" onClick={(e) => { e.stopPropagation(); setSel({ ...u }) }}>Abrir</button>}
               </div>
             ))}
@@ -91,7 +93,7 @@ function NuevoEmpleado({ me, templates, onClose, onDone }: { me: Me; templates: 
           <label>Contraseña inicial<input value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} placeholder="mínimo 8" /></label>
         </div>
         <p className="muted small">El usuario no se puede repetir con otro negocio. En su primer ingreso le pedirá cambiar la contraseña.</p>
-        <label>Puesto<select value={f.template} onChange={(e) => setF({ ...f, template: e.target.value })}>{templates.filter((t) => templateLabel(me, t.key) && (me.user.role === 'owner' || t.key !== 'encargado')).map((t) => <option key={t.key} value={t.key}>{templateLabel(me, t.key)}</option>)}</select></label>
+        <label>Puesto<select value={f.template} onChange={(e) => setF({ ...f, template: e.target.value })}>{templates.filter((t) => templateLabel(me, t.key) && (me.user.role === 'owner' || (t.key !== 'encargado' && t.key !== 'administrador'))).map((t) => <option key={t.key} value={t.key}>{templateLabel(me, t.key)}</option>)}</select></label>
         {branches.length > 1 && <label>Sucursal<select value={f.branchId ?? ''} onChange={(e) => setF({ ...f, branchId: e.target.value || undefined })}><option value="">Principal</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>}
         <p className="muted small">El puesto pone permisos de inicio; después puedes ajustarlos uno por uno.</p>
         {err && <p className="error">{err}</p>}
@@ -107,6 +109,7 @@ function Empleado({ me, u, catalog, onClose, onChanged }: { me: Me; u: any; cata
   const [active, setActive] = useState<boolean>(u.active)
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const run = (fn: () => Promise<unknown>, ok: string) => async () => { try { await fn(); setMsg({ ok }); onChanged() } catch (e) { setMsg({ err: (e as Error).message }) } }
+  const admin = u.position === 'administrador'
   const owner = me.user.role === 'owner'
   const agenda = owner && hasGiro(me, 'barberia', 'unas')
   return (
@@ -121,10 +124,11 @@ function Empleado({ me, u, catalog, onClose, onChanged }: { me: Me; u: any; cata
         </nav>
         {tab === 'permisos' && (<>
           <div className="checks perms">
-            {catalog.permissions.map((p) => (
+            {catalog.permissions.filter((p) => admin || !FIN_PERMS.includes(p.key)).map((p) => (
               <label key={p.key} className="check"><input type="checkbox" checked={perms.includes(p.key)} onChange={() => setPerms(perms.includes(p.key) ? perms.filter((x) => x !== p.key) : [...perms, p.key])} />{p.label}</label>
             ))}
           </div>
+          {admin && <p className="muted small"><b>Administrador autorizado:</b> empieza sin ninguna función. Marca solo lo que quieres que vea o haga; no hereda nada tuyo.</p>}
           <p className="muted small">Lo que no esté marcado no le aparece en pantalla ni puede hacerlo: el sistema lo bloquea. «Ver reportes» le permite ver también las ventas de sus compañeros.</p>
           <p><button className="primary" onClick={run(() => api('PATCH', `/users/${u.id}`, { permissions: perms }), 'Permisos guardados.')}>Guardar permisos</button></p>
         </>)}

@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { authorize } from './authcode.js'
-import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Env } from './context.js'
+import { body, canFinance, hasPerm, ownerOnly, parse, requirePerm, type C, type Env, requireFinance } from './context.js'
 import type { Db } from './db.js'
 import { bad, clampTime, conflict, forbidden, iso, newId, notFound, type Clock } from './util.js'
 import { scopeBranch } from './scope.js'
@@ -133,11 +133,14 @@ export function suggestedPrice(db: Db, p: ProductRow, unitCost = p.last_cost): n
   return Math.round(unitCost * (1 + margin / 10_000))
 }
 
-function productView(db: Db, p: ProductRow, branchId: string | null) {
+/** Costo y margen solo los ve quien los necesita (dueño, administrador autorizado, o quien compra y edita inventario). */
+const seeCosts = (c: C) => canFinance(c.get('session').user, 'costs')
+
+function productView(db: Db, p: ProductRow, branchId: string | null, costs = true) {
   const presentations = db.prepare('SELECT id, name, factor_milli AS factorMilli, price, barcode FROM presentations WHERE product_id = ? AND active = 1').all(p.id)
   // Precio de mayoreo / escalas por volumen: la caja los usa para mostrar el mismo precio que cobra el servidor.
   const tiers = (db.prepare('SELECT min_milli, price FROM price_tiers WHERE product_id = ? ORDER BY min_milli').all(p.id) as { min_milli: number; price: number }[]).map((t) => ({ minQuantity: fromMilli(t.min_milli), price: t.price }))
-  return {
+  const v = {
     id: p.id, name: p.name, categoryId: p.category_id, barcode: p.barcode, unit: p.unit, basePrice: p.price, marginBp: p.margin_bp,
     minStock: fromMilli(p.min_stock_milli), trackExpiry: !!p.track_expiry, sellable: !!p.sellable, attrs: JSON.parse(p.attrs), trackStock: !!(p as ProductRow & { track_stock: number }).track_stock, lastCost: p.last_cost, version: p.version, updatedAt: p.updated_at, active: !!p.active,
     ...(branchId ? { price: currentPrice(db, branchId, p), stock: fromMilli(stockOf(db, branchId, p.id)), reserved: fromMilli((db.prepare("SELECT COALESCE(SUM(i.qty_milli),0) v FROM layaway_items i JOIN layaways l ON l.id = i.layaway_id WHERE l.branch_id = ? AND l.status = 'abierto' AND i.product_id = ?").get(branchId, p.id) as { v: number }).v) } : {}),
@@ -147,6 +150,9 @@ function productView(db: Db, p: ProductRow, branchId: string | null) {
     // Set o combo: lo que descuenta al venderse (perfumería, papelería).
     combo: (db.prepare('SELECT ci.product_id AS productId, x.name, ci.qty_milli FROM combo_items ci JOIN products x ON x.id = ci.product_id WHERE ci.combo_id = ?').all(p.id) as { productId: string; name: string; qty_milli: number }[]).map(({ qty_milli, ...r }) => ({ ...r, quantity: fromMilli(qty_milli) })),
   }
+  if (costs) return v
+  const { lastCost: _c, marginBp: _m, suggestedPrice: _s, ...safe } = v
+  return safe
 }
 
 const branchOf = (c: C, q?: string) => {
@@ -244,7 +250,7 @@ inventory.get('/products', (c) => {
   const rows = db
     .prepare(`SELECT * FROM products WHERE business_id = ? ${q ? 'AND (name LIKE ? OR barcode = ? OR attrs LIKE ?)' : ''} ${since ? 'AND updated_at > ?' : ''} ORDER BY name LIMIT 2000`)
     .all(...[u.business_id, ...(q ? [`%${q}%`, q, `%${q}%`] : []), ...(since ? [since] : [])]) as ProductRow[]
-  return c.json({ products: rows.map((p) => productView(db, p, branchId)) })
+  return c.json({ products: rows.map((p) => productView(db, p, branchId, seeCosts(c))) })
 })
 
 /** Búsqueda por código de barras (producto o presentación) para el lector de la caja. */
@@ -253,16 +259,16 @@ inventory.get('/products/barcode/:code', (c) => {
   const u = c.get('session').user
   const code = c.req.param('code')
   const p = db.prepare('SELECT * FROM products WHERE business_id = ? AND barcode = ? AND active = 1').get(u.business_id, code) as ProductRow | undefined
-  if (p) return c.json({ product: productView(db, p, branchOf(c)), presentationId: null })
+  if (p) return c.json({ product: productView(db, p, branchOf(c), seeCosts(c)), presentationId: null })
   const pr = db.prepare('SELECT pr.id, pr.product_id FROM presentations pr JOIN products p ON p.id = pr.product_id WHERE p.business_id = ? AND pr.barcode = ? AND pr.active = 1').get(u.business_id, code) as { id: string; product_id: string } | undefined
   if (!pr) throw notFound('Ningún producto tiene ese código.')
-  return c.json({ product: productView(db, getProduct(db, u.business_id, pr.product_id), branchOf(c)), presentationId: pr.id })
+  return c.json({ product: productView(db, getProduct(db, u.business_id, pr.product_id), branchOf(c), seeCosts(c)), presentationId: pr.id })
 })
 
 inventory.get('/products/:id', (c) => {
   const { db } = c.get('deps')
   const p = getProduct(db, c.get('session').user.business_id, c.req.param('id'))
-  return c.json({ product: productView(db, p, branchOf(c)) })
+  return c.json({ product: productView(db, p, branchOf(c), seeCosts(c)) })
 })
 
 inventory.post('/products', requirePerm('configure_catalog'), async (c) => {
@@ -270,7 +276,7 @@ inventory.post('/products', requirePerm('configure_catalog'), async (c) => {
   const u = c.get('session').user
   const d = parse(productBody, await body(c))
   const id = createProduct(db, now, u.business_id, u.id, d)
-  return c.json({ product: productView(db, getProduct(db, u.business_id, id), u.branch_id) }, 201)
+  return c.json({ product: productView(db, getProduct(db, u.business_id, id), u.branch_id, seeCosts(c)) }, 201)
 })
 
 /**
@@ -334,7 +340,7 @@ inventory.patch('/products/:id', requirePerm('configure_catalog'), async (c) => 
     })
     return stale ? 'conflicto_gana' : 'aplicado'
   })()
-  return c.json({ status: result, product: productView(db, getProduct(db, u.business_id, p.id), u.branch_id) })
+  return c.json({ status: result, product: productView(db, getProduct(db, u.business_id, p.id), u.branch_id, seeCosts(c)) })
 })
 
 inventory.post('/products/:id/presentations', requirePerm('configure_catalog'), async (c) => {
@@ -399,7 +405,7 @@ inventory.get('/inventory/expiring', requirePerm('view_inventory'), (c) => {
   return c.json({ lots: rows.map(({ qty_remaining_milli, ...r }) => ({ ...r, remaining: fromMilli(qty_remaining_milli), expired: r.expiresAt <= iso(now()) })) })
 })
 
-inventory.get('/inventory/value', requirePerm('view_reports'), (c) => {
+inventory.get('/inventory/value', requireFinance('finance'), (c) => {
   const { db } = c.get('deps')
   const r = db.prepare('SELECT COALESCE(SUM(qty_remaining_milli * unit_cost / 1000.0),0) v FROM lots WHERE business_id = ? AND branch_id = ?').get(c.get('session').user.business_id, branchOf(c)) as { v: number }
   return c.json({ value: Math.round(r.v) })

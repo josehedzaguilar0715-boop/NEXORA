@@ -289,10 +289,10 @@ describe('monitoreo', () => {
 })
 
 describe('migración 42', () => {
-  it('es aditiva: solo tablas nuevas y el esquema queda en 42', async () => {
+  it('es aditiva: solo tablas nuevas (el esquema es al menos 42)', async () => {
     const f = await dosSucursales()
-    expect((f.s.db.prepare('SELECT MAX(version) v FROM _migrations').get() as any).v).toBe(42)
+    expect((f.s.db.prepare('SELECT MAX(version) v FROM _migrations').get() as any).v).toBeGreaterThanOrEqual(42)
     expect((await f.s.app.request('/health')).status).toBe(200)
-    expect(await (await f.s.app.request('/health')).json()).toEqual({ ok: true, schema: 42 })
+    expect(await (await f.s.app.request('/health')).json()).toEqual({ ok: true, schema: (f.s.db.prepare('SELECT MAX(version) v FROM _migrations').get() as any).v })
   })
 })

@@ -30,7 +30,7 @@ describe('migraciones 41 y 42 (users.position; respaldos, errores e interruptore
     ;(db as any).close?.()
     // Arranque con el código nuevo: aplica la 41 (columna) y la 42 (tablas de respaldos, errores e interruptores).
     db = openDb(file)
-    expect((db.prepare('SELECT MAX(version) v FROM _migrations').get() as any).v).toBe(42)
+    expect((db.prepare('SELECT MAX(version) v FROM _migrations').get() as any).v).toBeGreaterThanOrEqual(42)
     expect((db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name IN ('backup_log','error_log','feature_flags')").get() as any).n).toBe(3)
     expect((db.prepare("SELECT COUNT(*) n FROM pragma_table_info('users') WHERE name = 'position'").get() as any).n).toBe(1)
     expect(db.prepare('SELECT id, role, name, permissions, branch_id FROM users ORDER BY id').all()).toEqual(antes)

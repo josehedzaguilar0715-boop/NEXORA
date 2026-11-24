@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { businessGiros, GIROS, setting } from './billing.js'
-import { body, parse, LOCK_MINUTES, MAX_FAILED, smsOn, type Deps, type Env, puestoOf, type UserRow } from './context.js'
+import { body, parse, LOCK_MINUTES, MAX_FAILED, smsOn, type Deps, type Env, canFinance, puestoOf, type UserRow } from './context.js'
 import {
   bad, businessCode, forbidden, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone,
   normalizeUsername, notFound, numericCode, sha256, unauthorized, verifySecret,
@@ -256,6 +256,8 @@ authed.get('/auth/me', (c) => {
     modules: JSON.parse((db.prepare('SELECT modules FROM businesses WHERE id = ?').get(user.business_id) as { modules: string }).modules),
     user: { id: user.id, name: user.name, username: user.username, phone: user.phone, role: user.role, position: puestoOf(user), branchId: user.branch_id, mustChangePassword: !!user.must_change_password },
     permissions,
+    // Lo que el servidor le permitirá ver de finanzas (la pantalla solo lo usa para mostrar u ocultar; el servidor decide siempre).
+    access: { dashboard: canFinance(user, 'dashboard'), finance: canFinance(user, 'finance'), manage: canFinance(user, 'manage'), costs: canFinance(user, 'costs') },
     business: biz,
   })
 })

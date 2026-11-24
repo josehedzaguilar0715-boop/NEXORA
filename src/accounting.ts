@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
-import { body, ownerOnly, parse, requirePerm, type Env } from './context.js'
+import { body, ownerOnly, parse, requirePerm, type Env, requireFinance } from './context.js'
 import type { Db } from './db.js'
 import { shiftTotals, type ShiftRow } from './cash.js'
 import { periodSummary, range, restockNeeded } from './finance.js'
@@ -136,7 +136,7 @@ export function ledger(db: Db, businessId: string, from: string, to: string): En
 
 const CATEGORY_LABEL: Record<string, string> = { renta: 'Renta', servicios: 'Luz, agua, gas, internet y teléfono', nomina: 'Sueldos', insumos: 'Insumos y limpieza', transporte: 'Transporte y gasolina', mantenimiento: 'Mantenimiento', publicidad: 'Publicidad', impuestos: 'Impuestos y permisos', comisiones_bancarias: 'Comisiones bancarias', otros: 'Otros' }
 
-accounting.get('/accounting/income-statement', requirePerm('view_reports'), (c) => {
+accounting.get('/accounting/income-statement', requireFinance('finance'), (c) => {
   const { db, now } = c.get('deps')
   const b = c.get('session').user.business_id
   const { from, to } = period(c, localDate(now()))
@@ -144,18 +144,18 @@ accounting.get('/accounting/income-statement', requirePerm('view_reports'), (c) 
   return c.json({ current: incomeStatement(db, b, from, to), previous: incomeStatement(db, b, prev.from, prev.to) })
 })
 
-accounting.get('/accounting/cash-flow', requirePerm('view_reports'), (c) => {
+accounting.get('/accounting/cash-flow', requireFinance('finance'), (c) => {
   const { db, now } = c.get('deps')
   const { from, to } = period(c, localDate(now()))
   return c.json(cashFlow(db, c.get('session').user.business_id, from, to))
 })
 
-accounting.get('/accounting/balance', requirePerm('view_reports'), (c) => {
+accounting.get('/accounting/balance', requireFinance('finance'), (c) => {
   const { db, now } = c.get('deps')
   return c.json({ date: localDate(now()), ...balanceSheet(db, c.get('session').user.business_id) })
 })
 
-accounting.get('/accounting/ledger', requirePerm('view_reports'), (c) => {
+accounting.get('/accounting/ledger', requireFinance('finance'), (c) => {
   const { db, now } = c.get('deps')
   const { from, to } = period(c, localDate(now()))
   const rows = ledger(db, c.get('session').user.business_id, from, to)
@@ -163,7 +163,7 @@ accounting.get('/accounting/ledger', requirePerm('view_reports'), (c) => {
 })
 
 /** Exportar para el contador (CSV que abre Excel). */
-accounting.get('/accounting/export', requirePerm('view_reports'), (c) => {
+accounting.get('/accounting/export', requireFinance('finance'), (c) => {
   const { db, now } = c.get('deps')
   const b = c.get('session').user.business_id
   const { from, to } = period(c, localDate(now()))

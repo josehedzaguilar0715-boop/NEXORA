@@ -2,8 +2,8 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { GIROS, limits, type BusinessRow } from './billing.js'
-import { body, hasPerm, type C, ownerOnly, parse, puestoOf, requirePerm, type Env, type UserRow } from './context.js'
-import { PERMISSIONS, PERMISSION_KEYS, TEMPLATES, type Permission } from './permissions.js'
+import { body, hasPerm, type C, ownerOnly, parse, puestoOf, requirePerm, type Env, type UserRow, requireFinance } from './context.js'
+import { FINANCE_PERMS, PERMISSIONS, PERMISSION_KEYS, TEMPLATES, type Permission } from './permissions.js'
 import { scopeOwn } from './scope.js'
 import { bad, checkPassword, conflict, forbidden, hashSecret, iso, newId, normalizeUsername, notFound, verifySecret } from './util.js'
 
@@ -71,7 +71,7 @@ users.post('/users', requirePerm('create_employees'), async (c) => {
       template: z.string().optional(),
       permissions: perms.optional(),
       branchId: z.string().optional(),
-      position: z.enum(['encargado', 'empleado']).optional(),
+      position: z.enum(['administrador', 'encargado', 'empleado']).optional(),
     }),
     await body(c),
   )
@@ -83,6 +83,8 @@ users.post('/users', requirePerm('create_employees'), async (c) => {
   const position = d.position ?? tpl?.position ?? 'empleado'
   // Solo el dueño nombra encargados: un encargado crea empleados de su sucursal.
   if (position === 'encargado' && actor.role !== 'owner') throw forbidden('Solo el dueño puede nombrar encargados.')
+  if (position === 'administrador' && actor.role !== 'owner') throw forbidden('Solo el dueño puede nombrar administradores.')
+  if (position !== 'administrador' && granted.some((p) => FINANCE_PERMS.includes(p))) throw bad('Las funciones de finanzas solo se le pueden dar a un Administrador autorizado.')
   // Quien no es dueño solo puede dar permisos que él mismo tiene.
   for (const p of granted) if (!hasPerm(actor, p)) throw forbidden('No puedes dar un permiso que tú no tienes.')
   const branchId = d.branchId ?? actor.branch_id
@@ -93,8 +95,8 @@ users.post('/users', requirePerm('create_employees'), async (c) => {
   const biz = db.prepare('SELECT force_password_change FROM businesses WHERE id = ?').get(actor.business_id) as { force_password_change: number }
   const id = newId()
   db.prepare(
-    "INSERT INTO users (id, business_id, branch_id, role, name, username, password_hash, must_change_password, permissions, position, created_at) VALUES (?,?,?,'staff',?,?,?,?,?,?,?)",
-  ).run(id, actor.business_id, branchId, d.name, username, hashSecret(d.password), biz.force_password_change, JSON.stringify(granted), position, iso(now()))
+    "INSERT INTO users (id, business_id, branch_id, role, name, username, password_hash, must_change_password, permissions, position, admin_authorized, created_at) VALUES (?,?,?,'staff',?,?,?,?,?,?,?,?)",
+  ).run(id, actor.business_id, branchId, d.name, username, hashSecret(d.password), biz.force_password_change, JSON.stringify(granted), position === 'administrador' ? null : position, position === 'administrador' ? 1 : 0, iso(now()))
   audit(db, now, { businessId: actor.business_id, userId: actor.id, action: 'usuario.alta', entity: 'user', entityId: id, newValue: { name: d.name, username, position, branchId, permissions: granted } })
   return c.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow) }, 201)
 })
@@ -115,7 +117,7 @@ users.patch('/users/:id', requirePerm('create_employees'), async (c) => {
   // Un encargado solo administra empleados (no a otros encargados) y solo de su sucursal (la sucursal ya la revisa el control central).
   if (actor.role !== 'owner' && puestoOf(target) !== 'empleado') throw forbidden('Solo el dueño administra a los encargados.')
   const d = parse(
-    z.object({ name: z.string().trim().min(2).max(100).optional(), permissions: perms.optional(), active: z.boolean().optional(), branchId: z.string().optional(), position: z.enum(['encargado', 'empleado']).optional() }),
+    z.object({ name: z.string().trim().min(2).max(100).optional(), permissions: perms.optional(), active: z.boolean().optional(), branchId: z.string().optional(), position: z.enum(['administrador', 'encargado', 'empleado']).optional() }),
     await body(c),
   )
   if (d.position && actor.role !== 'owner') throw forbidden('Solo el dueño cambia el puesto de una persona.')
@@ -123,13 +125,20 @@ users.patch('/users/:id', requirePerm('create_employees'), async (c) => {
   if (d.active === true && !target.active) ensureUserSlot(db, actor.business_id)
   const granted = d.permissions ? [...new Set<Permission>(d.permissions)] : undefined
   if (granted) for (const p of granted) if (!hasPerm(actor, p)) throw forbidden('No puedes dar un permiso que tú no tienes.')
-  if (d.branchId && !db.prepare('SELECT 1 FROM branches WHERE id = ? AND business_id = ?').get(d.branchId, actor.business_id)) throw bad('Esa sucursal no existe.')
-  db.prepare('UPDATE users SET name = ?, permissions = ?, active = ?, branch_id = ?, position = ? WHERE id = ?').run(
+  // Puesto resultante: las funciones de finanzas solo caben en un Administrador autorizado.
+  const makesAdmin = d.position ? d.position === 'administrador' : puestoOf(target) === 'administrador'
+  const finalPerms = granted ?? (JSON.parse(target.permissions) as Permission[])
+  if (!makesAdmin && granted && granted.some((p) => FINANCE_PERMS.includes(p))) throw bad('Las funciones de finanzas solo se le pueden dar a un Administrador autorizado.')
+  if (d.branchId && !db.prepare('SELECT 1 FROM branches WHERE id = ? AND business_id = ? AND active = 1').get(d.branchId, actor.business_id)) throw bad('Esa sucursal no existe.')
+  // Al cambiar de puesto, las funciones de finanzas guardadas se quitan si ya no es administrador (no quedan escondidas).
+  const keep = makesAdmin ? finalPerms : finalPerms.filter((p) => !FINANCE_PERMS.includes(p))
+  db.prepare('UPDATE users SET name = ?, permissions = ?, active = ?, branch_id = ?, position = ?, admin_authorized = ? WHERE id = ?').run(
     d.name ?? target.name,
-    granted ? JSON.stringify(granted) : target.permissions,
+    granted || !makesAdmin ? JSON.stringify(keep) : target.permissions,
     d.active === undefined ? target.active : d.active ? 1 : 0,
     d.branchId ?? target.branch_id,
-    d.position ?? target.position ?? puestoOf(target), // al guardar, el puesto queda registrado (autorización expresa del dueño)
+    makesAdmin ? target.position : d.position && d.position !== 'administrador' ? d.position : target.position ?? puestoOf(target), // al guardar, el puesto queda registrado (autorización expresa del dueño)
+    makesAdmin ? 1 : 0,
     target.id,
   )
   const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(target.id) as UserRow
@@ -205,7 +214,7 @@ users.patch('/business', ownerOnly, async (c) => {
   return c.json({ business: fresh })
 })
 
-users.get('/audit', requirePerm('view_reports'), (c) => {
+users.get('/audit', requireFinance('finance'), (c) => {
   const { db } = c.get('deps')
   const limit = Math.min(Number(c.req.query('limit') ?? 100) || 100, 500)
   const u = c.get('session').user

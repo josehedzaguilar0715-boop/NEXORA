@@ -1515,6 +1515,9 @@ const MIGRATIONS: Migration[] = [
   CREATE TABLE feature_flags (
     key TEXT PRIMARY KEY, enabled INTEGER NOT NULL, business_ids TEXT, note TEXT, updated_at TEXT NOT NULL
   );`,
+  // Administrador autorizado: un puesto más (nace sin permisos; el dueño le marca cada función). Solo agrega una columna con 0 por omisión:
+  // ningún usuario existente cambia de puesto ni de permisos.
+  `ALTER TABLE users ADD COLUMN admin_authorized INTEGER NOT NULL DEFAULT 0;`,
 ]
 export const SCHEMA_VERSION = MIGRATIONS.length
 

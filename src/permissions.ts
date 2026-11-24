@@ -13,14 +13,23 @@ export const PERMISSIONS = {
   attendance: 'Asistencia',
   give_stamps: 'Dar sellos o puntos a mano',
   kitchen: 'Cocina: ver comandas y pedidos y marcarlos listos',
+  // Solo para el Administrador autorizado (los marca el dueño; a nadie más le sirven).
+  view_dashboard: 'Ver el resumen general del negocio',
+  view_finance: 'Ver las finanzas: ganancias, gastos y dinero disponible',
+  manage_finance: 'Registrar retiros, gastos y el reparto del dinero',
+  view_costs: 'Ver costos y márgenes de los productos',
 } as const
 
 export type Permission = keyof typeof PERMISSIONS
+/** Funciones financieras: solo las puede tener un Administrador autorizado. */
+export const FINANCE_PERMS: Permission[] = ['view_dashboard', 'view_finance', 'manage_finance', 'view_costs']
 export const PERMISSION_KEYS = Object.keys(PERMISSIONS) as [Permission, ...Permission[]]
 
 /** Plantillas editables: solo son un punto de partida al crear un usuario. */
-export const TEMPLATES: Record<string, { label: string; position: 'encargado' | 'empleado'; permissions: Permission[] }> = {
+export const TEMPLATES: Record<string, { label: string; position: 'administrador' | 'encargado' | 'empleado'; permissions: Permission[] }> = {
   // El empleado no ve reportes ni ventas de otros: «ver reportes» lo autoriza el dueño aparte.
+  // Nace sin ninguna función: el dueño marca una por una lo que puede ver y hacer.
+  administrador: { label: 'Administrador autorizado', position: 'administrador', permissions: [] },
   cajero: { label: 'Cajero', position: 'empleado', permissions: ['sell', 'open_close_cash', 'customers_credit'] },
   encargado: {
     label: 'Encargado',

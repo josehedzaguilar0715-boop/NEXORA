@@ -13,8 +13,8 @@ const KIND: Record<string, string> = { venta: 'Venta', retiro: 'Retiro de caja',
 
 /** Inicio (dashboard): indicadores del día, gráfica de la semana y movimientos recientes. Se actualiza solo. */
 export function Inicio({ me }: { me: Me }) {
-  // Quien no tiene «ver reportes» (un empleado) ve solo «Mi día»: sus propias ventas y su caja.
-  if (!can(me, 'view_reports')) return <MiDia me={me} />
+  // El panel general es del dueño y de quien él autorice. Todos los demás ven solo «Mi día»: sus propias ventas y su caja.
+  if (!can(me, 'fin:dashboard')) return <MiDia me={me} />
   return <InicioNegocio me={me} />
 }
 

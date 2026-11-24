@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono'
-import { hasPerm, isManager, type C, type Env, type UserRow } from './context.js'
+import { hasPerm, isManager, puestoOf, seesWholeBusiness, type C, type Env, type UserRow } from './context.js'
 import type { Db } from './db.js'
 import { AppError } from './util.js'
 
@@ -7,6 +7,7 @@ import { AppError } from './util.js'
  * Alcance de cada puesto (decisión del propietario, 24 nov 2026; no cambiar sin consultarlo):
  *
  *  · DUEÑO     → todas las sucursales y toda la información del negocio.
+ *  · ADMINISTRADOR AUTORIZADO (aprobado 24 nov 2026) → todas las sucursales, pero SOLO con las funciones que el dueño le marcó (nace sin ninguna).
  *  · ENCARGADO → solo su sucursal, con los permisos operativos que el dueño le haya dado.
  *  · EMPLEADO  → solo lo propio (sus ventas, su caja y sus actividades) con los permisos que el dueño le haya dado.
  *                No ve las ventas privadas de otros empleados.
@@ -19,7 +20,7 @@ const otraSucursal = () => new AppError(403, 'otra_sucursal', 'No tienes acceso 
 const noEsTuyo = () => new AppError(403, 'no_es_tuyo', 'Solo puedes consultar tus propias operaciones.')
 
 /** Quien ve lo de otros empleados: dueño, encargado, o un empleado a quien el dueño le dio «ver reportes». */
-export const seesOthers = (u: UserRow) => isManager(u) || hasPerm(u, 'view_reports')
+export const seesOthers = (u: UserRow) => isManager(u) || puestoOf(u) === 'administrador' || hasPerm(u, 'view_reports')
 
 /**
  * Sucursal a la que se limitan las consultas de este usuario.
@@ -28,7 +29,7 @@ export const seesOthers = (u: UserRow) => isManager(u) || hasPerm(u, 'view_repor
  */
 export function scopeBranch(c: C): string | undefined {
   const u = c.get('session').user
-  if (u.role === 'owner') return c.req.query('branchId') || undefined
+  if (seesWholeBusiness(u)) return c.req.query('branchId') || undefined
   return u.branch_id ?? '(sin sucursal)'
 }
 
@@ -47,7 +48,7 @@ export const isMultiBranch = (db: Db, businessId: string) => (db.prepare('SELECT
  */
 export const wholeBusinessOnly: MiddlewareHandler<Env> = async (c, next) => {
   const u = c.get('session').user
-  if (u.role !== 'owner' && isMultiBranch(c.get('deps').db, u.business_id)) throw new AppError(403, 'solo_dueno', 'Esta información junta todas las sucursales: solo la ve el dueño.')
+  if (!seesWholeBusiness(u) && isMultiBranch(c.get('deps').db, u.business_id)) throw new AppError(403, 'solo_dueno', 'Esta información junta todas las sucursales: solo la ve el dueño.')
   await next()
 }
 
@@ -143,7 +144,7 @@ function check(db: Db, u: UserRow, rule: Rule, id: unknown, opts: { person?: boo
  */
 export const scopeGuard: MiddlewareHandler<Env> = async (c, next) => {
   const u = c.get('session').user
-  if (u.role === 'owner') return next()
+  if (seesWholeBusiness(u)) return next()
   const { db } = c.get('deps')
   const path = c.req.path.replace(/^\/api(?=\/)/, '')
 
