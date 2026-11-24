@@ -19,11 +19,14 @@ const server = serve({ fetch: root.fetch, port: 0 }); await new Promise((r) => s
 const base = `http://localhost:${(server.address() as { port: number }).port}`
 const VP: Record<string, { width: number; height: number }> = { escritorio: { width: 1366, height: 900 }, tableta: { width: 768, height: 1024 }, celular: { width: 390, height: 844 } }
 const vps = (process.env.VPS ?? 'escritorio,celular').split(',')
-const giros = DEMOS.map((d) => d.giro).filter((g) => !process.env.SOLO || process.env.SOLO.split(',').includes(g))
+// SOLO=nexora audita el producto 14 (la base NEXORA, sin giro propio): un negocio de prueba con un giro desconocido.
+const base14 = process.env.SOLO === 'nexora'
+const giros = base14 ? ['abarrotes'] : DEMOS.map((d) => d.giro).filter((g) => !process.env.SOLO || process.env.SOLO.split(',').includes(g))
 const browser = await chromium.launch()
 const hallazgos: string[] = []; let total = 0
 for (const giro of giros) {
   const r = await s.call('POST', `/admin/demos/${giro}`, { token: at })
+  if (base14) s.db.prepare("UPDATE businesses SET giro = 'base', extra_giros = '[]'").run()
   let own = await s.call('POST', '/auth/owner/login', { body: { phone: r.json.demo.phone, password: 'demo1234' } })
   if (own.json.challengeId) own = await s.call('POST', '/auth/owner/verify', { body: { challengeId: own.json.challengeId, code: s.codes[r.json.demo.phone] } })
   for (const vp of vps) {

@@ -93,6 +93,12 @@ export function Agenda({ me }: { me: Me }) {
         <button className="primary" onClick={() => setForm({ walkIn: false })}>+ Nueva cita</button>
         <button onClick={() => setForm({ walkIn: true })}>Cliente sin cita</button>
       </div>
+      {(() => {
+        const vivas = data.appointments.filter((x) => !['cancelada', 'no_asistio'].includes(x.status))
+        const porConfirmar = vivas.filter((x) => x.status === 'pendiente').length
+        const porCobrar = vivas.filter((x) => x.toCharge).length
+        return <p className="agenda-resumen" aria-live="polite"><b>{vivas.length}</b> {vivas.length === 1 ? 'cita' : 'citas'}{porConfirmar > 0 && <> · <span className="estado warn">{porConfirmar} por confirmar</span></>}{porCobrar > 0 && <> · <span className="estado info">{porCobrar} pendiente{porCobrar === 1 ? '' : 's'} de cobro</span></>}</p>
+      })()}
       {me.modules?.includes('reservas') && link && <p className="muted small link-line">Link para que tus clientes reserven: <a href={link} target="_blank" rel="noreferrer">{link}</a></p>}
       {msg.err && <p className="error">{msg.err}</p>}
       {msg.ok && <p className="okmsg">{msg.ok}</p>}

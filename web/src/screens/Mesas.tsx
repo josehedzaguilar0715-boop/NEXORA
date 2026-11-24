@@ -14,6 +14,7 @@ export function Mesas({ me }: { me: Me }) {
   const [tables, setTables] = useState<any[]>([])
   const [tab, setTab] = useState<any>(null)
   const [msg, setMsg] = useState('')
+  const [filtro, setFiltro] = useState('todas')
   const [panel, setPanel] = useState<'' | 'reservas' | 'rentas'>('')
   const load = async () => setTables((await api<any>('GET', '/tables')).tables)
   useEffect(() => { void load(); return everyVisible(load, 15_000) }, [])
@@ -28,9 +29,14 @@ export function Mesas({ me }: { me: Me }) {
     } catch (e) { setMsg((e as Error).message) }
   }
   if (tab) return <Cuenta me={me} tab={tab} onClose={() => { setTab(null); void load() }} />
-  const areas = [...new Set(tables.map((t) => t.area))]
+  const cuenta = (st: string) => tables.filter((t) => t.status === st).length
+  const visibles = tables.filter((t) => filtro === 'todas' || (filtro === 'activas' ? ['ocupada', 'por_cobrar'].includes(t.status) : t.status === filtro))
+  const areas = [...new Set(visibles.map((t) => t.area))]
   return (
     <div>
+      <div className="row chips" role="group" aria-label="Filtrar mesas">
+        {([['todas', 'Todas', tables.length], ['libre', 'Libres', cuenta('libre')], ['activas', 'Con cuenta abierta', cuenta('ocupada') + cuenta('por_cobrar')], ['por_cobrar', 'Por cobrar', cuenta('por_cobrar')], ['limpieza', 'Por limpiar', cuenta('limpieza')]] as [string, string, number][]).filter(([k, , n]) => k === 'todas' || n > 0 || filtro === k).map(([k, label, n]) => <button key={k} className={filtro === k ? 'on' : ''} aria-pressed={filtro === k} onClick={() => setFiltro(k)}>{label} <b>{n}</b></button>)}
+      </div>
       <div className="toolbar">
         <button onClick={() => setPanel('reservas')}>Reservas de mesa</button>
         {hasGiro(me, 'palapa') && <button onClick={() => setPanel('rentas')}>Rentas fuera</button>}
@@ -42,7 +48,7 @@ export function Mesas({ me }: { me: Me }) {
       {areas.map((a) => (
         <section key={a} className="card" style={{ marginBottom: 16 }}>
           <h2 style={{ textTransform: 'capitalize' }}>{a}</h2>
-          <div className="results">{tables.filter((t) => t.area === a).map((t) => (
+          <div className="results">{visibles.filter((t) => t.area === a).map((t) => (
             <button key={t.id} onClick={() => openTable(t)} style={{ borderColor: COLORS[t.status], borderWidth: 4, minHeight: 110 }}>
               Mesa {t.name} · {t.seats} lugares
               <small style={{ color: COLORS[t.status], fontWeight: 700 }}>{LABEL[t.status]}{t.status === 'limpieza' ? ' (toca para liberar)' : ''}</small>
@@ -52,6 +58,7 @@ export function Mesas({ me }: { me: Me }) {
           ))}</div>
         </section>
       ))}
+      {tables.length > 0 && visibles.length === 0 && <p className="card muted">No hay mesas en este grupo.</p>}
       {tables.length === 0 && <p className="card">Todavía no hay mesas. {me.user.role === 'owner' ? <>Dalas de alta en <a href="#/configurar">Configurar negocio → Mesas</a>.</> : 'Pídele al dueño que las dé de alta.'}</p>}
     </div>
   )
@@ -177,10 +184,11 @@ export function Cocina(_: { me: Me }) {
   return (
     <div>
       {stations.length > 0 && <div className="tabs">{stations.map((s) => <button key={s} className={station === s ? 'on' : ''} onClick={() => { setStation(s); localStorage.setItem('nx_station', s) }}>{s ? stationLabel(s) : 'Todas'}</button>)}</div>}
-      <div className="results" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>{list.map((k) => (
+      {list.length > 0 && <p className="muted" style={{ margin: '4px 0 10px' }}><b>{list.length}</b> {list.length === 1 ? 'comanda pendiente' : 'comandas pendientes'} · la más antigua lleva {Math.max(...list.map((k) => k.minutes))} min (las más viejas van primero)</p>}
+      <div className="results" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>{[...list].sort((a, b) => b.minutes - a.minutes).map((k) => (
         <div key={k.id} className="card" style={{ borderColor: k.minutes >= 20 ? 'var(--danger)' : k.minutes >= 10 ? 'var(--accent)' : 'var(--line)', borderWidth: 3 }}>
           <h2>{k.where}</h2>
-          <p className="muted">{stationLabel(k.station)} · hace {k.minutes} min</p>
+          <p className="muted">{stationLabel(k.station)} · hace {k.minutes} min {k.minutes >= 20 ? <span className="estado danger">Urgente</span> : k.minutes >= 10 ? <span className="estado warn">Atención</span> : null}</p>
           <ul style={{ fontSize: '1.2rem' }}>{k.items.map((i: any, n: number) => <li key={n}><b>{i.quantity}</b> {i.description}{i.notes ? ` — ${i.notes}` : ''}</li>)}</ul>
           <button className="primary big" style={{ width: '100%' }} onClick={async () => { await api('POST', `/comandas/${k.id}/ready`); void load() }}>Lista</button>
         </div>

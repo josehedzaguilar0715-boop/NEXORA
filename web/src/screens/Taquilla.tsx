@@ -35,19 +35,21 @@ export function Taquilla(_: { me: Me }) {
   return (
     <div className="grid2">
       <section className="card">
+        <h3 className="form-h">1 · ¿Para qué día?</h3>
         <label>Día<input type="date" value={date} onChange={(e) => { setDate(e.target.value); setStart('') }} /></label>
-        <h3 style={{ marginTop: 12 }}>Horario</h3>
+        <h3 className="form-h">2 · ¿A qué hora?</h3>
         <div className="results">{slots.map((s) => (
           <button key={s.start} disabled={s.closed || s.past || s.available === 0} className={start === s.start ? 'primary' : ''} onClick={() => setStart(s.start)}>{h12(s.start)}–{h12(s.end)}<small>{s.closed ? 'Cerrado' : s.past ? 'Ya pasó' : `${s.available} lugares`}</small></button>
         ))}</div>
         {slots.length === 0 && <p className="muted">No hay horarios para este día. Configúralos en <a href="#/configurar">Configurar negocio → Horarios y aforo</a>.</p>}
-        <h3 style={{ marginTop: 12 }}>Boletos</h3>
+        <h3 className="form-h">3 · ¿Cuántos boletos?</h3>
         <div className="table-wrap"><table className="list"><tbody>{types.map((t) => (
           <tr key={t.id}><td>{t.name}<br /><small className="muted">{mxn(t.price)}</small></td>
             <td><div className="qty"><button onClick={() => setQty({ ...qty, [t.id]: Math.max(0, (qty[t.id] ?? 0) - 1) })}>−</button><b style={{ minWidth: 40, textAlign: 'center' }}>{qty[t.id] ?? 0}</b><button onClick={() => setQty({ ...qty, [t.id]: (qty[t.id] ?? 0) + 1 })}>+</button></div></td></tr>
         ))}</tbody></table></div>
         {types.length === 0 && <p className="muted">No hay tipos de boleto. Agrégalos en <a href="#/configurar">Configurar negocio → Tipos de boleto</a>.</p>}
         <div className="total">{mxn(total)}</div>
+        <h3 className="form-h">4 · Cobrar</h3>
         <div className="pay">
           <button className="primary big" disabled={!start || !total} onClick={() => sell('efectivo')}>Efectivo</button>
           <button className="big" disabled={!start || !total} onClick={() => sell('transferencia')}>Transferencia</button>
@@ -55,8 +57,9 @@ export function Taquilla(_: { me: Me }) {
         </div>
         {msg.err && <p className="error">{msg.err}</p>}
         {msg.ok && <p className="okmsg">{msg.ok}</p>}
-        <h3 style={{ marginTop: 16 }}>Cobrar compra en línea</h3>
+        <details className="more"><summary>Cobrar una compra hecha en línea</summary>
         <div className="row"><input aria-label="Folio de compra en línea" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Folio de la compra" /><button style={{ flex: '0 0 auto' }} disabled={!token} onClick={() => payOnline('efectivo')}>Efectivo</button><button style={{ flex: '0 0 auto' }} disabled={!token} onClick={() => payOnline('transferencia')}>Transferencia</button></div>
+        </details>
       </section>
       <section className="card">
         <h2>Boletos impresos</h2>

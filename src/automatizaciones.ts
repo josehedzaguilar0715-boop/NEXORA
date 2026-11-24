@@ -123,7 +123,7 @@ export function rentabilidadPlatillos(db: Db, businessId: string, start: string,
   // Ingredientes: consumo del periodo, existencias y cambio de costo (compras de los últimos 30 días contra los 30 anteriores).
   const used = db.prepare(`SELECT sm.product_id id, p.name, p.unit, SUM(-sm.qty_milli) qty, SUM(ABS(sm.cost)) cost FROM stock_movements sm JOIN products p ON p.id = sm.product_id
     WHERE sm.business_id = ? AND sm.type = 'consumo' AND sm.created_at >= ? AND sm.created_at < ? GROUP BY sm.product_id ORDER BY cost DESC`).all(businessId, start, end) as { id: string; name: string; unit: string; qty: number; cost: number }[]
-  const avgCost = db.prepare('SELECT AVG(pi.unit_cost) a FROM purchase_items pi JOIN purchases pu ON pu.id = pi.purchase_id WHERE pi.product_id = ? AND pu.created_at >= ? AND pu.created_at < ? AND pi.unit_cost > 0')
+  const avgCost = db.prepare('SELECT AVG(pi.unit_cost) a FROM purchase_items pi JOIN purchases pu ON pu.id = pi.purchase_id WHERE pi.product_id = ? AND pu.created_at >= ? AND pu.created_at <= ? AND pi.unit_cost > 0')
   const d30 = new Date(nowDate.getTime() - 30 * 86_400_000).toISOString(), d60 = new Date(nowDate.getTime() - 60 * 86_400_000).toISOString()
   const branch = (db.prepare('SELECT id FROM branches WHERE business_id = ? AND active = 1 ORDER BY created_at LIMIT 1').get(businessId) as { id: string } | undefined)?.id
   const mins = db.prepare('SELECT min_stock_milli m FROM products WHERE id = ?')

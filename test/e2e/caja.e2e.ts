@@ -249,7 +249,7 @@ try {
   await page.getByRole('button', { name: 'Confirmar' }).click()
   check((await page.getByRole('button', { name: 'Cobrar', exact: true }).count()) === 0, 'barbería: la agenda ya no tiene botón «Cobrar»')
   await page.getByRole('button', { name: 'Terminar' }).click()
-  await page.getByText('Pendiente de cobro').waitFor()
+  await page.locator('.pill', { hasText: 'Pendiente de cobro' }).waitFor()
   await page.screenshot({ path: `${shots}/10-agenda.png` })
   await page.getByRole('button', { name: 'Ver en Caja' }).click()
   await page.getByLabel(/Propina para/).fill('20')

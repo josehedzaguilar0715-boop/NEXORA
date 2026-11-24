@@ -15,6 +15,7 @@ export function Clientes({ me }: { me: Me }) {
   const [rec, setRec] = useState<{ customers: any[]; total?: number }>({ customers: [], total: 0 })
   const [sel, setSel] = useState<any>(null)
   const [q, setQ] = useState('')
+  const [soloDeuda, setSoloDeuda] = useState(false)
   const [adding, setAdding] = useState(false)
   const [msg, setMsg] = useState('')
   const load = async () => {
@@ -31,25 +32,29 @@ export function Clientes({ me }: { me: Me }) {
         <button className="primary" onClick={() => setAdding(true)}>+ Nuevo cliente</button>
       </div>
       {fiado && <div className="kpis mini">{rec.total !== undefined && <div><span className="muted">Te deben en total</span><b>{mxn(rec.total)}</b></div>}<div><span className="muted">Clientes con saldo</span><b>{rec.customers.length}</b></div></div>}
-      {hasGiro(me, 'barberia', 'unas') && <Seguimiento />}
       {msg && <p className="error">{msg}</p>}
       <div>
         <section className="card">
-          <div className="table-wrap"><table className="list">
-            <thead><tr><th>Cliente</th>{fiado && <th className="num">Debe</th>}</tr></thead>
-            <tbody>
-              {list.map((c) => (
-                <tr key={c.id} className={`clickable ${sel?.id === c.id ? 'sel' : ''}`} onClick={() => setSel(c)}>
-                  <td><b>{c.name}</b><br /><small className="muted">{c.phone ?? 'sin teléfono'}</small></td>
-                  {fiado && <td className="num">{balance(c.id) ? <span className="pill bad">{mxn(balance(c.id)!)}</span> : <span className="muted">—</span>}</td>}
-                </tr>
-              ))}
-              {list.length === 0 && <tr><td colSpan={2} className="empty">{q ? 'Nadie coincide con la búsqueda.' : 'Todavía no hay clientes.'}</td></tr>}
-            </tbody>
-          </table></div>
+          {fiado && (
+            <div className="row chips" role="group" aria-label="Filtrar clientes">
+              <button className={!soloDeuda ? 'on' : ''} aria-pressed={!soloDeuda} onClick={() => setSoloDeuda(false)}>Todos</button>
+              <button className={soloDeuda ? 'on' : ''} aria-pressed={soloDeuda} onClick={() => setSoloDeuda(true)}>Con saldo pendiente</button>
+            </div>
+          )}
+          <div className="team" role="list">
+            {list.filter((c) => !soloDeuda || balance(c.id)).map((c) => (
+              <div key={c.id} role="listitem" className={`team-row clickable ${sel?.id === c.id ? 'sel' : ''}`} tabIndex={0} onClick={() => setSel(c)} onKeyDown={(e) => { if (e.key === 'Enter') setSel(c) }}>
+                <span className="avatar" aria-hidden>{c.name.trim().charAt(0).toUpperCase()}</span>
+                <span className="team-who"><b>{c.name}</b><small className="muted">{c.phone ?? 'sin teléfono'}</small></span>
+                {fiado && (balance(c.id) ? <span className="pill bad">Debe {mxn(balance(c.id)!)}</span> : null)}
+              </div>
+            ))}
+            {list.filter((c) => !soloDeuda || balance(c.id)).length === 0 && <p className="muted">{q ? 'Nadie coincide con la búsqueda.' : soloDeuda ? 'Nadie tiene saldo pendiente.' : 'Todavía no hay clientes. Agrega al primero con «+ Nuevo cliente».'}</p>}
+          </div>
         </section>
         {sel && <Sheet onClose={() => setSel(null)}><Cliente me={me} c={sel} fiado={fiado} onChanged={() => void load()} onClose={() => setSel(null)} /></Sheet>}
       </div>
+      {hasGiro(me, 'barberia', 'unas') && <Seguimiento />}
       {adding && <NuevoCliente onClose={() => setAdding(false)} onDone={(c) => { setAdding(false); setSel(c); void load() }} />}
     </div>
   )

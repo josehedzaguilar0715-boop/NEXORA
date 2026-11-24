@@ -284,6 +284,18 @@ export function Caja({ me }: { me: Me }) {
   if (!shift) return <OpenShift meals={hasGiro(me, 'comedor')} onOpen={(s) => { setShift(s); cache.set('shift', s) }} />
 
   const K = ({ k }: { k: string }) => <kbd>{k}</kbd>
+  /** Productos y servicios para tocar: arriba cuando la venta está vacía; abajo cuando ya hay renglones. */
+  const tiles = (
+        <div className="quick-grid">
+          <div className="card-head"><h3>{services.length ? 'Servicios y productos' : 'Productos más vendidos'}</h3><span className="muted small">toca para agregar</span></div>
+          <div className="results">
+            {services.slice(0, 12).map((sv) => <button key={sv.id} onClick={() => addService(sv)}>{sv.name}<small>{mxn(sv.price)}{sv.durationMin ? ` · ${sv.durationMin} min` : ''}</small></button>)}
+            {favorites.map((p) => <button key={p.id} onClick={() => add(p)}>{p.name}<small>{mxn(p.price)} / {unitLabel(p.unit)}{p.stock !== undefined ? ` · hay ${p.stock}` : ''}</small></button>)}
+            <button onClick={() => setModal({ kind: 'libre' })}>➕ Artículo común<small>escribe descripción y precio</small></button>
+          </div>
+        </div>
+)
+
   return (
     <div className="pos-screen">
       <section className="pos-main">
@@ -308,6 +320,7 @@ export function Caja({ me }: { me: Me }) {
           )}
         </div>
 
+        {cart.length === 0 && tiles}
         <div className="ticket-table card">
           <table>
             <thead><tr><th className="hide-sm">#</th><th>Descripción</th><th className="num">Cant.</th><th className="num hide-sm">Precio</th><th className="num">Importe</th><th /></tr></thead>
@@ -329,14 +342,7 @@ export function Caja({ me }: { me: Me }) {
           </table>
         </div>
 
-        <div className="quick-grid">
-          <div className="card-head"><h3>{services.length ? 'Servicios y productos' : 'Productos más vendidos'}</h3><span className="muted small">toca para agregar</span></div>
-          <div className="results">
-            {services.slice(0, 12).map((sv) => <button key={sv.id} onClick={() => addService(sv)}>{sv.name}<small>{mxn(sv.price)}{sv.durationMin ? ` · ${sv.durationMin} min` : ''}</small></button>)}
-            {favorites.map((p) => <button key={p.id} onClick={() => add(p)}>{p.name}<small>{mxn(p.price)} / {unitLabel(p.unit)}{p.stock !== undefined ? ` · hay ${p.stock}` : ''}</small></button>)}
-            <button onClick={() => setModal({ kind: 'libre' })}>➕ Artículo común<small>escribe descripción y precio</small></button>
-          </div>
-        </div>
+        {cart.length > 0 && tiles}
       </section>
 
       <aside className="pos-side card">
@@ -358,14 +364,15 @@ export function Caja({ me }: { me: Me }) {
         {msg && <p className={msg.startsWith('Venta puesta') ? 'okmsg' : 'error'}>{msg}</p>}
         <button className="primary big cobrar" disabled={!cart.length} onClick={() => setModal({ kind: 'cobro' })}>Cobrar <K k={KEYS.cobrar} /></button>
         <div className="pos-actions">
+          <h4 className="pos-group">Esta venta</h4>
           <button onClick={hold}>{cart.length ? 'Poner en espera' : 'Ventas en espera'} <K k={KEYS.espera} /></button>
           {can(me, 'cancel_discount') && <button disabled={!cart.length} onClick={() => setModal({ kind: 'descuento' })}>Descuento <K k={KEYS.descuento} /></button>}
-          <button onClick={() => setModal({ kind: 'libre' })}>Artículo común <K k={KEYS.libre} /></button>
+          <button disabled={!cart.length} onClick={() => setModal({ kind: 'cancelar' })}>Cancelar venta <K k="Esc" /></button>
+          <h4 className="pos-group">Mi caja</h4>
           {hasGiro(me, 'barberia', 'unas') && <button className={porCobrar ? 'primary' : ''} onClick={() => setModal({ kind: 'citas' })}>Pendientes de cobro{porCobrar ? ` (${porCobrar})` : ''}</button>}
           <button onClick={() => setModal({ kind: 'ventas' })}>Ventas del turno <K k={KEYS.ventas} /></button>
           {can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'mov' })}>Meter o sacar dinero <K k={KEYS.mov} /></button>}
           {hasGiro(me, 'papeleria') && can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'contador' })}>Contador copiadora</button>}
-          <button disabled={!cart.length} onClick={() => setModal({ kind: 'cancelar' })}>Cancelar venta <K k="Esc" /></button>
           {can(me, 'open_close_cash') && <button className="corte" onClick={() => setModal({ kind: 'corte' })}>Corte de caja</button>}
         </div>
       </aside>

@@ -113,11 +113,13 @@ export function Compras({ me }: { me: Me }) {
     <div className="grid2">
       <section className="card">
         <h2>Nueva compra</h2>
+        <h3 className="form-h">1 · ¿A quién le compraste?</h3>
         <div className="row">
           <div><label>Proveedor<select value={head.supplierId} onChange={(e) => setHead({ ...head, supplierId: e.target.value })}><option value="">—</option>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label></div>
           <button style={{ flex: '0 0 auto', alignSelf: 'end' }} onClick={newSupplier}>+ Proveedor</button>
         </div>
         <label>Folio del ticket<input value={head.ticketRef} onChange={(e) => setHead({ ...head, ticketRef: e.target.value })} /></label>
+        <h3 className="form-h">2 · ¿Qué compraste?</h3>
         <label>Agregar producto</label>
         <div className="row"><input aria-label="Agregar producto" value={find} onChange={(e) => setFind(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { const p = catalog.find((x) => x.barcode === find.trim()); if (p) add(p) } }} placeholder="Busca o escanea…" /><ScanButton onCode={(c) => { const p = catalog.find((x) => x.barcode === c); if (p) add(p); else setFind(c) }} /></div>
         <div className="results">{matches.map((p) => <button key={p.id} onClick={() => add(p)}>{p.name}</button>)}</div>
@@ -130,14 +132,16 @@ export function Compras({ me }: { me: Me }) {
               <div><label>Costo total<input inputMode="decimal" value={r.cost} onChange={(e) => upd(i, 'cost', e.target.value)} /></label></div>
             </div>
             {r.pack && r.byPack && Number(r.quantity) > 0 && <p className="muted small">= {Number(r.quantity) * r.pack.size} piezas{toCents(r.cost) > 0 ? ` · ${mxn(Math.round(toCents(r.cost) / (Number(r.quantity) * r.pack.size)))} cada una` : ''}</p>}
+            <details className="more"><summary>Más: precio nuevo y caducidad</summary>
             <div className="row">
               <div><label>Precio nuevo (opcional)<input inputMode="decimal" value={r.newPrice} onChange={(e) => upd(i, 'newPrice', e.target.value)} /></label></div>
               <div><label>Caduca (opcional)<input type="date" value={r.expiresAt} onChange={(e) => upd(i, 'expiresAt', e.target.value)} /></label></div>
             </div>
+            </details>
             <button onClick={() => setRows(rows.filter((_, j) => j !== i))}>Quitar</button>
           </div>
         ))}
-        <h3 style={{ marginTop: 14 }}>Fletes y gastos de traslado</h3>
+        <details className="more"><summary>Fletes y gastos de traslado (opcional)</summary>
         {freight.map((f, i) => (
           <div key={i} className="row">
             <input placeholder="Gasolina, casetas…" value={f.concept} onChange={(e) => setFreight(freight.map((x, j) => (j === i ? { ...x, concept: e.target.value } : x)))} />
@@ -145,7 +149,8 @@ export function Compras({ me }: { me: Me }) {
           </div>
         ))}
         <button onClick={() => setFreight([...freight, { concept: '', amount: '' }])}>+ Flete</button>
-        <div className="row" style={{ marginTop: 12 }}>
+        </details>
+        <h3 className="form-h">3 · ¿Cómo pagaste?</h3>        <div className="row" style={{ marginTop: 12 }}>
           <div><label>Pago<select value={head.payment} onChange={(e) => setHead({ ...head, payment: e.target.value })}><option value="contado">Contado</option><option value="credito">Crédito</option></select></label></div>
           {head.payment === 'contado' ? <label style={{ alignSelf: 'end' }}><input type="checkbox" style={{ width: 'auto', minHeight: 0 }} checked={head.paidFromCash} onChange={(e) => setHead({ ...head, paidFromCash: e.target.checked })} /> Sale de la caja</label>
             : <div><label>Vence<input type="date" value={head.dueDate} onChange={(e) => setHead({ ...head, dueDate: e.target.value })} /></label></div>}

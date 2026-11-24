@@ -24,7 +24,7 @@ export function Apartados({ me }: { me: Me }) {
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = async () => setList((await api<any>('GET', `/layaways?status=${status}`)).layaways)
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [status])
-  const shown = list.filter((l) => !q || `${l.folio} ${l.customer.name}`.toLowerCase().includes(q.toLowerCase()))
+  const shown = list.filter((l) => !q || `${l.folio} ${l.customer.name}`.toLowerCase().includes(q.toLowerCase())).sort((a, b) => Number(!!b.overdue) - Number(!!a.overdue) || (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'))
   const owed = list.filter((l) => l.status === 'abierto').reduce((a, l) => a + l.balance, 0)
   return (
     <div className="page">
@@ -38,18 +38,18 @@ export function Apartados({ me }: { me: Me }) {
       {status === 'abierto' && list.length > 0 && <div className="kpis mini"><div><span className="muted">Apartados abiertos</span><b>{list.length}</b></div><div><span className="muted">Por cobrar en apartados</span><b>{mxn(owed)}</b></div></div>}
       {msg.err && <p className="error">{msg.err}</p>}{msg.ok && <p className="okmsg">{msg.ok}</p>}
       <section className="card">
-        <div className="table-wrap" style={{ border: 0, margin: 0 }}>
+        <div className="table-wrap cards-sm" style={{ border: 0, margin: 0 }}>
           <table className="list">
             <thead><tr><th>Folio</th><th>Cliente</th><th className="num">Total</th><th className="num hide-sm">Pagado</th><th className="num">Resta</th><th className="hide-sm">Recoger antes de</th></tr></thead>
             <tbody>
               {shown.map((l) => (
                 <tr key={l.id} className="clickable" onClick={() => setSel(l.id)}>
-                  <td><b>#{l.folio}</b></td>
-                  <td>{l.customer.name}{l.overdue && <><br /><span className="tag bad">vencido</span></>}</td>
-                  <td className="num">{mxn(l.total)}</td>
-                  <td className="num hide-sm">{mxn(l.paid)}</td>
-                  <td className="num">{l.status === 'abierto' ? <span className={l.balance ? 'pill' : 'pill ok'}>{l.balance ? mxn(l.balance) : 'liquidado'}</span> : <span className="muted">{l.status}</span>}</td>
-                  <td className="hide-sm">{l.dueDate ? fmtDate(l.dueDate) : '—'}</td>
+                  <td data-label="Folio"><b>#{l.folio}</b></td>
+                  <td data-label="Cliente">{l.customer.name}{l.overdue && <><br /><span className="estado danger">Vencido</span></>}{l.status === 'abierto' && l.total > 0 && <div className="bar-track" role="progressbar" aria-label={`Pagado ${Math.round((l.paid / l.total) * 100)}%`} aria-valuenow={Math.round((l.paid / l.total) * 100)} aria-valuemin={0} aria-valuemax={100} style={{ marginTop: 6 }}><div className="bar-fill profit" style={{ width: `${Math.min(100, Math.round((l.paid / l.total) * 100))}%` }} /></div>}</td>
+                  <td data-label="Total" className="num">{mxn(l.total)}</td>
+                  <td data-label="Pagado" className="num hide-sm">{mxn(l.paid)}</td>
+                  <td data-label="Resta" className="num">{l.status === 'abierto' ? <span className={l.balance ? 'pill' : 'pill ok'}>{l.balance ? mxn(l.balance) : 'liquidado'}</span> : <span className="muted">{l.status}</span>}</td>
+                  <td data-label="Recoger antes de" className="hide-sm">{l.dueDate ? fmtDate(l.dueDate) : '—'}</td>
                 </tr>
               ))}
               {shown.length === 0 && <tr><td colSpan={6} className="empty">{status === 'abierto' ? 'No hay apartados abiertos. El cliente aparta mercancía con un anticipo y se la lleva al liquidar.' : 'Nada en esta lista.'}</td></tr>}
