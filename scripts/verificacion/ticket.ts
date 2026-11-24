@@ -20,10 +20,13 @@ const T = own.json.token as string
 const prod = (await s.call('GET', '/products', { token: T })).json.products[0]
 if (!(await s.call('GET', '/shifts/current', { token: T })).json.shift) await s.call('POST', '/shifts/open', { token: T, body: { openingFloat: 10000 } })
 await s.call('POST', '/sales', { token: T, body: { id: s.uuid(), items: [{ productId: prod.id, quantity: 1 }], paymentMethod: 'efectivo', cashReceived: 100000 } })
+s.db.prepare("UPDATE businesses SET logo_url = 'http://localhost/logo.png'").run()
+const saleId = (s.db.prepare('SELECT id FROM sales ORDER BY created_at DESC LIMIT 1').get() as { id: string }).id
+const tok = (await s.call('POST', `/sales/${saleId}/receipt-link`, { token: T })).json
 const browser = await chromium.launch()
 for (const [dev, vp] of [['escritorio', { width: 1366, height: 900 }], ['celular', { width: 390, height: 844 }]] as const) {
   const ctx = await browser.newContext({ viewport: vp })
-  await ctx.addInitScript((t: string) => { (window as any).__name = (f: unknown) => f; sessionStorage.setItem('nx_intro', '1'); localStorage.setItem('nx_token', t); (window as any).__impreso = []; window.print = () => { (window as any).__impreso.push(document.querySelector('.print-root pre')?.textContent ?? '') } }, T)
+  await ctx.addInitScript((t: string) => { (window as any).__name = (f: unknown) => f; sessionStorage.setItem('nx_intro', '1'); localStorage.setItem('nx_token', t); (window as any).__impreso = []; window.print = () => { (window as any).__impreso.push(document.querySelector('.print-root pre')?.textContent ?? ''); (window as any).__logo = !!document.querySelector('.print-root img.ticket-logo') } }, T)
   const page = await ctx.newPage(); const errs: string[] = []
   page.on('pageerror', (e: Error) => errs.push(e.message))
   await page.goto(base + '/#/caja'); await page.waitForTimeout(1200)
@@ -37,6 +40,12 @@ for (const [dev, vp] of [['escritorio', { width: 1366, height: 900 }], ['celular
   await page.getByRole('button', { name: 'Reimprimir' }).first().click(); await page.waitForTimeout(500)
   imp = await page.evaluate(() => (window as any).__impreso)
   ok(imp.length === 2 && Math.max(...imp[1]!.split('\n').map((l) => l.length)) <= 48 && Math.max(...imp[1]!.split('\n').map((l) => l.length)) > 32, `[${dev}] con papel de 80 mm usa hasta 48 columnas`)
+  ok(await page.evaluate(() => (window as any).__logo === true), `[${dev}] el logotipo configurado va arriba del ticket impreso`)
+  const pub = await ctx.newPage()
+  await pub.goto(base + `/comprobante/${tok.token}`); await pub.waitForTimeout(1000)
+  const pt = await pub.locator('body').innerText()
+  ok(/Folio/.test(pt) && /No es una factura/.test(pt) && /Total/.test(pt), `[${dev}] el comprobante digital público muestra folio, total y «no es una factura»`)
+  ok(!(await pub.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)), `[${dev}] el comprobante digital cabe en pantalla`)
   ok(!errs.length, `[${dev}] sin errores${errs[0] ? ' ' + errs[0] : ''}`)
   await ctx.close()
 }

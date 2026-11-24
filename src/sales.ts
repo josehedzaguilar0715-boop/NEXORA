@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
@@ -9,6 +10,7 @@ import { consume, currentPrice, getProduct, priceFor, restore, stockOf, toMilli,
 import { saleCancelledNotice, stockAlerts } from './notifications.js'
 import { bad, conflict, forbidden, iso, newId, notFound } from './util.js'
 import { scopeBranch, scopeOwn, seesOthers } from './scope.js'
+import { publicName } from './publiclinks.js'
 import { assertCashAvailable, cashOf } from './cash.js'
 
 export const sales = new Hono<Env>()
@@ -371,21 +373,50 @@ sales.post('/sales/:id/cancel', requirePerm('cancel_discount'), async (c) => {
 // ?paper=58|80 elige el ancho (32 u 48 columnas); ?reprint=1 lo marca como reimpresión. NO es una factura (CFDI): el texto lo dice.
 sales.get('/sales/:id/ticket', (c) => {
   const deps = c.get('deps')
-  const { db } = deps
   const s = loadSale(c)
   ensureCanSee(c, s)
+  const paper = c.req.query('paper') === '80' ? 80 : 58
+  const ticket = buildTicket(deps, s, paper, c.req.query('reprint') === '1')
+  return c.json({ ticket, text: ticketText(ticket, paper === 80 ? 48 : 32) })
+})
+
+function buildTicket(deps: Deps, s: SaleRow, paper: 58 | 80, reprint: boolean) {
+  const { db } = deps
   const biz = db.prepare('SELECT name, phone, logo_url FROM businesses WHERE id = ?').get(s.business_id) as { name: string; phone: string | null; logo_url: string | null }
   const branch = db.prepare('SELECT name FROM branches WHERE id = ?').get(s.branch_id) as { name: string } | undefined
   const multi = (db.prepare('SELECT COUNT(*) n FROM branches WHERE business_id = ?').get(s.business_id) as { n: number }).n > 1
   const cashier = db.prepare('SELECT name FROM users WHERE id = ?').get(s.cashier_id) as { name: string }
   const v = saleView(deps, s)
-  const paper = c.req.query('paper') === '80' ? 80 : 58
-  const ticket = {
+  return {
     business: biz.name, branch: multi ? branch?.name ?? null : null, logoUrl: biz.logo_url, phone: biz.phone, folio: String(s.folio).padStart(6, '0'), date: s.created_at,
     items: v.items, subtotal: s.subtotal, discount: s.discount + s.promo_discount, total: s.total, paymentMethod: v.paymentMethod, payments: v.payments, cashReceived: s.cash_received, change: v.change, cashier: cashier.name,
-    cancelled: s.status === 'cancelada', reprint: c.req.query('reprint') === '1', paper,
+    cancelled: s.status === 'cancelada', reprint, paper,
   }
-  return c.json({ ticket, text: ticketText(ticket, paper === 80 ? 48 : 32) })
+}
+
+/** Enlace privado del comprobante digital (se crea una vez y se reutiliza). Es un comprobante de venta, no una factura. */
+sales.post('/sales/:id/receipt-link', (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const s = loadSale(c)
+  ensureCanSee(c, s)
+  let token = (db.prepare('SELECT receipt_token t FROM sales WHERE id = ?').get(s.id) as { t: string | null }).t
+  if (!token) {
+    token = randomBytes(16).toString('base64url')
+    db.prepare('UPDATE sales SET receipt_token = ? WHERE id = ?').run(token, s.id)
+    audit(db, now, { businessId: u.business_id, userId: u.id, action: 'venta.comprobante_digital', entity: 'sale', entityId: s.id })
+  }
+  return c.json({ token, path: `/comprobante/${token}` })
+})
+
+/** Comprobante digital público: solo lo que dice el ticket (sin datos del cliente; quien atendió con nombre e inicial). */
+export const publicReceipts = new Hono<Env>()
+publicReceipts.get('/public/receipt/:token', (c) => {
+  const deps = c.get('deps')
+  const s = deps.db.prepare('SELECT * FROM sales WHERE receipt_token = ?').get(c.req.param('token')) as SaleRow | undefined
+  if (!s) throw notFound('Este comprobante no existe.')
+  const t = buildTicket(deps, s, 58, false)
+  return c.json({ receipt: { ...t, cashier: publicName(t.cashier), phone: t.phone }, legend: 'Comprobante de venta. No es una factura (CFDI).' })
 })
 
 const mxn = (cents: number) => `$${(cents / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

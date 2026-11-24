@@ -56,6 +56,7 @@ const Privacidad = lazyNamed(() => import('./screens/Privacidad'), 'Privacidad')
 const Comisiones = lazyNamed(() => import('./screens/Comisiones'), 'Comisiones')
 const EstadoCita = lazyNamed(() => import('./screens/Reservar'), 'EstadoCita')
 const Reservar = lazyNamed(() => import('./screens/Reservar'), 'Reservar')
+const Comprobante = lazyNamed(() => import('./screens/Comprobante'), 'Comprobante')
 const Productos = lazyNamed(() => import('./screens/Productos'), 'Productos')
 const Reportes = lazyNamed(() => import('./screens/Reportes'), 'Reportes')
 const MiAsistencia = lazyNamed(() => import('./screens/Usuarios'), 'MiAsistencia')
@@ -200,6 +201,7 @@ export function App() {
   if (path.startsWith('/privacidad')) return <Privacidad />
   if (path.startsWith('/admin')) return <SuperPanel />
   if (path.startsWith('/reservar/')) return <Reservar code={path.split('/')[2] ?? ''} />
+  if (path.startsWith('/comprobante/')) return <Comprobante token={path.split('/')[2] ?? ''} />
   if (path.startsWith('/cita/')) return <EstadoCita token={path.split('/')[2] ?? ''} />
   if (path.startsWith('/boletos/')) return <TiendaBoletos code={path.split('/')[2] ?? ''} />
   if (path.startsWith('/descargar')) return <Descargar />

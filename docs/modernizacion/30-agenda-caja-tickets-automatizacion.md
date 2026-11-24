@@ -26,3 +26,10 @@ Crear → confirmar → atender → **Terminar (pasa a Caja)** → *por cobrar* 
 
 ## Aún sin hacer (por giro)
 Barbería (rentabilidad por barbero/servicio, clientes que no regresan automáticos), restaurante (costo de platillo, desperdicio, compras), uñas (insumos por servicio), recordatorios automáticos de cita. Quedan para la siguiente entrega; no se marcan como hechos.
+
+## Actualización (cierre): logotipo, comprobante digital e historial
+- **Logotipo**: el que el dueño configura en Ajustes («Logo, dirección de la imagen») se imprime arriba del ticket (blanco y negro, ancho máximo 40 mm, apto para 58 mm) y aparece en el comprobante digital y en la página de reservas. Sigue siendo una **dirección (URL) de imagen**; subir el archivo directamente no se implementó (requeriría almacenamiento de archivos).
+- **Comprobante digital**: botón «Enviar comprobante digital» tras cobrar; crea (una vez, se reutiliza) un enlace privado e inadivinable `/comprobante/{token}` (migración 47, `sales.receipt_token`), que se comparte con el menú de compartir del celular o WhatsApp. Muestra negocio, sucursal, folio, fecha, renglones, total, pago y cambio; quien atendió con nombre e inicial; **sin datos del cliente**; leyenda «Comprobante de venta. No es una factura (CFDI)». Un empleado no puede crearlo para la venta de otro.
+- **Historial y reimpresión**: «Ventas del turno» (Caja) y «Tickets del día» (Ventas, para quien ve finanzas) tienen **Reimprimir** (marca REIMPRESIÓN, respeta 58/80 mm y logotipo).
+- **Facturación CFDI**: NO existe integración; nada en el sistema dice que se emita factura. Impuestos desglosados: el sistema no los maneja, por lo que el ticket no los muestra.
+- **Pruebas**: A `ticket-formatos.test.ts` (4); N `scripts/verificacion/ticket.ts` (logotipo en la impresión, comprobante público, escritorio y celular). **Impresión física: NO se pudo verificar** (no hay impresora térmica en este entorno); se verificó el contenido que se manda a imprimir y los anchos de columnas, no el resultado en papel (corte, densidad, codificación de acentos en impresoras ESC/POS).

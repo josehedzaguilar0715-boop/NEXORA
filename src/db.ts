@@ -1565,6 +1565,9 @@ const MIGRATIONS: Migration[] = [
   // Solo columnas nulas: las ventas y citas anteriores quedan «sin responsable registrado» y nada existente cambia.
   `ALTER TABLE sale_items ADD COLUMN staff_id TEXT;
   ALTER TABLE appointments ADD COLUMN reminded_at TEXT;`,
+  // Comprobante digital: enlace privado e imposible de adivinar para compartir el ticket de una venta. Solo una columna nula.
+  `ALTER TABLE sales ADD COLUMN receipt_token TEXT;
+  CREATE UNIQUE INDEX sales_receipt_token ON sales(receipt_token) WHERE receipt_token IS NOT NULL;`,
 ]
 export const SCHEMA_VERSION = MIGRATIONS.length
 

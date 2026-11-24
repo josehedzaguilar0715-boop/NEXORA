@@ -413,7 +413,8 @@ export function Caja({ me }: { me: Me }) {
             {(['58', '80'] as Papel[]).map((p) => <button key={p} className={papel() === p ? 'on' : ''} aria-pressed={papel() === p} onClick={async () => { guardarPapel(p); if (modal.saleId) { const r = await api<{ text: string }>('GET', `/sales/${modal.saleId}/ticket?paper=${p}`).catch(() => null); if (r) setModal({ ...modal, text: r.text }) } else setModal({ ...modal }) }}>{p} mm</button>)}
           </div>
           <div className="row">
-            <button className="big" onClick={() => printText(modal.text)}>Imprimir ticket</button>
+            <button className="big" onClick={() => printText(modal.text, (me.business as any).logo_url)}>Imprimir ticket</button>
+            {modal.saleId && <button className="big" onClick={async () => { try { const r = await api<{ path: string }>('POST', `/sales/${modal.saleId}/receipt-link`); const url = `${location.origin}${r.path}`; const msg = `Tu comprobante de compra en ${me.business.name}: ${url}`; if (navigator.share) await navigator.share({ title: 'Comprobante', text: msg, url }).catch(() => {}); else window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank') } catch (e) { setMsg((e as Error).message) } }}>Enviar comprobante digital</button>}
             <button className="primary big" autoFocus onClick={() => { setModal(null); focusSearch() }}>Nueva venta</button>
           </div>
         </Modal>
@@ -717,7 +718,7 @@ function VentasTurno({ shift, me, onClose }: { shift: Shift; me: Me; onClose: ()
             <tr key={s.id}>
               <td>#{s.folio}<br /><small className="muted">{new Date(s.createdAt).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })} · {s.paymentMethod}</small></td>
               <td className="num">{s.status === 'cancelada' ? <s>{mxn(s.total)}</s> : mxn(s.total)}</td>
-              <td className="row chips"><button onClick={async () => { try { printText((await api<{ text: string }>('GET', `/sales/${s.id}/ticket?paper=${papel()}&reprint=1`)).text) } catch (e) { setErr((e as Error).message) } }}>Reimprimir</button>{s.status === 'completada' && can(me, 'cancel_discount') ? <button onClick={() => cancel(s.id)}>Cancelar</button> : <small className="muted">{s.status}</small>}</td>
+              <td className="row chips"><button onClick={async () => { try { printText((await api<{ text: string }>('GET', `/sales/${s.id}/ticket?paper=${papel()}&reprint=1`)).text, (me.business as any).logo_url) } catch (e) { setErr((e as Error).message) } }}>Reimprimir</button>{s.status === 'completada' && can(me, 'cancel_discount') ? <button onClick={() => cancel(s.id)}>Cancelar</button> : <small className="muted">{s.status}</small>}</td>
             </tr>
           ))}
         </tbody></table></div>

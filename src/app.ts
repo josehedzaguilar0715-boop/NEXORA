@@ -22,6 +22,7 @@ import { inventory } from './inventory.js'
 import { hardware } from './hardware.js'
 import { services } from './services.js'
 import { agenda, publicAgenda } from './agenda.js'
+import { publicReceipts } from './sales.js'
 import { commissions } from './commissions.js'
 import { payouts } from './payouts.js'
 import { settings } from './settings.js'
@@ -57,6 +58,7 @@ export function createApp(deps: Deps) {
   app.route('/', publicCommon)
   app.route('/', publicCampaigns)
   app.route('/', publicAgenda)
+  app.route('/', publicReceipts)
   app.route('/', publicTourism)
   app.route('/', admin as unknown as Hono<Env>)
   // Todo lo demás exige sesión (authed ya aplica `authenticate`).

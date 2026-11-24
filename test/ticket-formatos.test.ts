@@ -49,4 +49,20 @@ describe('ticket: 58 mm y 80 mm, folio, reimpresión y «no es factura»', () =>
     expect(t.text).toContain('Sucursal ')
     expect(t.ticket.branch).toBeTruthy()
   })
+
+  it('comprobante digital: enlace privado reutilizable, sin datos del cliente, con leyenda de «no es factura»; otro empleado no puede crearlo', async () => {
+    const f = await dosSucursales()
+    const a = (await f.s.call('POST', `/sales/${f.sale1a.id}/receipt-link`, { token: f.e1a.token })).json
+    expect(a.token).toMatch(/^[A-Za-z0-9_-]{20,}$/)
+    expect((await f.s.call('POST', `/sales/${f.sale1a.id}/receipt-link`, { token: f.T })).json.token).toBe(a.token) // se reutiliza
+    const pub = await f.s.call('GET', `/public/receipt/${a.token}`) // sin sesión
+    expect(pub.status).toBe(200)
+    expect(pub.json.receipt.folio).toMatch(/^\d{6}$/)
+    expect(pub.json.legend).toMatch(/No es una factura \(CFDI\)/)
+    const txt = JSON.stringify(pub.json).toLowerCase()
+    for (const k of ['customer', 'permissions', 'password', 'username', 'business_id', 'cashier_id']) expect(txt).not.toContain(k)
+    expect((await f.s.call('GET', '/public/receipt/inventado')).status).toBe(404)
+    // Un empleado no puede generar el comprobante de la venta de un compañero.
+    expect((await f.s.call('POST', `/sales/${f.sale1a.id}/receipt-link`, { token: f.e1b.token })).status).toBe(403)
+  })
 })

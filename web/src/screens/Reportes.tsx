@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, fechaHora, hora, mxn, toCents } from '../api'
 import type { Me } from '../App'
 import { vocab } from '../giros'
+import { papel, printText } from '../print'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -101,9 +102,9 @@ export function Reportes({ me }: { me: Me }) {
       <section className="card">
         <div className="card-head"><h2>Tickets del día</h2>{board?.tickets.length > 0 && <button className="mini" onClick={exportTickets}>Exportar a Excel</button>}</div>
         <label className="tk-day">Día<input type="date" value={day} min={from} max={to} onChange={(e) => e.target.value && setDay(e.target.value)} /></label>
-        <div className="table-wrap tickets-wrap"><table className="list tickets"><thead><tr><th>Folio</th><th>Hora</th><th>Cajero</th><th>Pago</th><th className="num">Total</th></tr></thead><tbody>
-          {board?.tickets.map((x: any) => <tr key={x.id} className={x.status === 'cancelada' ? 'muted strike' : ''}><td>#{x.folio}</td><td>{hora(x.at)}</td><td>{x.cashier}{x.customer && <><br /><small className="muted">{x.customer}</small></>}</td><td>{metodo(x.method)}{x.status === 'cancelada' && <><br /><small>Cancelada</small></>}</td><td className="num"><b>{mxn(x.total)}</b></td></tr>)}
-          {board && board.tickets.length === 0 && <tr><td colSpan={5} className="empty">Sin ventas este día.</td></tr>}
+        <div className="table-wrap tickets-wrap"><table className="list tickets"><thead><tr><th>Folio</th><th>Hora</th><th>Cajero</th><th>Pago</th><th className="num">Total</th><th /></tr></thead><tbody>
+          {board?.tickets.map((x: any) => <tr key={x.id} className={x.status === 'cancelada' ? 'muted strike' : ''}><td>#{x.folio}</td><td>{hora(x.at)}</td><td>{x.cashier}{x.customer && <><br /><small className="muted">{x.customer}</small></>}</td><td>{metodo(x.method)}{x.status === 'cancelada' && <><br /><small>Cancelada</small></>}</td><td className="num"><b>{mxn(x.total)}</b></td><td><button className="mini" onClick={async () => { try { printText((await api<{ text: string }>('GET', `/sales/${x.id}/ticket?paper=${papel()}&reprint=1`)).text, (me.business as any).logo_url) } catch { /* sin conexión: no se imprime */ } }}>Reimprimir</button></td></tr>)}
+          {board && board.tickets.length === 0 && <tr><td colSpan={6} className="empty">Sin ventas este día.</td></tr>}
         </tbody></table></div>
       </section>
       <section className="card">

@@ -19,8 +19,12 @@ function run(fill: (root: HTMLElement) => void) {
 }
 
 /** Ticket o corte en texto (32 columnas). */
-export function printText(text: string) {
-  run((root) => { const pre = document.createElement('pre'); pre.className = 'ticket-print'; pre.textContent = text; root.appendChild(pre) })
+export function printText(text: string, logoUrl?: string | null) {
+  run((root) => {
+    // El logotipo del negocio (si lo configuró) va arriba, en blanco y negro y con ancho acotado para rollos de 58 mm.
+    if (logoUrl) { const img = document.createElement('img'); img.className = 'ticket-logo'; img.alt = ''; img.src = logoUrl; root.appendChild(img) }
+    const pre = document.createElement('pre'); pre.className = 'ticket-print'; pre.textContent = text; root.appendChild(pre)
+  })
 }
 
 /** Una parte de la pantalla tal cual (p. ej. los boletos con su QR). */
