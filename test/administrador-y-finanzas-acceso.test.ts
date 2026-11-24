@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { dosSucursales } from './sucursales-fixture.js'
 
-/** Acceso financiero: dueño y administrador autorizado; el empleado nunca; el encargado actual no cambia. */
+/** Acceso financiero: dueño y administrador autorizado; el empleado nunca; el encargado no (opción B). */
 const FINANZAS = ['/dashboard/panel', '/reports/summary', '/reports/daily?days=7', '/reports/recent?limit=8', '/expenses', '/finance/trend', '/inventory/value', '/audit', '/accounting/income-statement', '/accounting/balance']
 const get = async (f: Awaited<ReturnType<typeof dosSucursales>>, tok: string, p: string) => (await f.s.app.request(p, { headers: { authorization: `Bearer ${tok}` } })).status
 
@@ -20,10 +20,20 @@ describe('acceso a finanzas por puesto', () => {
       expect(r.status).toBe(400)
     }
   })
-  it('el encargado actual conserva su acceso (sin cambios)', async () => {
+  it('el encargado NO ve panel ni finanzas (opción B), pero conserva sus funciones operativas y su puesto', async () => {
     const f = await dosSucursales()
-    expect(await get(f, f.enc1.token, '/dashboard/panel')).toBe(200)
-    expect(await get(f, f.enc1.token, '/expenses')).toBe(200)
+    for (const p of FINANZAS) expect(await get(f, f.enc1.token, p), p).toBe(403)
+    for (const p of ['/finanzas/resumen', '/finanzas/planes', '/finanzas/retiros', '/accounting/cash-flow', '/accounting/ledger', '/accounting/export?kind=ventas', '/fixed-expenses']) expect(await get(f, f.enc1.token, p), p).toBe(403)
+    // Supervisión de su sucursal y operación: sin cambios.
+    for (const p of ['/sales', '/products', '/shifts/current', '/customers', '/receivables', '/dashboard/mine']) expect(await get(f, f.enc1.token, p), p).toBe(200)
+    // Su puesto y sus permisos no cambiaron.
+    const u = (await f.s.call('GET', '/auth/me', { token: f.enc1.token })).json
+    expect(u.user.position).toBe('encargado')
+    expect(u.permissions).toContain('view_reports')
+    expect(u.permissions).toContain('cancel_discount')
+    expect(u.access).toEqual({ dashboard: false, finance: false, manage: false, costs: true })
+    // Y los demás sí: dueño (todo) y administrador autorizado (lo marcado).
+    for (const p of FINANZAS) expect(await get(f, f.T, p), `dueño ${p}`).toBe(200)
   })
   it('el administrador autorizado nace sin funciones y el dueño se las marca una por una', async () => {
     const f = await dosSucursales()

@@ -105,20 +105,17 @@ export const seesWholeBusiness = (u: UserRow) => u.role === 'owner' || puestoOf(
 
 export type FinanceKind = 'dashboard' | 'finance' | 'manage' | 'costs'
 /**
- * Quién ve el panel general y lo financiero. Decisión del propietario (24 nov 2026): exclusivo del dueño y de
- * administradores expresamente autorizados. Los encargados actuales conservan lo que ya tenían («ver reportes»),
- * y un EMPLEADO nunca, aunque el dueño le haya marcado «ver reportes».
+ * Quién ve el panel general y lo financiero. Decisión del propietario (24 nov 2026, opción B): exclusivo del dueño y de
+ * administradores expresamente autorizados. Ni el encargado ni el empleado, aunque tengan «ver reportes» guardado
+ * (ese permiso solo sirve para ver las ventas de sus compañeros). Los costos de productos los ve quien compra y edita inventario.
  */
 export function canFinance(u: UserRow, kind: FinanceKind): boolean {
   const p = puestoOf(u)
   if (p === 'dueno') return true
-  // Costos: quien compra y edita inventario necesita verlos; el empleado de piso que solo consulta, no.
-  if (p === 'empleado') return kind === 'costs' && hasPerm(u, 'edit_inventory')
   if (p === 'administrador') return hasPerm(u, ({ dashboard: 'view_dashboard', finance: 'view_finance', manage: 'manage_finance', costs: 'view_costs' } as const)[kind])
-  // Encargado (sin cambios para los actuales): panel y finanzas de su sucursal con «ver reportes»; costos con inventario; mover dinero, no.
-  if (kind === 'manage') return false
-  if (kind === 'costs') return hasPerm(u, 'view_inventory') || hasPerm(u, 'edit_inventory')
-  return hasPerm(u, 'view_reports')
+  // Encargado y empleado: nada de finanzas; costos solo si compran/editan inventario (el encargado conserva lo que ya tenía en inventario).
+  if (kind === 'costs') return p === 'encargado' ? hasPerm(u, 'view_inventory') || hasPerm(u, 'edit_inventory') : hasPerm(u, 'edit_inventory')
+  return false
 }
 
 export const requireFinance = (kind: FinanceKind): MiddlewareHandler<Env> => async (c, next) => {

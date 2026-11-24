@@ -24,6 +24,7 @@ s.db.prepare("UPDATE businesses SET plan = 'profesional'").run()
 const code = (s.db.prepare('SELECT code FROM businesses').get() as { code: string }).code
 const emp = await s.createStaff(T, code, 'cajeraprueba', 'cajero', { permissions: ['sell', 'view_reports'] })
 const adm = await s.createStaff(T, code, 'admprueba', 'administrador')
+const enc = await s.createStaff(T, code, 'encprueba', 'encargado')
 const browser = await chromium.launch()
 const abrir = async (tok: string, vp: { width: number; height: number }, hash: string) => {
   const ctx = await browser.newContext({ viewport: vp })
@@ -84,6 +85,16 @@ for (const [dev, vp] of [['escritorio', { width: 1366, height: 900 }], ['celular
   const { ctx, page } = await abrir(adm.token, { width: 1366, height: 900 }, '/#/finanzas')
   const t = await page.locator('main').innerText()
   ok(/Puedes retirar/.test(t) && !(await page.getByRole('button', { name: 'Registrar un retiro' }).count()), '[administrador con ver finanzas] ve las cifras pero no el botón de registrar retiros')
+  await ctx.close()
+}
+// Encargado (opción B): conserva Caja/Productos y supervisión, pero sin Finanzas, Ventas ni panel.
+for (const [dev, vp] of [['escritorio', { width: 1366, height: 900 }], ['celular', { width: 390, height: 844 }]] as const) {
+  const { ctx, page } = await abrir(enc.token, vp, '/#/inicio')
+  const t = await page.locator('body').innerText()
+  ok(/Mi día/.test(t) && !/Ganancia real|Utilidad|Dinero disponible/.test(t), `[encargado/${dev}] Inicio sin utilidades (ve «Mi día»)`)
+  if (dev === 'escritorio') ok(!/Finanzas/.test(t) && /Caja/.test(t) && /Productos/.test(t), '[encargado] el menú no tiene Finanzas y conserva Caja y Productos')
+  await page.goto(base + '/#/finanzas'); await page.waitForTimeout(800)
+  ok(!/Vendiste|Dinero disponible|Puedes retirar/.test(await page.locator('body').innerText()), `[encargado/${dev}] entrar a #/finanzas por la dirección no muestra cifras`)
   await ctx.close()
 }
 // Auditoría visual de cada pestaña (contraste AA, letra mínima en celular, desborde, textos encimados) en claro y oscuro.

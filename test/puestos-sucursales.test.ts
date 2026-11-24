@@ -61,11 +61,11 @@ describe('puestos: encargado de la sucursal 2 no ve ni modifica la sucursal 1', 
 
   it('sus totales son solo los de su sucursal', async () => {
     const f = await dosSucursales()
-    const mia = (await f.s.call('GET', '/reports/summary', { token: f.enc2.token })).json
+    // Los totales financieros ya no son del encargado (opción B): lo suyo es supervisar las ventas de su sucursal.
+    expect((await f.s.call('GET', '/reports/summary', { token: f.enc2.token })).status).toBe(403)
     const toda = (await f.s.call('GET', '/reports/summary', { token: f.T })).json
     const suc2 = (await f.s.call('GET', `/reports/summary?branchId=${f.b2}`, { token: f.T })).json
-    expect(JSON.stringify(mia)).toBe(JSON.stringify(suc2))
-    expect(JSON.stringify(mia)).not.toBe(JSON.stringify(toda))
+    expect(JSON.stringify(suc2)).not.toBe(JSON.stringify(toda))
     const ventas = (await f.s.call('GET', '/sales', { token: f.enc2.token })).json.sales as { id: string }[]
     expect(ventas.map((x) => x.id)).toEqual([f.sale2.id])
     // El dueño le autoriza administrar personal: ve y edita solo el de su sucursal.

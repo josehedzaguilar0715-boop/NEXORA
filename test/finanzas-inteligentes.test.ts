@@ -114,7 +114,7 @@ describe('Finanzas inteligentes (API)', () => {
     expect((await s.call('POST', '/finanzas/retiros', { token: adm.token, body: rutas[3]![2] })).status).toBe(403) // ver no es mover dinero
     await s.call('PATCH', `/users/${adm.id}`, { token: T, body: { permissions: ['view_finance', 'manage_finance'] } })
     expect((await s.call('POST', '/finanzas/retiros', { token: adm.token, body: rutas[3]![2] })).status).toBe(201)
-    expect((await s.call('GET', '/finanzas/resumen', { token: enc.token })).status).toBe(200)
+    expect((await s.call('GET', '/finanzas/resumen', { token: enc.token })).status).toBe(403)
     expect((await s.call('POST', '/finanzas/retiros', { token: enc.token, body: rutas[3]![2] })).status).toBe(403)
   })
 })

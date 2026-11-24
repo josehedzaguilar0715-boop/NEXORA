@@ -59,8 +59,10 @@ describe('decisiones de permisos: permisos antiguos no amplían el alcance', () 
   it('un encargado anterior (sin puesto) conserva su alcance de sucursal y no se amplía', async () => {
     const f = await dosSucursales()
     f.s.db.prepare('UPDATE users SET position = NULL').run()
-    expect((await f.s.call('GET', '/reports/summary', { token: f.enc2.token })).status).toBe(200)
-    expect((await f.s.call('GET', `/reports/summary?branchId=${f.b1}`, { token: f.enc2.token })).status).toBe(403)
+    // Sigue supervisando su sucursal (ventas), nunca otra; y sin finanzas (opción B).
+    expect(((await f.s.call('GET', '/sales', { token: f.enc2.token })).json.sales as { id: string }[]).map((x) => x.id)).toEqual([f.sale2.id])
+    expect((await f.s.call('GET', `/sales?branchId=${f.b1}`, { token: f.enc2.token })).status).toBe(403)
+    expect((await f.s.call('GET', '/reports/summary', { token: f.enc2.token })).status).toBe(403)
   })
 })
 
