@@ -24,7 +24,7 @@ const SLOT_MIN = 15
 interface Svc { serviceId: string; name: string; price: number; duration: number }
 interface ApptRow {
   id: string; business_id: string; branch_id: string; staff_id: string | null; customer_id: string | null; customer_name: string; phone: string | null; services: string
-  starts_at: string; ends_at: string; status: string; source: string; public_token: string | null; at_home: number; address: string | null; travel_min: number; notes: string | null; sale_id: string | null
+  starts_at: string; ends_at: string; status: string; source: string; public_token: string | null; at_home: number; address: string | null; travel_min: number; notes: string | null; sale_id: string | null; completed_at: string | null
 }
 
 /** Duración que ocupa un servicio en la agenda: su tiempo más lo que bloquea (p. ej. secado). Un combo sin duración propia suma la de sus servicios. */
@@ -62,6 +62,12 @@ export function isFree(db: Db, staffId: string, start: string, end: string, excl
   return { ok: true }
 }
 
+/** Nombre que ve el público: nombre e inicial; si quien atiende es el dueño, se muestra el nombre del negocio (nunca su nombre personal). */
+function publicStaffName(db: Db, userId: string, fullName: string) {
+  const u = db.prepare('SELECT u.role, b.name business FROM users u JOIN businesses b ON b.id = u.business_id WHERE u.id = ?').get(userId) as { role: string; business: string } | undefined
+  return u?.role === 'owner' ? u.business : publicName(fullName)
+}
+
 export function agendaStaff(db: Db, businessId: string) {
   return db.prepare("SELECT id, name FROM users WHERE business_id = ? AND active = 1 AND in_agenda = 1 ORDER BY name").all(businessId) as { id: string; name: string }[]
 }
@@ -90,9 +96,9 @@ function firstAvailable(db: Db, businessId: string, start: string, end: string):
 const apptView = (db: Db, a: ApptRow, forBusiness = true) => ({
   id: a.id, staffId: forBusiness ? a.staff_id : undefined,
   // Al público solo se le muestra nombre e inicial de quien atiende.
-  staffName: a.staff_id ? ((n: string) => (forBusiness ? n : publicName(n)))((db.prepare('SELECT name FROM users WHERE id = ?').get(a.staff_id) as { name: string }).name) : null,
+  staffName: a.staff_id ? ((n: string) => (forBusiness ? n : publicStaffName(db, a.staff_id!, n)))((db.prepare('SELECT name FROM users WHERE id = ?').get(a.staff_id) as { name: string }).name) : null,
   customerName: a.customer_name, services: JSON.parse(a.services) as Svc[], startsAt: a.starts_at, endsAt: a.ends_at, status: a.status, source: a.source,
-  ...(forBusiness ? { customerId: a.customer_id, phone: a.phone, atHome: !!a.at_home, address: a.address, travelMin: a.travel_min, notes: a.notes, saleId: a.sale_id } : {}),
+  ...(forBusiness ? { customerId: a.customer_id, phone: a.phone, atHome: !!a.at_home, address: a.address, travelMin: a.travel_min, notes: a.notes, saleId: a.sale_id, completedAt: a.completed_at, toCharge: !!a.completed_at && !a.sale_id } : {}),
 })
 
 function createAppointment(deps: Deps, businessId: string, branchId: string, a: { staffId: string | 'any'; serviceIds: string[]; startsAt: string; customerId?: string | null; customerName: string; phone?: string | null; status: string; source: string; atHome?: boolean; address?: string | null; travelMin?: number; notes?: string | null; createdBy: string | null }) {
@@ -251,6 +257,29 @@ function transition(c: C, from: string[], to: string, action: string, extra?: (a
 
 agenda.post('/appointments/:id/confirm', (c) => transition(c, ['pendiente'], 'confirmada', 'cita.confirmada'))
 agenda.post('/appointments/:id/start', (c) => transition(c, ['pendiente', 'confirmada'], 'en_atencion', 'cita.inicio'))
+/** Terminar la atención: la cita queda «por cobrar» y aparece en Caja. No toca dinero ni crea la venta. */
+agenda.post('/appointments/:id/complete', (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const a = loadAppt(c)
+  if (!canHandle(u, a)) throw forbidden()
+  if (a.completed_at) throw conflict('Esa cita ya está terminada y por cobrar.', 'ya_terminada')
+  if (!['pendiente', 'confirmada', 'en_atencion'].includes(a.status)) throw conflict(`La cita está ${a.status}.`, 'estado_invalido')
+  const t = iso(now())
+  db.prepare("UPDATE appointments SET status = 'en_atencion', completed_at = ? WHERE id = ?").run(t, a.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'cita.terminada', entity: 'appointment', entityId: a.id, oldValue: { status: a.status }, newValue: { status: 'en_atencion', porCobrar: true } })
+  return c.json({ appointment: apptView(db, { ...a, status: 'en_atencion', completed_at: t }) })
+})
+
+/** Citas terminadas que Caja todavía no cobra (de la sucursal de quien consulta). Trae el total para cobrar. */
+agenda.get('/agenda/to-charge', requirePerm('sell'), (c) => {
+  const { db } = c.get('deps')
+  const u = c.get('session').user
+  const br = scopeBranch(c)
+  const rows = db.prepare(`SELECT * FROM appointments WHERE business_id = ? AND completed_at IS NOT NULL AND sale_id IS NULL AND status IN ${ACTIVE} ${br ? 'AND branch_id = ?' : ''} ORDER BY completed_at`).all(...(br ? [u.business_id, br] : [u.business_id])) as ApptRow[]
+  return c.json({ appointments: rows.map((a) => { const v = apptView(db, a); return { ...v, total: v.services.reduce((x, sv) => x + sv.price, 0) } }) })
+})
+
 agenda.post('/appointments/:id/no-show', (c) => transition(c, ['pendiente', 'confirmada'], 'no_asistio', 'cita.no_asistio'))
 agenda.post('/appointments/:id/cancel', async (c) => {
   const d = parse(z.object({ reason: z.string().trim().min(2).max(200) }), await body(c))
@@ -315,7 +344,12 @@ publicAgenda.get('/public/book/:code', (c) => {
   const { db } = c.get('deps')
   const b = publicBusiness(c)
   const services = (db.prepare('SELECT id, name, price, category FROM services WHERE business_id = ? AND active = 1 ORDER BY category, name').all(b.id) as { id: string }[]).map((s) => ({ ...s, duration: serviceDuration(db, s.id) })).filter((s) => s.duration > 0)
-  return c.json({ business: { name: b.name, phone: b.phone, giro: b.giro }, services, staff: agendaStaff(db, b.id).map((s) => ({ id: s.id, name: publicName(s.name) })) })
+  const staff = agendaStaff(db, b.id)
+  // Horario del negocio: el más amplio de quienes atienden, por día de la semana.
+  const rows = db.prepare(`SELECT weekday, MIN(start) start, MAX(end) end FROM staff_schedules WHERE user_id IN (${staff.map(() => '?').join(',') || "''"}) GROUP BY weekday ORDER BY weekday`).all(...staff.map((x) => x.id)) as { weekday: number; start: string; end: string }[]
+  const logo = (db.prepare('SELECT logo_url FROM businesses WHERE id = ?').get(b.id) as { logo_url: string | null }).logo_url
+  // Solo identidad del negocio, servicios, horario y nombre público de quien atiende: nada interno ni personal.
+  return c.json({ business: { name: b.name, phone: b.phone, giro: b.giro, logoUrl: logo }, hours: rows, services, staff: staff.map((s) => ({ id: s.id, name: publicStaffName(db, s.id, s.name) })) })
 })
 
 publicAgenda.get('/public/book/:code/availability', (c) => {

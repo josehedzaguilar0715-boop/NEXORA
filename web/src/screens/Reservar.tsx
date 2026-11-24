@@ -26,7 +26,9 @@ export function Reservar({ code }: { code: string }) {
   if (!info) return <main className="login">{err ? <p className="error">{err}</p> : <p className="muted">Cargando…</p>}</main>
   return (
     <main className="login" style={{ maxWidth: 720 }}>
+      {info.business.logoUrl && <img src={info.business.logoUrl} alt={`Logotipo de ${info.business.name}`} style={{ maxHeight: 72, maxWidth: 200, objectFit: 'contain' }} />}
       <h1>{info.business.name}</h1>
+      {info.hours?.length > 0 && <p className="muted small">Horario: {info.hours.map((h: any) => `${['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][h.weekday]} ${h.start}–${h.end}`).join(' · ')}</p>}
       <p className="muted">Reserva tu cita</p>
       <div className="card">
         <h2>1. ¿Qué te vas a hacer?</h2>

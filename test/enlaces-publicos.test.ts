@@ -61,7 +61,7 @@ describe('enlaces públicos sin datos internos', () => {
     const { s, T } = await barberia()
     const { slug } = (await s.call('GET', '/business/public-link', { token: T })).json
     const info = (await (await s.app.request(`/public/book/${slug}`)).json()) as any
-    expect(info.business).toEqual({ name: 'Fénix Barbería', phone: expect.anything(), giro: 'barberia' })
+    expect(info.business).toEqual({ name: 'Fénix Barbería', phone: expect.anything(), giro: 'barberia', logoUrl: null })
     const { productOf } = await import('../web/src/products/index.js')
     expect(productOf(info.business.giro).id).toBe('barber')
   })

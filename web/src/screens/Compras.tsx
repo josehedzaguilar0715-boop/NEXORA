@@ -26,6 +26,8 @@ export function Compras({ me }: { me: Me }) {
     setRecent((await api<{ purchases: any[] }>('GET', '/purchases')).purchases)
   }
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [])
+  const [rep, setRep] = useState<any>(null)
+  useEffect(() => { api<any>('GET', '/inventory/replenishment').then(setRep).catch(() => setRep(null)) }, [recent.length])
 
   const add = (p: Product) => { setRows([...rows, { productId: p.id, name: p.name, quantity: '', cost: '', newPrice: '', expiresAt: '', pack: p.pack ?? null, byPack: !!p.pack }]); setFind('') }
   const upd = (i: number, k: keyof Row, v: string | boolean) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)))
@@ -85,6 +87,29 @@ export function Compras({ me }: { me: Me }) {
 
   const matches = find ? catalog.filter((p) => p.name.toLowerCase().includes(find.toLowerCase()) || p.barcode === find).slice(0, 8) : []
   return (
+    <>
+    {rep && (rep.toBuy.length > 0 || rep.slow.length > 0) && (
+      <div className="grid2" style={{ marginBottom: 14 }}>
+        {rep.toBuy.length > 0 && (
+          <section className="card">
+            <h2>Conviene comprar <span className="muted small">· unos {mxn(rep.toBuyCost)}</span></h2>
+            <p className="muted small">Calculado con lo que realmente vendes: alcanza para {rep.cover} días.</p>
+            <div className="table-wrap"><table className="list"><tbody>
+              {rep.toBuy.slice(0, 8).map((x: any) => <tr key={x.id}><td><b>{x.name}</b><br /><small className="muted">hay {x.stock}{x.daysLeft !== null ? ` · alcanza ${x.daysLeft} días` : ''}</small></td><td className="num">comprar {x.suggested}</td><td><button className="mini" onClick={() => { const p = catalog.find((c) => c.id === x.id); if (p) setRows((r) => r.some((q) => q.productId === p.id) ? r : [...r, { productId: p.id, name: p.name, quantity: String(x.suggested), cost: '', newPrice: '', expiresAt: '', pack: p.pack ?? null, byPack: false }]) }}>Agregar</button></td></tr>)}
+            </tbody></table></div>
+          </section>
+        )}
+        {rep.slow.length > 0 && (
+          <section className="card">
+            <h2>Casi no se vende <span className="muted small">· {mxn(rep.tiedUp)} parados</span></h2>
+            <p className="muted small">Con existencia y sin ventas en {rep.slowDays} días. Quizá convenga no comprar más o hacer una promoción.</p>
+            <div className="table-wrap"><table className="list"><tbody>
+              {rep.slow.slice(0, 8).map((x: any) => <tr key={x.id}><td>{x.name}<br /><small className="muted">hay {x.stock}</small></td><td className="num">{mxn(x.tiedUp)}</td></tr>)}
+            </tbody></table></div>
+          </section>
+        )}
+      </div>
+    )}
     <div className="grid2">
       <section className="card">
         <h2>Nueva compra</h2>
@@ -152,5 +177,6 @@ export function Compras({ me }: { me: Me }) {
         </div>}
       </section>
     </div>
+    </>
   )
 }

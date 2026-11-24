@@ -1558,6 +1558,9 @@ const MIGRATIONS: Migration[] = [
       json_object('name','Ahorro e imprevistos','kind','ahorro','mode','pct','value', COALESCE(json_extract(s.value,'$.savings'), 20))),
     0, 1, strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now')
   FROM businesses b LEFT JOIN business_settings s ON s.business_id = b.id AND s.key = 'budgetRule';`,
+  // Agenda → Caja: la cita terminada queda «por cobrar» (completed_at) hasta que Caja la cobra. Solo agrega una columna nula.
+  `ALTER TABLE appointments ADD COLUMN completed_at TEXT;
+  CREATE INDEX appointments_to_charge ON appointments(business_id, completed_at);`,
 ]
 export const SCHEMA_VERSION = MIGRATIONS.length
 

@@ -40,7 +40,7 @@ function Cita({ a, me, wa, act, onCobrar }: { a: any; me: Me; wa: string | null;
   const off = ['cancelada', 'no_asistio'].includes(a.status)
   return (
     <div className={`appt appt-${a.status}`} style={{ opacity: off ? 0.55 : 1 }}>
-      <div className="appt-top"><b>{hm(a.startsAt)} – {hm(a.endsAt)}</b><span className="pill">{STATUS[a.status]}</span></div>
+      <div className="appt-top"><b>{hm(a.startsAt)} – {hm(a.endsAt)}</b><span className="pill">{a.toCharge ? 'Por cobrar en Caja' : STATUS[a.status]}</span></div>
       <div className="appt-name">{a.customerName}</div>
       <div className="muted small">{a.services.map((s: any) => s.name).join(' + ')}{a.source === 'link' ? ' · reservó por link' : ''}{a.atHome ? ' · a domicilio' : ''}</div>
       {!off && a.status !== 'atendida' && (
@@ -48,6 +48,7 @@ function Cita({ a, me, wa, act, onCobrar }: { a: any; me: Me; wa: string | null;
           {a.status === 'pendiente' && <button className="primary" onClick={act(a.id, 'confirm')}>Confirmar</button>}
           {['confirmada', 'en_atencion'].includes(a.status) && can(me, 'sell') && <button className="primary" onClick={onCobrar}>Cobrar</button>}
           {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'start')}>Atender</button>}
+          {['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && !a.completedAt && <button onClick={act(a.id, 'complete')}>Terminar (pasa a Caja)</button>}
           {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'no-show')}>No vino</button>}
           {['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && <button onClick={async () => { const r = await ask({ title: 'Cancelar cita', label: 'Motivo', placeholder: 'Ej. el cliente no puede venir', confirmLabel: 'Cancelar cita', danger: true }); if (r) void act(a.id, 'cancel', { reason: r })() }}>Cancelar</button>}
           {wa && <a className="button" href={wa} target="_blank" rel="noreferrer">WhatsApp</a>}
@@ -188,7 +189,7 @@ function NuevaCita({ walkIn, preset, date, staff, services, onClose, onSaved }: 
   )
 }
 
-function Cobro({ appt, onClose, onDone }: { appt: any; onClose: () => void; onDone: (total: number, loyalty?: Loyalty | null) => void }) {
+export function Cobro({ appt, onClose, onDone }: { appt: any; onClose: () => void; onDone: (total: number, loyalty?: Loyalty | null) => void }) {
   const [method, setMethod] = useState('efectivo')
   const [tip, setTip] = useState('')
   const [err, setErr] = useState('')

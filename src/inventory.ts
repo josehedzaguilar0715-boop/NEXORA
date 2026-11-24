@@ -395,6 +395,39 @@ inventory.get('/inventory/low-stock', requirePerm('view_inventory'), (c) => {
   return c.json({ products: rows })
 })
 
+/**
+ * Qué comprar y qué no se mueve, calculado de las ventas reales (automatización para tiendas con inventario).
+ * Compra sugerida: lo que alcanza para `cover` días al ritmo de ventas de los últimos `days` días (nunca menos que el mínimo), menos lo que hay.
+ * Poco movimiento: hay existencia y no se vendió nada en `slowDays` días; muestra cuánto dinero tiene parado.
+ */
+inventory.get('/inventory/replenishment', requirePerm('edit_inventory'), (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const branchId = branchOf(c)
+  const num = (k: string, d: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(c.req.query(k) ?? d)) || d))
+  const days = num('days', 30, 7, 180), cover = num('cover', 7, 1, 60), slowDays = num('slowDays', 60, 14, 365)
+  const since = (n: number) => new Date(now().getTime() - n * 86_400_000).toISOString()
+  const soldSince = db.prepare("SELECT COALESCE(-SUM(qty_milli),0) q FROM stock_movements WHERE branch_id = ? AND product_id = ? AND type IN ('venta','cancelacion','consumo') AND created_at >= ?")
+  const products = db.prepare("SELECT * FROM products WHERE business_id = ? AND active = 1 AND sellable = 1 AND COALESCE(track_stock, 1) = 1").all(u.business_id) as (ProductRow & { created_at?: string })[]
+  const toBuy: { id: string; name: string; stock: number; minStock: number; perDay: number; daysLeft: number | null; suggested: number; estCost: number }[] = []
+  const slow: { id: string; name: string; stock: number; tiedUp: number }[] = []
+  for (const p of products) {
+    const stock = stockOf(db, branchId, p.id)
+    const sold = (soldSince.get(branchId, p.id, since(days)) as { q: number }).q
+    const perDayMilli = Math.max(0, sold) / days
+    const target = Math.max(p.min_stock_milli, Math.ceil(perDayMilli * cover))
+    const missing = target - stock
+    if (missing > 0 && (p.min_stock_milli > 0 || perDayMilli > 0)) {
+      toBuy.push({ id: p.id, name: p.name, stock: fromMilli(stock), minStock: fromMilli(p.min_stock_milli), perDay: Math.round(fromMilli(perDayMilli) * 100) / 100, daysLeft: perDayMilli > 0 ? Math.round((stock / perDayMilli) * 10) / 10 : null, suggested: fromMilli(missing), estCost: Math.round((missing * p.last_cost) / 1000) })
+    } else if (stock > 0 && (soldSince.get(branchId, p.id, since(slowDays)) as { q: number }).q <= 0 && (!p.created_at || p.created_at < since(slowDays))) {
+      slow.push({ id: p.id, name: p.name, stock: fromMilli(stock), tiedUp: Math.round((stock * p.last_cost) / 1000) })
+    }
+  }
+  toBuy.sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999))
+  slow.sort((a, b) => b.tiedUp - a.tiedUp)
+  return c.json({ days, cover, slowDays, toBuy, toBuyCost: toBuy.reduce((a, x) => a + x.estCost, 0), slow, tiedUp: slow.reduce((a, x) => a + x.tiedUp, 0) })
+})
+
 inventory.get('/inventory/expiring', requirePerm('view_inventory'), (c) => {
   const { db, now } = c.get('deps')
   const days = Math.min(Number(c.req.query('days') ?? 7) || 7, 365)
