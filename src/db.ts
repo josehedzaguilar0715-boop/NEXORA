@@ -1518,6 +1518,46 @@ const MIGRATIONS: Migration[] = [
   // Administrador autorizado: un puesto más (nace sin permisos; el dueño le marca cada función). Solo agrega una columna con 0 por omisión:
   // ningún usuario existente cambia de puesto ni de permisos.
   `ALTER TABLE users ADD COLUMN admin_authorized INTEGER NOT NULL DEFAULT 0;`,
+  // Finanzas inteligentes: reparto del dueño (varias configuraciones guardadas, una activa) y retiros registrados.
+  // «Plan anterior» = la regla 50/30/20 (o la que ya tuviera el negocio), conservada como histórica: NO está activa ni se impone.
+  // Solo tablas nuevas; no cambia ningún dato existente.
+  `CREATE TABLE distribution_plans (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    name TEXT NOT NULL,
+    base TEXT NOT NULL CHECK (base IN ('ganancia','ganancia_bruta','ventas')),
+    items TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 0,
+    legacy INTEGER NOT NULL DEFAULT 0,
+    created_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX distribution_plans_business ON distribution_plans(business_id);
+  CREATE TABLE owner_withdrawals (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    amount INTEGER NOT NULL CHECK (amount > 0),
+    category TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    method TEXT NOT NULL CHECK (method IN ('efectivo','transferencia')),
+    responsible_id TEXT NOT NULL REFERENCES users(id),
+    cash_movement_id TEXT REFERENCES cash_movements(id),
+    suggested_amount INTEGER,
+    decision TEXT NOT NULL CHECK (decision IN ('aceptado','modificado','propio')),
+    exceeded INTEGER NOT NULL DEFAULT 0,
+    date TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX owner_withdrawals_business ON owner_withdrawals(business_id, date);
+  INSERT INTO distribution_plans (id, business_id, name, base, items, active, legacy, created_at, updated_at)
+  SELECT lower(hex(randomblob(16))), b.id, 'Plan anterior', 'ganancia_bruta',
+    json_array(
+      json_object('name','Operación','kind','operacion','mode','pct','value', COALESCE(json_extract(s.value,'$.ops'), 50)),
+      json_object('name','Dueño','kind','retiro','mode','pct','value', COALESCE(json_extract(s.value,'$.owner'), 30)),
+      json_object('name','Ahorro e imprevistos','kind','ahorro','mode','pct','value', COALESCE(json_extract(s.value,'$.savings'), 20))),
+    0, 1, strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now')
+  FROM businesses b LEFT JOIN business_settings s ON s.business_id = b.id AND s.key = 'budgetRule';`,
 ]
 export const SCHEMA_VERSION = MIGRATIONS.length
 
