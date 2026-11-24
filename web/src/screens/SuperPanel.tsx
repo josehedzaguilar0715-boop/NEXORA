@@ -285,7 +285,7 @@ function Alta({ onDone }: { onDone: () => void }) {
       <label>Nombre del negocio<input value={f.businessName} onChange={(e) => setF({ ...f, businessName: e.target.value })} /></label>
       <label>Giro principal<select value={f.giro} onChange={(e) => setF({ ...f, giro: e.target.value, extraGiros: f.extraGiros.filter((g) => g !== e.target.value) })}>{GIRO_KEYS.map((g) => <option key={g} value={g}>{giroLabel(g)}</option>)}</select></label>
       <p style={{ marginBottom: 4 }}><b>Negocio mixto</b> <span className="muted">— otros giros que también maneja (opcional)</span></p>
-      <div className="checks">{GIRO_KEYS.filter((g) => g !== f.giro).map((g) => <label key={g} style={{ fontWeight: 500 }}><input type="checkbox" style={{ width: 'auto', minHeight: 0, marginRight: 8 }} checked={f.extraGiros.includes(g)} onChange={() => setF({ ...f, extraGiros: f.extraGiros.includes(g) ? f.extraGiros.filter((x) => x !== g) : [...f.extraGiros, g] })} />{giroLabel(g)}</label>)}</div>
+      <div className="checks">{GIRO_KEYS.filter((g) => g !== f.giro).map((g) => <label key={g} className="check"><input type="checkbox" checked={f.extraGiros.includes(g)} onChange={() => setF({ ...f, extraGiros: f.extraGiros.includes(g) ? f.extraGiros.filter((x) => x !== g) : [...f.extraGiros, g] })} />{giroLabel(g)}</label>)}</div>
       <label>Nombre del dueño<input value={f.ownerName} onChange={(e) => setF({ ...f, ownerName: e.target.value })} /></label>
       <label>Teléfono del dueño<input inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></label>
       <label>Contraseña temporal<input value={f.tempPassword} onChange={(e) => setF({ ...f, tempPassword: e.target.value })} /></label>
