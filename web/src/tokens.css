@@ -197,3 +197,13 @@ small { font-size: max(var(--fs-min), 0.85rem); }
   .cards-sm td:first-child { display: block; }
   .cards-sm td:first-child::before { display: none; }
 }
+
+/* Formularios por secciones y opciones avanzadas en segundo nivel. */
+.form-h { margin: 18px 0 6px; font-size: var(--fs-md, 1.05rem); color: var(--ink); }
+.form-sections > .form-h:first-child { margin-top: 0; }
+details.more { margin: 14px 0; border: 1px dashed var(--line-strong); border-radius: 12px; padding: 4px 12px; }
+details.more > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--cyan); font-weight: 600; }
+details.more[open] > summary { margin-bottom: 8px; }
+@media (max-width: 640px) { .cards-sm td.row-actions { justify-content: flex-start; gap: 8px; flex-wrap: wrap; } }
+.cards-sm td > .v { min-width: 0; text-align: right; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .cards-sm td[data-label] { align-items: flex-start; } }

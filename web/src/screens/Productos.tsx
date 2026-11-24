@@ -71,7 +71,7 @@ export function Productos({ me }: { me: Me }) {
       </div>
       {err && <p className="error">{err}</p>}
       <section className="card">
-        <div className="table-wrap" style={{ border: 0, margin: 0 }}>
+        <div className="table-wrap cards-sm" style={{ border: 0, margin: 0 }}>
           <table className="list products">
             <thead><tr><th>Producto</th><th className="num">Precio</th><th className="num">Existencia</th>{costs && <th className="num hide-sm">Costo</th>}<th /></tr></thead>
             <tbody>
@@ -79,10 +79,10 @@ export function Productos({ me }: { me: Me }) {
                 const low = lowIds.has(p.id)
                 return (
                   <tr key={p.id} className="clickable" onClick={() => setEdit({ p })}>
-                    <td><b>{p.name}</b><br /><small className="muted">{[catName(p.categoryId), p.barcode ?? 'sin código', UNIT[p.unit] ?? p.unit].filter(Boolean).join(' · ')}{p.sellable === false ? ' · uso interno' : ''}</small></td>
-                    <td className="num">{mxn(p.price)}{p.tiers?.length ? <><br /><small className="muted">mayoreo {mxn(p.tiers[0]!.price)} desde {p.tiers[0]!.minQuantity}</small></> : null}</td>
-                    <td className="num">{p.trackStock === false ? <span className="muted">receta</span> : <span className={low ? 'pill bad' : 'pill'}>{p.stock ?? 0}</span>}{inPacks(p.stock ?? 0, (p as P).pack) && <><br /><small className="muted">{inPacks(p.stock ?? 0, (p as P).pack)}</small></>}{(p as P & { reserved?: number }).reserved ? <><br /><small className="muted">{(p as P & { reserved?: number }).reserved} apartados</small></> : null}{expIds.has(p.id) && <><br /><small className="neg">por caducar</small></>}</td>
-                    {costs && <td className="num hide-sm">{p.lastCost ? mxn(Math.round(p.lastCost)) : '—'}</td>}
+                    <td data-label="Producto"><b>{p.name}</b><br /><small className="muted">{[catName(p.categoryId), p.barcode ?? 'sin código', UNIT[p.unit] ?? p.unit].filter(Boolean).join(' · ')}{p.sellable === false ? ' · uso interno' : ''}</small></td>
+                    <td data-label="Precio" className="num"><span className="v">{mxn(p.price)}{p.tiers?.length ? <><br /><small className="muted">mayoreo {mxn(p.tiers[0]!.price)} desde {p.tiers[0]!.minQuantity}</small></> : null}</span></td>
+                    <td data-label="Existencia" className="num"><span className="v">{p.trackStock === false ? <span className="muted">receta</span> : <span className={low ? 'pill bad' : 'pill'}>{p.stock ?? 0}</span>}{inPacks(p.stock ?? 0, (p as P).pack) && <><br /><small className="muted">{inPacks(p.stock ?? 0, (p as P).pack)}</small></>}{(p as P & { reserved?: number }).reserved ? <><br /><small className="muted">{(p as P & { reserved?: number }).reserved} apartados</small></> : null}{expIds.has(p.id) && <><br /><small className="neg">por caducar</small></>}</span></td>
+                    {costs && <td data-label="Costo" className="num hide-sm">{p.lastCost ? mxn(Math.round(p.lastCost)) : '—'}</td>}
                     <td className="num row-actions">
                       {canStock && p.active !== false && p.trackStock !== false && <button className="mini" onClick={(e) => { e.stopPropagation(); setEdit({ p, tab: 'existencia' }) }}>+ Agregar</button>}
                       {canEdit && p.active !== false && <button className="mini icon-btn" aria-label={`Eliminar ${p.name}`} title="Eliminar" onClick={async (e) => { e.stopPropagation(); if (!(await confirmAsk(`¿Eliminar «${p.name}»?`, 'Ya no aparecerá en la caja ni en la lista. Sus ventas se conservan y puedes restaurarlo desde «Eliminados».', true))) return; try { await api('PATCH', `/products/${p.id}`, { active: false, baseVersion: p.version, updatedAt: new Date().toISOString() }); await load() } catch (er) { setErr((er as Error).message) } }}><Trash2 size={16} aria-hidden /></button>}
@@ -192,7 +192,8 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
     )
   }
   return (
-    <div>
+    <div className="form-sections">
+      <h3 className="form-h">Lo básico</h3>
       <label>Nombre<input value={f.name} onChange={set('name')} autoFocus={!p} disabled={!canEdit} /></label>
       <label>Código de barras</label>
       <div className="row"><input aria-label="Código de barras" value={f.barcode} onChange={set('barcode')} onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()} placeholder="Escanéalo o escríbelo" disabled={!canEdit} />{canEdit && <ScanButton onCode={(c) => setF((x) => ({ ...x, barcode: c }))} />}</div>
@@ -201,6 +202,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
         <div className="row"><label>Mililitros<input inputMode="numeric" value={f.sizeMl} onChange={set('sizeMl')} /></label>
           <label>Presentación<select value={f.presentation} onChange={set('presentation')}><option value="regular">Regular</option><option value="decant">Decant</option><option value="set">Set</option><option value="tester">Tester (uso interno)</option><option value="muestra">Muestra (uso interno)</option><option value="envase">Envase (uso interno)</option></select></label></div>
       </>)}
+      <h3 className="form-h">Precio y ganancia</h3>
       <div className="row">
         <label>Precio de venta<input inputMode="decimal" value={f.price} onChange={set('price')} placeholder="$0.00" disabled={!canEdit} /></label>
         {!p ? <label>Se vende por<select value={f.unit} onChange={set('unit')}><option value="pieza">Pieza</option><option value="kg">Kilo (granel)</option><option value="litro">Litro</option><option value="metro">Metro</option></select></label>
@@ -216,6 +218,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
           {costs && <ProfitLine price={toCents(f.price)} cost={toCents(f.cost)} margin={Number(f.margin)} onUse={canEdit ? (v) => setF({ ...f, price: String(v / 100) }) : undefined} />}
         </div>
       ) : <p className="muted small">El costo de este platillo sale de su receta (pestaña «Receta»).</p>}
+      <details className="more"><summary>Más opciones: compra a granel y precio de mayoreo</summary>
       {f.trackStock && f.unit === 'pieza' && (
         <div className="pack-box">
           <label className="check"><input type="checkbox" checked={f.packOn} onChange={(e) => setF({ ...f, packOn: e.target.checked })} disabled={!canEdit} />A granel: lo compro por bolsa, caja o paquete y lo vendo por pieza</label>
@@ -236,8 +239,10 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
           <label>A partir de cuántas{f.unit !== 'pieza' ? ` (${UNIT[f.unit]})` : ''}<input inputMode="decimal" value={f.wholesaleMin} onChange={set('wholesaleMin')} placeholder="Ej. 12" disabled={!canEdit} /></label>
         </div>
       )}
+      </details>
       {priceChanged && <label>Código de autorización (cambio de precio)<input type="password" value={f.authCode} onChange={set('authCode')} /></label>}
       {!p && food && <label className="check"><input type="checkbox" checked={!f.trackStock} onChange={(e) => setF({ ...f, trackStock: !e.target.checked })} />Es un platillo o bebida preparada (no lleva existencia; descuenta su receta)</label>}
+      {f.trackStock && <h3 className="form-h">Existencias</h3>}
       {f.trackStock && (
         <div className="row">
           <label>Avisar cuando queden menos de<input inputMode="decimal" value={f.minStock} onChange={set('minStock')} disabled={!canEdit} /></label>
