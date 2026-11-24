@@ -60,6 +60,12 @@ describe('exportación de un negocio', () => {
     expect(conDatosTabla.filter((n) => !(n in counts))).toEqual([])
   })
 
+  it('ignora las tablas internas del motor de Cloudflare (p. ej. __miniflare_do_name, error visto en el ensayo con workerd)', async () => {
+    const f = await dosSucursales()
+    f.s.db.exec('CREATE TABLE __motor_interno (k TEXT); INSERT INTO __motor_interno VALUES (\'x\')')
+    expect((await f.s.call('GET', '/data/export', { token: f.T })).status).toBe(200)
+  })
+
   it('solo el dueño exporta o restaura; empleados y encargados reciben 403', async () => {
     const f = await dosSucursales()
     for (const u of [f.enc1, f.e1a])

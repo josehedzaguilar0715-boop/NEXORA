@@ -47,7 +47,7 @@ export const uncoveredTables = (db: Db) => unclassified(db)
 function plan(db: Db): T[] {
   const hit = planCache.get(db)
   if (hit) return hit
-  const names = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name").all() as { name: string }[]).map((r) => r.name)
+  const names = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT LIKE '!_!_%' ESCAPE '!' ORDER BY name").all() as { name: string }[]).map((r) => r.name)
     .filter((n) => !EXCLUDED_TABLES.has(n) && !(GLOBAL_TABLES as readonly string[]).includes(n))
   const included = new Set(names)
   const info = new Map(names.map((n) => [n, { cols: db.pragma(`table_info("${n}")`) as { name: string; pk: number; notnull: number }[], fks: db.pragma(`foreign_key_list("${n}")`) as { table: string; from: string; to: string }[] }]))
