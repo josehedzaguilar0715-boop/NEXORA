@@ -168,3 +168,8 @@ small { font-size: max(var(--fs-min), 0.85rem); }
 /* Opciones en fila (p. ej. «¿Con quién?»): se acomodan en varias líneas y el texto nunca se corta. */
 .row.chips { flex-wrap: wrap; gap: 8px; }
 .row.chips > button { flex: 1 1 auto; white-space: normal; text-align: center; }
+
+/* Cifras que siempre caben en su tarjeta: el tamaño se adapta al ancho de cada tarjeta (nunca baja de 18 px). */
+.dkpi, .real-cell { container-type: inline-size; }
+.dkpi .dkpi-value, .dash-kpis .dkpi-value, .rep-kpis .dkpi-value, .dash-kpis > .dkpi:first-child .dkpi-value { font-size: clamp(0.9rem, 13.5cqw, 1.6rem); white-space: nowrap; }
+.real-cell b { font-size: clamp(0.9rem, 13cqw, 1.25rem); white-space: nowrap; }
