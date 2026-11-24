@@ -31,6 +31,7 @@ export function Usuarios({ me }: { me: Me }) {
   const owner = me.user.role === 'owner'
   const roleOf = (u: any) => {
     if (u.role === 'owner') return 'Dueño'
+    if (u.position === 'encargado') return 'Encargado'
     const t = catalog.templates.find((t) => t.permissions.length === u.permissions.length && t.permissions.every((p) => u.permissions.includes(p)))
     return t ? templateLabel(me, t.key) ?? t.label : 'Permisos a la medida'
   }
@@ -49,7 +50,7 @@ export function Usuarios({ me }: { me: Me }) {
             {users.map((u) => (
               <div key={u.id} className={`team-row ${u.role === 'owner' ? '' : 'clickable'}`} onClick={() => u.role !== 'owner' && setSel({ ...u })}>
                 <span className="avatar" aria-hidden>{u.name.trim().charAt(0).toUpperCase()}</span>
-                <span className="team-who"><b>{u.name}</b><small className="muted"><span className="team-role">{roleOf(u)}</span> · {u.username ? `usuario: ${u.username}` : 'entra con su teléfono'}{!u.active ? ' · desactivado' : ''}</small></span>
+                <span className="team-who"><b>{u.name}</b><small className="muted"><span className="team-role">{u.position === 'encargado' ? 'Encargado' : roleOf(u)}</span> · {u.username ? `usuario: ${u.username}` : 'entra con su teléfono'}{!u.active ? ' · desactivado' : ''}</small></span>
                 {u.role !== 'owner' && <button className="mini" onClick={(e) => { e.stopPropagation(); setSel({ ...u }) }}>Abrir</button>}
               </div>
             ))}
@@ -75,8 +76,10 @@ export function Usuarios({ me }: { me: Me }) {
 }
 
 function NuevoEmpleado({ me, templates, onClose, onDone }: { me: Me; templates: { key: string; label: string }[]; onClose: () => void; onDone: (name: string) => void }) {
-  const [f, setF] = useState({ name: '', username: '', password: '', template: 'cajero' })
+  const [f, setF] = useState<{ name: string; username: string; password: string; template: string; branchId?: string }>({ name: '', username: '', password: '', template: 'cajero' })
   const [err, setErr] = useState('')
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([])
+  useEffect(() => { if (me.user.role === 'owner') api<any>('GET', '/branches').then((r) => setBranches(r.branches ?? [])).catch(() => {}) }, [])
   const suggest = (name: string) => name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')
   return (
     <div className="modal" onClick={onClose}>
@@ -88,7 +91,8 @@ function NuevoEmpleado({ me, templates, onClose, onDone }: { me: Me; templates: 
           <label>Contraseña inicial<input value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} placeholder="mínimo 8" /></label>
         </div>
         <p className="muted small">El usuario no se puede repetir con otro negocio. En su primer ingreso le pedirá cambiar la contraseña.</p>
-        <label>Puesto<select value={f.template} onChange={(e) => setF({ ...f, template: e.target.value })}>{templates.filter((t) => templateLabel(me, t.key)).map((t) => <option key={t.key} value={t.key}>{templateLabel(me, t.key)}</option>)}</select></label>
+        <label>Puesto<select value={f.template} onChange={(e) => setF({ ...f, template: e.target.value })}>{templates.filter((t) => templateLabel(me, t.key) && (me.user.role === 'owner' || t.key !== 'encargado')).map((t) => <option key={t.key} value={t.key}>{templateLabel(me, t.key)}</option>)}</select></label>
+        {branches.length > 1 && <label>Sucursal<select value={f.branchId ?? ''} onChange={(e) => setF({ ...f, branchId: e.target.value || undefined })}><option value="">Principal</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>}
         <p className="muted small">El puesto pone permisos de inicio; después puedes ajustarlos uno por uno.</p>
         {err && <p className="error">{err}</p>}
         <p className="row"><button type="button" onClick={onClose}>Cancelar</button><button className="primary" disabled={f.name.trim().length < 2 || f.username.trim().length < 3 || f.password.length < 8}>Crear empleado</button></p>
@@ -118,10 +122,10 @@ function Empleado({ me, u, catalog, onClose, onChanged }: { me: Me; u: any; cata
         {tab === 'permisos' && (<>
           <div className="checks perms">
             {catalog.permissions.map((p) => (
-              <label key={p.key} className="check"><input type="checkbox" disabled={p.key === 'view_reports'} checked={p.key === 'view_reports' || perms.includes(p.key)} onChange={() => setPerms(perms.includes(p.key) ? perms.filter((x) => x !== p.key) : [...perms, p.key])} />{p.label}</label>
+              <label key={p.key} className="check"><input type="checkbox" checked={perms.includes(p.key)} onChange={() => setPerms(perms.includes(p.key) ? perms.filter((x) => x !== p.key) : [...perms, p.key])} />{p.label}</label>
             ))}
           </div>
-          <p className="muted small">Lo que no esté marcado no le aparece en pantalla.</p>
+          <p className="muted small">Lo que no esté marcado no le aparece en pantalla ni puede hacerlo: el sistema lo bloquea. «Ver reportes» le permite ver también las ventas de sus compañeros.</p>
           <p><button className="primary" onClick={run(() => api('PATCH', `/users/${u.id}`, { permissions: perms }), 'Permisos guardados.')}>Guardar permisos</button></p>
         </>)}
         {tab === 'acceso' && (

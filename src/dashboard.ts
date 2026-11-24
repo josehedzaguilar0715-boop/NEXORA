@@ -7,6 +7,7 @@ import { fromMilli, stockOf } from './inventory.js'
 import { periodSummary, range } from './finance.js'
 import { mainBranch } from './today.js'
 import { localDate } from './util.js'
+import { scopeBranch, scopeOwn } from './scope.js'
 
 /**
  * Panel de Inicio: ventas de hoy contra ayer y contra la meta, el mes contra el mes anterior,
@@ -18,13 +19,14 @@ const shiftDate = (date: string, d: number) => new Date(Date.parse(`${date}T12:0
 const pctChange = (now: number, before: number): number | null => (before ? Math.round(((now - before) / Math.abs(before)) * 1000) / 10 : null)
 
 /** Dinero que realmente entró y salió en el periodo (forma de pago), y la utilidad real (lo que entró − costo − egresos). */
-export function realMoney(db: Db, businessId: string, from: string, to: string) {
+export function realMoney(db: Db, businessId: string, from: string, to: string, branchId?: string) {
   const { start, end } = range(from, to)
-  const byMethod = db.prepare("SELECT p.method, COALESCE(SUM(p.amount),0) a FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? GROUP BY p.method").all(businessId, start, end) as { method: string; a: number }[]
+  const ba = branchId ? [branchId] : []
+  const byMethod = db.prepare(`SELECT p.method, COALESCE(SUM(p.amount),0) a FROM sale_payments p JOIN sales s ON s.id = p.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? ${branchId ? 'AND s.branch_id = ?' : ''} GROUP BY p.method`).all(businessId, start, end, ...ba) as { method: string; a: number }[]
   const m = (k: string) => byMethod.find((x) => x.method === k)?.a ?? 0
-  const abonos = -(db.prepare("SELECT COALESCE(SUM(delta),0) v FROM credit_ledger WHERE business_id = ? AND ((kind = 'abono' AND method IS NOT NULL) OR (kind = 'cancelacion' AND reverses_id IS NOT NULL)) AND created_at >= ? AND created_at < ?").get(businessId, start, end) as { v: number }).v
-  const layaway = (db.prepare("SELECT COALESCE(SUM(lp.amount),0) v FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND lp.created_at >= ? AND lp.created_at < ?").get(businessId, start, end) as { v: number }).v
-  const s = periodSummary(db, businessId, from, to)
+  const abonos = -(db.prepare(`SELECT COALESCE(SUM(delta),0) v FROM credit_ledger WHERE business_id = ? AND ((kind = 'abono' AND method IS NOT NULL) OR (kind = 'cancelacion' AND reverses_id IS NOT NULL)) AND created_at >= ? AND created_at < ? ${branchId ? 'AND shift_id IN (SELECT id FROM shifts WHERE branch_id = ?)' : ''}`).get(businessId, start, end, ...ba) as { v: number }).v
+  const layaway = (db.prepare(`SELECT COALESCE(SUM(lp.amount),0) v FROM layaway_payments lp JOIN layaways l ON l.id = lp.layaway_id WHERE l.business_id = ? AND lp.created_at >= ? AND lp.created_at < ? ${branchId ? 'AND l.branch_id = ?' : ''}`).get(businessId, start, end, ...ba) as { v: number }).v
+  const s = periodSummary(db, businessId, from, to, branchId)
   const efectivo = m('efectivo'), transferencia = m('transferencia'), tarjeta = m('tarjeta')
   const ingresado = efectivo + transferencia + tarjeta + abonos + layaway
   // Egresos: gastos, comisiones, mermas y devoluciones de dinero (el costo de lo vendido va aparte).
@@ -34,10 +36,24 @@ export function realMoney(db: Db, businessId: string, from: string, to: string) 
 
 export const dashboard = new Hono<Env>()
 
+// «Mi día»: lo que cada quien necesita al empezar. Es solo de la persona que entra (sin permiso de reportes).
+dashboard.get('/dashboard/mine', (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const today = localDate(now())
+  const sales = db.prepare("SELECT id, folio, total, payment_method AS paymentMethod, status, created_at AS createdAt FROM sales WHERE business_id = ? AND cashier_id = ? AND substr(created_at,1,10) = ? ORDER BY created_at DESC LIMIT 20").all(u.business_id, u.id, today) as { total: number; status: string }[]
+  const valid = sales.filter((s) => s.status !== 'cancelada')
+  const shift = db.prepare("SELECT id, opening_float AS openingFloat, opened_at AS openedAt FROM shifts WHERE cashier_id = ? AND status = 'abierto'").get(u.id) ?? null
+  return c.json({ date: today, tickets: valid.length, total: valid.reduce((a, s) => a + s.total, 0), shift, recent: sales.slice(0, 8) })
+})
+
 dashboard.get('/dashboard/panel', requirePerm('view_reports'), (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const b = u.business_id
+  // Dueño: todo el negocio (o la sucursal que pida); los demás: su sucursal.
+  const br = scopeBranch(c)
+  const brArgs = br ? [br] : []
   const today = localDate(now())
   const yesterday = shiftDate(today, -1)
   const monthStart = `${today.slice(0, 8)}01`
@@ -47,29 +63,29 @@ dashboard.get('/dashboard/panel', requirePerm('view_reports'), (c) => {
   const prevEndDay = Math.min(dayOfMonth, Number(shiftDate(monthStart, -1).slice(8, 10)))
   const prevEnd = `${prevStart.slice(0, 8)}${String(prevEndDay).padStart(2, '0')}`
 
-  const t = periodSummary(db, b, today, today)
-  const y = periodSummary(db, b, yesterday, yesterday)
-  const mo = periodSummary(db, b, monthStart, today)
-  const pm = periodSummary(db, b, prevStart, prevEnd)
+  const t = periodSummary(db, b, today, today, br)
+  const y = periodSummary(db, b, yesterday, yesterday, br)
+  const mo = periodSummary(db, b, monthStart, today, br)
+  const pm = periodSummary(db, b, prevStart, prevEnd, br)
   const egresos = (s: ReturnType<typeof periodSummary>) => s.expenses + s.commissions + s.waste + s.refunds
 
   // Serie diaria del mes (ventas, egresos y utilidad) para las minigráficas y la tendencia.
   const series: { date: string; sales: number; out: number; profit: number }[] = []
   for (let d = monthStart; d <= today; d = shiftDate(d, 1)) {
-    const s = periodSummary(db, b, d, d)
+    const s = periodSummary(db, b, d, d, br)
     series.push({ date: d, sales: s.sales.total ?? 0, out: egresos(s), profit: s.profit })
   }
 
   // Granel de hoy: lo vendido por kilo, litro o metro.
   const { start, end } = range(today, today)
-  const bulk = db.prepare("SELECT COALESCE(SUM(si.total),0) v, COUNT(*) n FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN products p ON p.id = si.product_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? AND p.unit != 'pieza'").get(b, start, end) as { v: number; n: number }
+  const bulk = db.prepare(`SELECT COALESCE(SUM(si.total),0) v, COUNT(*) n FROM sale_items si JOIN sales s ON s.id = si.sale_id JOIN products p ON p.id = si.product_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? AND p.unit != 'pieza' ${br ? 'AND s.branch_id = ?' : ''}`).get(b, start, end, ...brArgs) as { v: number; n: number }
   const sellsBulk = !!db.prepare("SELECT 1 FROM products WHERE business_id = ? AND active = 1 AND unit != 'pieza' AND sellable = 1 LIMIT 1").get(b)
 
   // Lo que más ganancia dejó hoy.
-  const topProfit = db.prepare("SELECT si.description name, SUM(si.quantity) qty, SUM(si.total) sales, SUM(si.total - si.cost) profit FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? GROUP BY si.description ORDER BY profit DESC LIMIT 6").all(b, start, end)
+  const topProfit = db.prepare(`SELECT si.description name, SUM(si.quantity) qty, SUM(si.total) sales, SUM(si.total - si.cost) profit FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? ${br ? 'AND s.branch_id = ?' : ''} GROUP BY si.description ORDER BY profit DESC LIMIT 6`).all(b, start, end, ...brArgs)
 
   // Stock bajo (lo que está debajo del mínimo).
-  const branch = mainBranch(db, u)
+  const branch = br ?? mainBranch(db, u)
   const low = branch ? (db.prepare('SELECT id, name, unit, min_stock_milli FROM products WHERE business_id = ? AND active = 1 AND min_stock_milli > 0').all(b) as { id: string; name: string; unit: string; min_stock_milli: number }[])
     .map((p) => ({ name: p.name, unit: p.unit, stock: fromMilli(stockOf(db, branch, p.id)), min: fromMilli(p.min_stock_milli) }))
     .filter((p) => p.stock < p.min).sort((a, z) => a.stock / a.min - z.stock / z.min) : []
@@ -82,7 +98,7 @@ dashboard.get('/dashboard/panel', requirePerm('view_reports'), (c) => {
       vsPrev: { sales: pctChange(mo.sales.total ?? 0, pm.sales.total ?? 0), out: pctChange(egresos(mo), egresos(pm)), profit: pctChange(mo.profit, pm.profit) },
       avgTicket: mo.sales.tickets ? Math.round((mo.sales.total ?? 0) / mo.sales.tickets) : 0,
     },
-    real: realMoney(db, b, monthStart, today),
+    real: realMoney(db, b, monthStart, today, br),
     series, topProfit, lowStock: low.slice(0, 12), lowStockCount: low.length,
   })
 })
@@ -105,9 +121,11 @@ dashboard.get('/reports/board', requirePerm('view_reports'), (c) => {
   const from = c.req.query('from') ?? `${today.slice(0, 8)}01`
   const to = c.req.query('to') ?? today
   const day = c.req.query('day') ?? (today >= from && today <= to ? today : to)
-  const cashier = c.req.query('cashierId') || null
-  const cf = cashier ? 'AND s.cashier_id = ?' : ''
-  const ca = cashier ? [cashier] : []
+  // Alcance: sucursal del usuario (dueño: todas) y, para un empleado, solo lo que él cobró.
+  const br = scopeBranch(c)
+  const cashier = scopeOwn(c) ?? (c.req.query('cashierId') || null)
+  const cf = `${cashier ? 'AND s.cashier_id = ?' : ''} ${br ? 'AND s.branch_id = ?' : ''}`
+  const ca = [...(cashier ? [cashier] : []), ...(br ? [br] : [])]
   const kpis = (f: string, t: string) => {
     const { start, end } = range(f, t)
     const s = db.prepare(`SELECT COALESCE(SUM(s.total),0) total, COUNT(*) n FROM sales s WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? ${cf}`).get(b, start, end, ...ca) as { total: number; n: number }
@@ -120,7 +138,7 @@ dashboard.get('/reports/board', requirePerm('view_reports'), (c) => {
       const parts = db.prepare('SELECT method, amount FROM sale_payments WHERE sale_id = ?').all(t.id) as { method: string; amount: number }[]
       return { ...t, method: parts.length > 1 ? parts.map((p) => p.method).join(' + ') : t.method }
     })
-  const cashiers = db.prepare("SELECT DISTINCT u.id, u.name FROM sales s JOIN users u ON u.id = s.cashier_id WHERE s.business_id = ? ORDER BY u.name").all(b)
+  const cashiers = db.prepare(`SELECT DISTINCT u.id, u.name FROM sales s JOIN users u ON u.id = s.cashier_id WHERE s.business_id = ? ${br ? 'AND s.branch_id = ?' : ''} ${scopeOwn(c) ? 'AND u.id = ?' : ''} ORDER BY u.name`).all(b, ...(br ? [br] : []), ...(scopeOwn(c) ? [scopeOwn(c)!] : []))
   const sellsBulk = !!db.prepare("SELECT 1 FROM products WHERE business_id = ? AND unit != 'pieza' AND sellable = 1 LIMIT 1").get(b)
   return c.json({ from, to, day, cashierId: cashier, cashiers, sellsBulk, dayKpis: kpis(day, day), period: kpis(from, to), tickets })
 })
@@ -137,7 +155,7 @@ dashboard.get('/reports/stock-log', requirePerm('view_reports'), (c) => {
   const today = localDate(now())
   const { start, end } = range(c.req.query('from') ?? `${today.slice(0, 8)}01`, c.req.query('to') ?? today)
   const withSales = c.req.query('sales') === '1'
-  const rows = db.prepare(`SELECT m.created_at at, m.type, m.qty_milli, m.cost, m.reason, p.name product, p.unit, u.name user FROM stock_movements m JOIN products p ON p.id = m.product_id LEFT JOIN users u ON u.id = m.user_id WHERE m.business_id = ? AND m.created_at >= ? AND m.created_at < ? ${withSales ? '' : "AND m.type NOT IN ('venta','consumo')"} ORDER BY m.created_at DESC LIMIT 500`).all(b, start, end) as { at: string; type: string; qty_milli: number; cost: number; reason: string | null; product: string; unit: string; user: string | null }[]
+  const rows = db.prepare(`SELECT m.created_at at, m.type, m.qty_milli, m.cost, m.reason, p.name product, p.unit, u.name user FROM stock_movements m JOIN products p ON p.id = m.product_id LEFT JOIN users u ON u.id = m.user_id WHERE m.business_id = ? AND m.created_at >= ? AND m.created_at < ? ${scopeBranch(c) ? 'AND m.branch_id = ?' : ''} ${withSales ? '' : "AND m.type NOT IN ('venta','consumo')"} ORDER BY m.created_at DESC LIMIT 500`).all(b, start, end, ...(scopeBranch(c) ? [scopeBranch(c)!] : [])) as { at: string; type: string; qty_milli: number; cost: number; reason: string | null; product: string; unit: string; user: string | null }[]
   return c.json({ movements: rows.map((r) => ({ at: r.at, type: r.type, label: MOVE_LABEL[r.type] ?? r.type, product: r.product, unit: r.unit, qty: fromMilli(r.qty_milli), cost: r.cost, reason: r.reason, user: r.user ?? '—' })) })
 })
 
@@ -154,9 +172,9 @@ dashboard.get('/finance/trend', requirePerm('view_reports'), (c) => {
   const points: { label: string; from: string; to: string; income: number; out: number; profit: number }[] = []
   for (let d = from; d <= end;) {
     const last = byMonth ? (() => { const x = new Date(Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)), 0)).toISOString().slice(0, 10); return x > end ? end : x })() : d
-    const s = periodSummary(db, b, d, last)
+    const s = periodSummary(db, b, d, last, scopeBranch(c))
     points.push({ label: byMonth ? d.slice(0, 7) : d, from: d, to: last, income: s.sales.total ?? 0, out: s.expenses + s.commissions + s.waste + s.refunds, profit: s.profit })
     d = shiftDate(last, 1)
   }
-  return c.json({ from, to: end, by: byMonth ? 'mes' : 'dia', points, real: realMoney(db, b, from, end) })
+  return c.json({ from, to: end, by: byMonth ? 'mes' : 'dia', points, real: realMoney(db, b, from, end, scopeBranch(c)) })
 })

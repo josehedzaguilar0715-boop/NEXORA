@@ -53,7 +53,7 @@ Desarrollo local: src/server.ts (Node + better-sqlite3) corre la MISMA app Hono 
 ## 3. Base de datos
 
 * **SQLite.** En Cloudflare es la SQLite del Durable Object; en local es `better-sqlite3`. El mismo código usa ambas a través de la interfaz `Db` (`src/db.ts`).
-* **Migraciones:** el arreglo `MIGRATIONS` de `src/db.ts` (40 hoy) se aplica en orden al arrancar y queda registrado en `_migrations`.
+* **Migraciones:** el arreglo `MIGRATIONS` de `src/db.ts` (41 hoy) se aplica en orden al arrancar y queda registrado en `_migrations`.
   * **Regla: solo agregar al final**; nunca editar una ya publicada.
   * El esquema resultante está en `docs/entrega-floot/esquema-sqlite.sql`.
 * **Multi-negocio lógico:** casi todas las tablas tienen `business_id`, y cada ruta filtra por el negocio de la sesión. Probado en ~90 rutas (`test/aislamiento-negocios.test.ts`).
@@ -71,7 +71,7 @@ Desarrollo local: src/server.ts (Node + better-sqlite3) corre la MISMA app Hono 
 ## 5. Autenticación
 
 * **Dueño:** teléfono + contraseña. Con SMS configurado, el registro y los equipos nuevos se confirman con un código.
-* **Empleado:** usuario + contraseña; permisos por puesto (plantillas en `src/permissions.ts`).
+* **Empleado y encargado:** usuario + contraseña. Tres puestos fijos (dueño, encargado, empleado) con alcance forzado en el servidor (`src/scope.ts`); ver `docs/modernizacion/16-permisos-por-sucursal.md`.
 * **Contraseñas y códigos:** *scrypt* con sal (`hashSecret`).
 * **Sesiones:** token aleatorio. En la base solo se guarda su **sha256** (tabla `sessions`), con vigencia de 30 días, y se puede revocar. El token viaja como `Authorization: Bearer`.
 * **Bloqueos:** 5 intentos fallidos bloquean la cuenta 15 minutos. Además hay un **límite por IP** en entrar, códigos, registro y rutas públicas (`src/ratelimit.ts`).
@@ -99,10 +99,10 @@ Desarrollo local: src/server.ts (Node + better-sqlite3) corre la MISMA app Hono 
 
 ## 8. Pruebas
 
-* `test/*.test.ts` (52 archivos, 254 pruebas) con vitest sobre SQLite en memoria. Cubren:
+* `test/*.test.ts` (53 archivos, 268 pruebas) con vitest sobre SQLite en memoria. Cubren:
   * un archivo por giro;
   * días completos (`dia-completo.test.ts`);
-  * permisos (`permisos-barrido.test.ts`) y aislamiento;
+  * permisos (`permisos-barrido.test.ts`), los tres puestos por sucursal (`puestos-sucursales.test.ts`) y aislamiento;
   * respaldos, límite por IP, pagos al personal, devolución a proveedor y primeros pasos.
 * `test/e2e/caja.e2e.ts`: navegador real con Playwright.
 * `scripts/verificacion/`: recorridos de todas las pantallas por giro, rol y dispositivo, velocidad e internet lento.

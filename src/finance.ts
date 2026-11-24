@@ -8,6 +8,7 @@ import type { Db } from './db.js'
 import { fromMilli, stockOf, type ProductRow } from './inventory.js'
 import { customerBalance } from './sales.js'
 import { bad, conflict, iso, localDate, newId, notFound } from './util.js'
+import { scopeBranch, scopeOwn, wholeBusinessOnly } from './scope.js'
 import { assertCashAvailable } from './cash.js'
 
 export const finance = new Hono<Env>()
@@ -131,7 +132,10 @@ finance.get('/receivables', requirePerm('customers_credit'), (c) => {
 /** Historial de compras de un cliente frecuente. */
 finance.get('/customers/:id/sales', requirePerm('customers_credit'), (c) => {
   const cu = loadCustomer(c)
-  const rows = c.get('deps').db.prepare('SELECT id, folio, total, payment_method AS paymentMethod, status, created_at AS createdAt FROM sales WHERE customer_id = ? ORDER BY created_at DESC LIMIT 200').all(cu.id)
+  // El cliente es del negocio, pero sus compras son de cada sucursal (y de quien las cobró).
+  const branch = scopeBranch(c)
+  const own = scopeOwn(c)
+  const rows = c.get('deps').db.prepare(`SELECT id, folio, total, payment_method AS paymentMethod, status, created_at AS createdAt FROM sales WHERE customer_id = ? ${branch ? 'AND branch_id = ?' : ''} ${own ? 'AND cashier_id = ?' : ''} ORDER BY created_at DESC LIMIT 200`).all(cu.id, ...(branch ? [branch] : []), ...(own ? [own] : []))
   return c.json({ sales: rows })
 })
 
@@ -187,11 +191,12 @@ finance.post('/expenses/:id/void', requirePerm('edit_inventory'), async (c) => {
 finance.get('/expenses', requirePerm('view_reports'), (c) => {
   const from = c.req.query('from') ?? '0000-00-00'
   const to = c.req.query('to') ?? '9999-12-31'
-  const rows = c.get('deps').db.prepare('SELECT id, concept, amount, kind, category, method, date, from_cash_shift IS NOT NULL AS fromCash, voided_at AS voidedAt, void_reason AS voidReason FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ORDER BY voided_at IS NOT NULL, date DESC').all(c.get('session').user.business_id, from, to)
+  const branch = scopeBranch(c) // dueño: todos (o la que pida); los demás: los de su sucursal
+  const rows = c.get('deps').db.prepare(`SELECT id, concept, amount, kind, category, method, date, from_cash_shift IS NOT NULL AS fromCash, voided_at AS voidedAt, void_reason AS voidReason FROM expenses WHERE business_id = ? AND date BETWEEN ? AND ? ${branch ? 'AND branch_id = ?' : ''} ORDER BY voided_at IS NOT NULL, date DESC`).all(c.get('session').user.business_id, from, to, ...(branch ? [branch] : []))
   return c.json({ expenses: rows })
 })
 
-finance.get('/fixed-expenses', requirePerm('view_reports'), (c) => {
+finance.get('/fixed-expenses', requirePerm('view_reports'), wholeBusinessOnly, (c) => {
   const { db } = c.get('deps')
   const b = c.get('session').user.business_id
   const rows = db.prepare('SELECT id, concept, monthly_amount AS monthlyAmount, active FROM fixed_expenses WHERE business_id = ? ORDER BY concept').all(b)
@@ -269,11 +274,12 @@ finance.get('/reports/summary', requirePerm('view_reports'), (c) => {
   const from = c.req.query('from') ?? today
   const to = c.req.query('to') ?? today
   const u = c.get('session').user
-  const summary = periodSummary(db, u.business_id, from, to, c.req.query('branchId'))
+  const branch = scopeBranch(c)
+  const summary = periodSummary(db, u.business_id, from, to, branch)
   const { start, end } = range(from, to)
   const top = db
-    .prepare("SELECT si.description, SUM(si.quantity) qty, SUM(si.total) total, SUM(si.total - si.cost) profit FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? GROUP BY COALESCE(si.product_id, si.description) ORDER BY total DESC LIMIT 20")
-    .all(u.business_id, start, end)
+    .prepare(`SELECT si.description, SUM(si.quantity) qty, SUM(si.total) total, SUM(si.total - si.cost) profit FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = ? AND s.status = 'completada' AND s.created_at >= ? AND s.created_at < ? ${branch ? 'AND s.branch_id = ?' : ''} GROUP BY COALESCE(si.product_id, si.description) ORDER BY total DESC LIMIT 20`)
+    .all(u.business_id, start, end, ...(branch ? [branch] : []))
   return c.json({ ...summary, topProducts: top })
 })
 
@@ -285,7 +291,7 @@ finance.get('/reports/daily', requirePerm('view_reports'), (c) => {
   const out: { date: string; total: number; tickets: number; profit: number }[] = []
   for (let i = days - 1; i >= 0; i--) {
     const date = localDate(new Date(now().getTime() - i * 86_400_000))
-    const s = periodSummary(db, u.business_id, date, date)
+    const s = periodSummary(db, u.business_id, date, date, scopeBranch(c))
     out.push({ date, total: s.sales.total!, tickets: s.sales.tickets!, profit: s.profit })
   }
   return c.json({ days: out })
@@ -296,13 +302,15 @@ finance.get('/reports/recent', requirePerm('view_reports'), (c) => {
   const { db } = c.get('deps')
   const b = c.get('session').user.business_id
   const limit = Math.min(Number(c.req.query('limit') ?? 12) || 12, 50)
+  const br = scopeBranch(c)
+  const f = (col: string) => (br ? `AND ${col} = ?` : '')
   const rows = db.prepare(`
     SELECT * FROM (
-      SELECT 'venta' AS kind, s.created_at AS at, s.total AS amount, 'Venta #' || s.folio || ' · ' || s.payment_method AS label, s.status AS status FROM sales s WHERE s.business_id = ?
-      UNION ALL SELECT m.type, m.created_at, m.amount, m.reason, NULL FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ?
-      UNION ALL SELECT 'compra', p.created_at, p.items_total + p.freight_total, CASE WHEN p.ticket_ref IS NULL THEN 'de ' || p.payment ELSE 'folio ' || p.ticket_ref || ' · ' || p.payment END, p.payment FROM purchases p WHERE p.business_id = ?
-      UNION ALL SELECT 'gasto', e.created_at, e.amount, e.concept, CASE WHEN e.voided_at IS NULL THEN e.kind ELSE 'anulado' END FROM expenses e WHERE e.business_id = ?
-    ) ORDER BY at DESC LIMIT ?`).all(b, b, b, b, limit)
+      SELECT 'venta' AS kind, s.created_at AS at, s.total AS amount, 'Venta #' || s.folio || ' · ' || s.payment_method AS label, s.status AS status FROM sales s WHERE s.business_id = ? ${f('s.branch_id')}
+      UNION ALL SELECT m.type, m.created_at, m.amount, m.reason, NULL FROM cash_movements m JOIN shifts sh ON sh.id = m.shift_id WHERE sh.business_id = ? ${f('sh.branch_id')}
+      UNION ALL SELECT 'compra', p.created_at, p.items_total + p.freight_total, CASE WHEN p.ticket_ref IS NULL THEN 'de ' || p.payment ELSE 'folio ' || p.ticket_ref || ' · ' || p.payment END, p.payment FROM purchases p WHERE p.business_id = ? ${f('p.branch_id')}
+      UNION ALL SELECT 'gasto', e.created_at, e.amount, e.concept, CASE WHEN e.voided_at IS NULL THEN e.kind ELSE 'anulado' END FROM expenses e WHERE e.business_id = ? ${f('e.branch_id')}
+    ) ORDER BY at DESC LIMIT ?`).all(...[b, ...(br ? [br] : []), b, ...(br ? [br] : []), b, ...(br ? [br] : []), b, ...(br ? [br] : []), limit])
   return c.json({ movements: rows })
 })
 
@@ -357,7 +365,10 @@ finance.get('/reports/suggested-withdrawal', ownerOnly, (c) => {
 
 // ---------- Cajas ----------
 
-finance.get('/registers', (c) => c.json({ registers: c.get('deps').db.prepare('SELECT id, branch_id AS branchId, name, active FROM registers WHERE business_id = ? ORDER BY name').all(c.get('session').user.business_id) }))
+finance.get('/registers', (c) => {
+  const branch = c.get('session').user.role === 'owner' ? undefined : scopeBranch(c)
+  return c.json({ registers: c.get('deps').db.prepare(`SELECT id, branch_id AS branchId, name, active FROM registers WHERE business_id = ? ${branch ? 'AND branch_id = ?' : ''} ORDER BY name`).all(c.get('session').user.business_id, ...(branch ? [branch] : [])) })
+})
 
 finance.post('/registers', ownerOnly, async (c) => {
   const { db, now } = c.get('deps')

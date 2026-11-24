@@ -7,6 +7,7 @@ import type { Db } from './db.js'
 import { getProduct, toMilli, fromMilli } from './inventory.js'
 import { createSale, parseSale } from './sales.js'
 import { bad, conflict, iso, newId, notFound } from './util.js'
+import { scopeBranch, scopeOwn } from './scope.js'
 import { assertCashAvailable } from './cash.js'
 
 /** Servicios, recetas (consumibles), combos, copiadoras con contador y encargos con anticipo. */
@@ -124,7 +125,10 @@ services.put('/products/:id/combo', requirePerm('configure_catalog'), async (c) 
 
 // ---------- Copiadoras: lectura del contador al inicio y fin de turno ----------
 
-services.get('/machines', (c) => c.json({ machines: c.get('deps').db.prepare('SELECT id, branch_id AS branchId, name, active FROM machines WHERE business_id = ? ORDER BY name').all(c.get('session').user.business_id) }))
+services.get('/machines', (c) => {
+  const br = scopeBranch(c)
+  return c.json({ machines: c.get('deps').db.prepare(`SELECT id, branch_id AS branchId, name, active FROM machines WHERE business_id = ? ${br ? 'AND branch_id = ?' : ''} ORDER BY name`).all(c.get('session').user.business_id, ...(br ? [br] : [])) })
+})
 
 services.patch('/machines/:id', ownerOnly, async (c) => {
   const { db, now } = c.get('deps')
@@ -239,7 +243,10 @@ services.post('/orders', requirePerm('sell'), async (c) => {
 
 services.get('/orders', requirePerm('sell'), (c) => {
   const status = c.req.query('status')
-  const rows = c.get('deps').db.prepare(`SELECT * FROM orders WHERE business_id = ? ${status ? 'AND status = ?' : "AND status IN ('pendiente','listo')"} ORDER BY due_date, folio`).all(...[c.get('session').user.business_id, ...(status ? [status] : [])]) as OrderRow[]
+  // Encargos: los de la sucursal de quien los capturó (y, si el empleado no ve lo de otros, solo los suyos).
+  const br = scopeBranch(c)
+  const own = scopeOwn(c)
+  const rows = c.get('deps').db.prepare(`SELECT o.* FROM orders o ${br ? 'JOIN users cu ON cu.id = o.created_by' : ''} WHERE o.business_id = ? ${status ? 'AND o.status = ?' : "AND o.status IN ('pendiente','listo')"} ${br ? 'AND cu.branch_id = ?' : ''} ${own ? 'AND o.created_by = ?' : ''} ORDER BY o.due_date, o.folio`).all(...[c.get('session').user.business_id, ...(status ? [status] : []), ...(br ? [br] : []), ...(own ? [own] : [])]) as OrderRow[]
   return c.json({ orders: rows.map(orderView) })
 })
 

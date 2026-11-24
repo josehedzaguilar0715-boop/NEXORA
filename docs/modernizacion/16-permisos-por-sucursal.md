@@ -1,59 +1,34 @@
-# Permisos por sucursal: situación actual y recomendación
+# 16 · Puestos y alcance por sucursal (IMPLEMENTADO, 24 nov 2026)
 
-Fecha: 24 nov 2026. Rama `modernizacion`. **Es una recomendación: no se cambió el código.** Implementarla requiere tu decisión.
+Decisión del propietario: **tres puestos, ni uno más**. No se agrega un cuarto rol de administrador y esta estructura no se cambia sin consultarlo.
 
-## 1. Cómo funciona hoy (comprobado con una prueba real, no supuesto)
-
-* Los usuarios son **dueño** (uno por negocio) o **personal**.
-* El personal se crea con una plantilla editable de permisos: Cajero, Encargado, Barbero, Empleado de piso y Cocina (`src/permissions.ts`).
-* **No existe un rol «administrador»**: hoy el encargado hace de administrador.
-* Cada empleado tiene una **sucursal asignada**. Se usa como **valor por omisión**: su caja, su turno y el inventario que ve al entrar.
-* **Pero no limita lo que puede consultar o cambiar.** Prueba con un negocio de 2 sucursales, un cajero y un encargado asignados a la sucursal 2:
-
-| Qué se probó | Resultado hoy |
+| Puesto | Alcance |
 |---|---|
-| El cajero de la sucursal 2 consulta la existencia de la sucursal 1 | ✅ La ve (8 piezas) |
-| El cajero ve el resumen de ventas de la sucursal 1 y el de todo el negocio | ✅ Los ve ($60.00) |
-| El cajero lista las ventas | Ve **todas** las del negocio (todos tienen «ver reportes») |
-| El encargado de la sucursal 2 ajusta el inventario de la sucursal 1 | ✅ **Puede** (respuesta 200) |
-| Un empleado de **otro negocio** intenta cualquiera de lo anterior | ❌ Bloqueado: el aislamiento entre negocios está probado en 87 listas y ~90 rutas |
+| **Dueño** (`role = owner`) | Todas las sucursales y toda la información del negocio. Administra todo. |
+| **Encargado** (`position = encargado`) | Solo **su sucursal**, con los permisos operativos que el dueño le autorice. Solo el dueño nombra encargados. Puede crear/editar **empleados** de su sucursal (si el dueño le dio «Crear empleados») y no puede dar permisos que él no tiene. |
+| **Empleado** (`position = empleado`) | Solo lo **propio**: sus ventas, su caja, sus encargos y las actividades autorizadas. No ve ventas privadas de otros empleados ni administra inventario, caja general, usuarios o reportes generales, salvo permisos que el dueño le dé expresamente. |
 
-**Conclusión.** Entre negocios no hay ningún riesgo. Dentro de un negocio con varias sucursales, cualquier empleado puede ver la información de todas, y quien edita inventario puede editar el de cualquier sucursal.
+## Dónde se hace cumplir (servidor, no botones)
 
-En un negocio de **una sola sucursal** (el plan base) esto no importa: todo es de la misma sucursal.
+* `src/context.ts`: `puestoOf(u)`, `isManager(u)`. Los usuarios existentes sin puesto se clasifican solos (con «cancelar/descuento» → encargado; si no → empleado), así que **no hubo migración de datos**; la migración 41 solo agrega la columna `users.position` (aditiva, nullable).
+* `src/scope.ts`:
+  * `scopeGuard` (middleware global, después de la sesión): rechaza (403 `otra_sucursal`) cualquier `branchId`, `fromBranch`, `toBranch`, `fromBranchId`, `toBranchId` ajeno en la dirección o en el cuerpo; revisa los identificadores en la ruta, dirección o cuerpo (venta, turno, compra, gasto, cita, cuenta, mesa, apartado, cotización, encargo, usuario…) contra su sucursal; y, para un empleado sin «ver reportes», contra su propio usuario (403 `no_es_tuyo`).
+  * `scopeBranch(c)` / `scopeOwn(c)`: filtros que cada lista, reporte y total aplica (dueño: todas, opcionalmente `?branchId=`; los demás: la suya; empleado: solo lo suyo).
+  * `wholeBusinessOnly`: información que junta todas las sucursales (contabilidad, estados financieros, gastos fijos, conflictos de sincronización) es solo del dueño cuando el negocio tiene más de una sucursal.
+* «Ver reportes» **ya no es gratis**: solo lo traen el dueño, el encargado o quien el dueño autorice. Con ese permiso, un empleado ve también ventas de compañeros **de su misma sucursal**, nunca de otra.
+* Traspasos entre sucursales: solo dueño.
+* Para el empleado, el Inicio es **«Mi día»** (`GET /dashboard/mine`): solo sus ventas del día y su caja.
 
-## 2. Recomendación
+## Decisiones que conviene conocer
 
-| | **Dueño** | **Administrador** (nuevo) | **Encargado** | **Empleado** (cajero, barbero, técnica, mesero, cocina) |
-|---|---|---|---|---|
-| Para quién | El propietario | Gerente general de confianza con varias sucursales | Responsable de **una** sucursal | Quien vende o atiende |
-| Sucursales que ve | Todas | Todas | **Solo la suya** | **Solo la suya** |
-| Ventas y reportes | Todo, con comparación entre sucursales | Todo, con comparación entre sucursales | Los de su sucursal | **Solo sus ventas y su turno**. Hoy ve todo: es la decisión pendiente de «ver reportes para todos». |
-| Finanzas (utilidad, 50/30/20, retiro sugerido, balance) | Sí | Sí, solo lectura | No | No |
-| Caja | Cualquiera; corte de cualquier caja | Cualquiera | Las de su sucursal; autoriza con su código | Solo la suya |
-| Cancelar, descontar, cambiar precio | Directo | Con su código | Con su código, en su sucursal | Pide el código del encargado o del dueño |
-| Inventario: ver | Todas las sucursales | Todas | Su sucursal (y la existencia de otras **solo para pedir un traspaso**) | Su sucursal |
-| Inventario: compras, ajustes, mermas | Todas | Todas | **Solo su sucursal** | No |
-| Traspasos entre sucursales | Sí | Sí | Solicita; envía desde la suya | No |
-| Catálogo y precios del negocio | Sí | Sí | No (o solo precios locales, si se usan) | No |
-| Personal | Crea, edita y da de baja a todos | Crea y edita personal (no dueños ni administradores) | Ve a su equipo; asistencia de su sucursal | Su asistencia |
-| Comisiones y pagos al personal | Todo | Todo | Las de su sucursal; paga con código del dueño | Solo las suyas |
-| Plan, pagos de NEXORA, enlace público, respaldos | Sí | No | No | No |
-| Bitácora | Toda | Toda | La de su sucursal | No |
+1. Clientes y fiado se comparten entre sucursales (un cliente es del negocio).
+2. Permisos ya guardados no se tocaron: un empleado que ya tenía `view_reports` guardado lo conserva hasta que el dueño lo quite.
+3. `/staff/sellers` muestra nombres de compañeros de la misma sucursal (para elegir quién atendió).
+4. La agenda es de la sucursal (no por empleado).
+5. En negocios de una sola sucursal, «su sucursal» y «el negocio» coinciden: contabilidad sigue disponible para quien tenga «ver reportes».
 
-**Principios:**
+## Pruebas
 
-1. **La sucursal asignada debe ser un límite, no solo un valor por omisión**, para todo el que no sea dueño ni administrador.
-2. **Menos es más para el empleado:** que vea lo que necesita para vender. Las cifras del negocio (utilidad, ventas totales) son información sensible para el dueño.
-3. **Un negocio de una sola sucursal no nota ningún cambio.**
-
-## 3. Cómo implementarlo (si lo autorizas)
-
-1. Permiso nuevo **«Todas las sucursales»**, que solo tienen el dueño y la plantilla nueva **Administrador**.
-2. Un solo punto de control: la función que decide la sucursal de cada consulta (`branchOf` en `src/inventory.ts`, y los filtros de reportes y ventas). Si el usuario no tiene «Todas las sucursales» y pide otra sucursal, responde «No tienes acceso a esa sucursal» (403).
-3. Reportes, ventas, cortes, comisiones y bitácora filtran por la sucursal del usuario cuando no tiene «Todas las sucursales».
-4. Decidir si «ver reportes» sigue siendo de todos (hoy sí) o solo de encargado en adelante.
-5. **Pruebas:** extender el barrido automático de aislamiento (`test/aislamiento-listas.test.ts`) a sucursales. Un empleado de la sucursal 2 pidiendo los ids de la sucursal 1 no debe recibir nada.
-6. Estimado: **2 a 3 días** con pruebas. No requiere migración destructiva: solo un permiso nuevo en la lista.
-
-**Efecto en los 3 negocios actuales:** si tienen una sola sucursal, ninguno. Los empleados seguirían viendo lo mismo, salvo lo que decidas sobre «ver reportes» (punto 4).
+* `test/puestos-sucursales.test.ts` (14): encargado de la sucursal 2 no lee ni modifica la 1 (exploración de todas las rutas GET con marcas de la sucursal 1, más lectura/escritura por identificador); empleado no ve operaciones de otro; `branchId`/ids manipulados en dirección y cuerpo; el dueño lee y administra ambas; «Mi día».
+* `scripts/verificacion/puestos.ts`: navegador real, escritorio 1366×900 y celular 390×844, con dueño, encargado 2 y empleado (32 comprobaciones).
+* `test/permisos-reportes.test.ts` actualizado a la nueva política.

@@ -10,6 +10,7 @@ import { notify } from './notifications.js'
 import { findPublicBusiness, publicName } from './publiclinks.js'
 import { getSettings } from './settings.js'
 import { AppError, bad, conflict, forbidden, iso, localDate, newId, normalizePhone, notFound } from './util.js'
+import { scopeBranch } from './scope.js'
 
 // Centro de México: UTC−6 fijo (sin horario de verano desde 2022).
 const OFFSET = '-06:00'
@@ -124,7 +125,8 @@ export const agenda = new Hono<Env>()
 
 agenda.get('/agenda/staff', (c) => {
   const { db } = c.get('deps')
-  const staff = agendaStaff(db, c.get('session').user.business_id).map((s) => ({ ...s, schedule: db.prepare('SELECT weekday, start, end FROM staff_schedules WHERE user_id = ? ORDER BY weekday, start').all(s.id) }))
+  const br = scopeBranch(c)
+  const staff = agendaStaff(db, c.get('session').user.business_id).filter((s) => !br || (db.prepare('SELECT branch_id FROM users WHERE id = ?').get(s.id) as { branch_id: string | null }).branch_id === br).map((s) => ({ ...s, schedule: db.prepare('SELECT weekday, start, end FROM staff_schedules WHERE user_id = ? ORDER BY weekday, start').all(s.id) }))
   return c.json({ staff })
 })
 
@@ -169,11 +171,12 @@ agenda.get('/agenda', requirePerm('sell'), (c) => {
   const from = localToIso(date, '00:00')
   const to = addMin(from, 1440)
   const staffId = c.req.query('staffId')
-  const rows = db.prepare(`SELECT * FROM appointments WHERE business_id = ? AND starts_at >= ? AND starts_at < ? ${staffId ? 'AND staff_id = ?' : ''} ORDER BY starts_at`).all(...[u.business_id, from, to, ...(staffId ? [staffId] : [])]) as ApptRow[]
-  const blocks = db.prepare(`SELECT b.id, b.user_id AS staffId, b.starts_at AS startsAt, b.ends_at AS endsAt, b.reason FROM agenda_blocks b WHERE b.business_id = ? AND b.starts_at < ? AND b.ends_at > ? ${staffId ? 'AND b.user_id = ?' : ''}`).all(...[u.business_id, to, from, ...(staffId ? [staffId] : [])])
+  const br = scopeBranch(c) // la agenda de la sucursal (dueño: todas)
+  const rows = db.prepare(`SELECT * FROM appointments WHERE business_id = ? AND starts_at >= ? AND starts_at < ? ${staffId ? 'AND staff_id = ?' : ''} ${br ? 'AND branch_id = ?' : ''} ORDER BY starts_at`).all(...[u.business_id, from, to, ...(staffId ? [staffId] : []), ...(br ? [br] : [])]) as ApptRow[]
+  const blocks = db.prepare(`SELECT b.id, b.user_id AS staffId, b.starts_at AS startsAt, b.ends_at AS endsAt, b.reason FROM agenda_blocks b WHERE b.business_id = ? AND b.starts_at < ? AND b.ends_at > ? ${staffId ? 'AND b.user_id = ?' : ''} ${br ? 'AND b.user_id IN (SELECT id FROM users WHERE branch_id = ?)' : ''}`).all(...[u.business_id, to, from, ...(staffId ? [staffId] : []), ...(br ? [br] : [])])
   // Horario de cada persona ese día de la semana (para ver sus horas libres).
   const weekday = new Date(`${date}T12:00:00-06:00`).getUTCDay()
-  const hours = db.prepare('SELECT s.user_id AS staffId, s.start, s.end FROM staff_schedules s JOIN users u ON u.id = s.user_id WHERE u.business_id = ? AND u.active = 1 AND u.in_agenda = 1 AND s.weekday = ? ORDER BY s.start').all(u.business_id, weekday)
+  const hours = db.prepare(`SELECT s.user_id AS staffId, s.start, s.end FROM staff_schedules s JOIN users u ON u.id = s.user_id WHERE u.business_id = ? AND u.active = 1 AND u.in_agenda = 1 AND s.weekday = ? ${br ? 'AND u.branch_id = ?' : ''} ORDER BY s.start`).all(u.business_id, weekday, ...(br ? [br] : []))
   return c.json({ date, appointments: rows.map((a) => apptView(db, a)), blocks, hours })
 })
 
@@ -374,7 +377,8 @@ agenda.get('/reminders/retouch', requirePerm('sell'), (c) => {
   const svcs = (db.prepare('SELECT id, name, attrs FROM services WHERE business_id = ? AND active = 1').all(u.business_id) as { id: string; name: string; attrs: string }[])
     .map((s) => ({ ...s, days: Number((JSON.parse(s.attrs) as { retouchDays?: number }).retouchDays ?? 0) }))
     .filter((s) => s.days > 0)
-  const appts = db.prepare("SELECT * FROM appointments WHERE business_id = ? AND status = 'atendida' ORDER BY starts_at DESC").all(u.business_id) as ApptRow[]
+  const br = scopeBranch(c)
+  const appts = db.prepare(`SELECT * FROM appointments WHERE business_id = ? AND status = 'atendida' ${br ? 'AND branch_id = ?' : ''} ORDER BY starts_at DESC`).all(u.business_id, ...(br ? [br] : [])) as ApptRow[]
   const out: { customerName: string; phone: string | null; service: string; lastVisit: string; dueSince: string; message: string; whatsapp: string | null }[] = []
   const seen = new Set<string>()
   for (const a of appts) {

@@ -36,6 +36,7 @@ import { idempotency, sync } from './sync.js'
 import { users } from './users.js'
 import { AppError } from './util.js'
 import { rateLimiter } from './ratelimit.js'
+import { scopeGuard } from './scope.js'
 
 export function createApp(deps: Deps) {
   const app = new Hono<Env>()
@@ -55,6 +56,8 @@ export function createApp(deps: Deps) {
   const protectedApp = new Hono<Env>()
   protectedApp.use('*', authenticate)
   protectedApp.use('*', businessGate)
+  // Alcance por puesto: sucursal y «solo lo propio» (ver src/scope.ts). Antes de cualquier ruta.
+  protectedApp.use('*', scopeGuard)
   protectedApp.use('*', idempotency)
   protectedApp.route('/', authed)
   protectedApp.route('/', sync)

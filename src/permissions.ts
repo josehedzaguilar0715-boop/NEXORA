@@ -5,7 +5,7 @@ export const PERMISSIONS = {
   change_prices: 'Cambiar precios',
   view_inventory: 'Ver inventario',
   edit_inventory: 'Editar inventario y compras',
-  view_reports: 'Ver reportes y finanzas (todos; solo lectura)',
+  view_reports: 'Ver reportes y ventas de otros (de su sucursal; solo lectura)',
   create_employees: 'Crear empleados',
   view_commissions: 'Ver comisiones',
   configure_catalog: 'Configurar productos o menú',
@@ -19,13 +19,15 @@ export type Permission = keyof typeof PERMISSIONS
 export const PERMISSION_KEYS = Object.keys(PERMISSIONS) as [Permission, ...Permission[]]
 
 /** Plantillas editables: solo son un punto de partida al crear un usuario. */
-export const TEMPLATES: Record<string, { label: string; permissions: Permission[] }> = {
-  cajero: { label: 'Cajero', permissions: ['sell', 'open_close_cash', 'customers_credit', 'view_reports'] },
+export const TEMPLATES: Record<string, { label: string; position: 'encargado' | 'empleado'; permissions: Permission[] }> = {
+  // El empleado no ve reportes ni ventas de otros: «ver reportes» lo autoriza el dueño aparte.
+  cajero: { label: 'Cajero', position: 'empleado', permissions: ['sell', 'open_close_cash', 'customers_credit'] },
   encargado: {
     label: 'Encargado',
+    position: 'encargado',
     permissions: ['sell', 'open_close_cash', 'cancel_discount', 'view_inventory', 'edit_inventory', 'view_reports', 'customers_credit', 'attendance', 'configure_catalog'],
   },
-  barbero: { label: 'Barbero', permissions: ['sell', 'view_commissions', 'view_reports'] },
-  empleado_piso: { label: 'Empleado de piso', permissions: ['view_inventory', 'attendance', 'view_reports'] },
-  cocina: { label: 'Cocina', permissions: ['kitchen', 'attendance', 'view_reports'] },
+  barbero: { label: 'Barbero', position: 'empleado', permissions: ['sell', 'view_commissions'] },
+  empleado_piso: { label: 'Empleado de piso', position: 'empleado', permissions: ['view_inventory', 'attendance'] },
+  cocina: { label: 'Cocina', position: 'empleado', permissions: ['kitchen', 'attendance'] },
 }

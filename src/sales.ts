@@ -8,6 +8,7 @@ import { body, hasPerm, parse, requirePerm, type C, type Deps, type Env, type Us
 import { consume, currentPrice, getProduct, priceFor, restore, stockOf, toMilli, type MoveCtx } from './inventory.js'
 import { saleCancelledNotice, stockAlerts } from './notifications.js'
 import { bad, conflict, forbidden, iso, newId, notFound } from './util.js'
+import { scopeBranch, scopeOwn, seesOthers } from './scope.js'
 import { assertCashAvailable, cashOf } from './cash.js'
 
 export const sales = new Hono<Env>()
@@ -301,18 +302,20 @@ function loadSale(c: C): SaleRow {
 /** Ve la venta quien la cobró, o quien puede ver reportes. */
 function ensureCanSee(c: C, s: SaleRow) {
   const u = c.get('session').user
-  if (s.cashier_id !== u.id && !hasPerm(u, 'view_reports')) throw forbidden()
+  if (s.cashier_id !== u.id && !seesOthers(u)) throw forbidden('Solo puedes consultar tus propias ventas.')
 }
 
 sales.get('/sales', (c) => {
   const deps = c.get('deps')
   const u = c.get('session').user
   const shiftId = c.req.query('shiftId')
-  const all = hasPerm(u, 'view_reports')
-  if (!shiftId && !all) throw forbidden()
+  // Alcance por puesto: el dueño ve todo; el encargado, su sucursal; el empleado, solo lo que él cobró
+  // (salvo que el dueño le haya dado «ver reportes»: entonces, lo de su sucursal).
+  const branch = scopeBranch(c)
+  const own = scopeOwn(c)
   const rows = deps.db
-    .prepare(`SELECT * FROM sales WHERE business_id = ? ${shiftId ? 'AND shift_id = ?' : ''} ${all ? '' : 'AND cashier_id = ?'} ORDER BY folio DESC LIMIT 500`)
-    .all(...[u.business_id, ...(shiftId ? [shiftId] : []), ...(all ? [] : [u.id])]) as SaleRow[]
+    .prepare(`SELECT * FROM sales WHERE business_id = ? ${branch ? 'AND branch_id = ?' : ''} ${shiftId ? 'AND shift_id = ?' : ''} ${own ? 'AND cashier_id = ?' : ''} ORDER BY folio DESC LIMIT 500`)
+    .all(...[u.business_id, ...(branch ? [branch] : []), ...(shiftId ? [shiftId] : []), ...(own ? [own] : [])]) as SaleRow[]
   return c.json({ sales: rows.map((s) => saleView(deps, s)) })
 })
 
@@ -322,6 +325,7 @@ sales.get('/sales/folio/:folio', (c) => {
   if (!hasPerm(u, 'cancel_discount') && !hasPerm(u, 'view_reports')) throw forbidden()
   const s = c.get('deps').db.prepare('SELECT * FROM sales WHERE business_id = ? AND branch_id = ? AND folio = ?').get(u.business_id, c.req.query('branchId') ?? u.branch_id, Number(c.req.param('folio'))) as SaleRow | undefined
   if (!s) throw notFound('No se encontró ese folio.')
+  ensureCanSee(c, s)
   const items = c.get('deps').db.prepare('SELECT id, description, quantity, total FROM sale_items WHERE sale_id = ? ORDER BY rowid').all(s.id)
   return c.json({ sale: { ...saleView(c.get('deps'), s), items } })
 })

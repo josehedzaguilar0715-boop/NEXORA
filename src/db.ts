@@ -1499,6 +1499,9 @@ const MIGRATIONS: Migration[] = [
   CREATE INDEX IF NOT EXISTS credit_ledger_business ON credit_ledger(business_id, created_at);
   CREATE INDEX IF NOT EXISTS cash_movements_shift ON cash_movements(shift_id);
   CREATE INDEX IF NOT EXISTS tips_business ON tips(business_id, created_at);`,
+  // Puestos: dueño (rol «owner»), encargado y empleado. NULL = se deduce de los permisos como antes
+  // (con «cancelar o descontar» es encargado). Solo agrega una columna: no cambia ningún dato existente.
+  `ALTER TABLE users ADD COLUMN position TEXT CHECK (position IS NULL OR position IN ('encargado','empleado'));`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

@@ -7,6 +7,7 @@ import type { Db } from './db.js'
 import { fromMilli, stockOf } from './inventory.js'
 import { createSale, parseSale, resolveLine } from './sales.js'
 import { bad, conflict, iso, localDate, newId, notFound } from './util.js'
+import { scopeBranch } from './scope.js'
 import { assertCashAvailable } from './cash.js'
 
 /**
@@ -99,7 +100,8 @@ layaways.post('/layaways', requirePerm('sell'), async (c) => {
 layaways.get('/layaways', requirePerm('sell'), (c) => {
   const { db, now } = c.get('deps')
   const status = c.req.query('status') ?? 'abierto'
-  const rows = db.prepare(`SELECT * FROM layaways WHERE business_id = ? ${status === 'todos' ? '' : 'AND status = ?'} ORDER BY folio DESC LIMIT 500`).all(...[c.get('session').user.business_id, ...(status === 'todos' ? [] : [status])]) as LayawayRow[]
+  const br = scopeBranch(c)
+  const rows = db.prepare(`SELECT * FROM layaways WHERE business_id = ? ${status === 'todos' ? '' : 'AND status = ?'} ${br ? 'AND branch_id = ?' : ''} ORDER BY folio DESC LIMIT 500`).all(...[c.get('session').user.business_id, ...(status === 'todos' ? [] : [status]), ...(br ? [br] : [])]) as LayawayRow[]
   const today = localDate(now())
   return c.json({ layaways: rows.map((l) => view(db, l, today)) })
 })

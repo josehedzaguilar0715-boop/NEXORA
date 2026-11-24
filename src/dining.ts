@@ -10,6 +10,7 @@ import { createSale, parseSale } from './sales.js'
 import { notify } from './notifications.js'
 import { getSettings } from './settings.js'
 import { bad, conflict, forbidden, iso, localDate, newId, notFound } from './util.js'
+import { scopeBranch } from './scope.js'
 
 /**
  * Mesas, cuentas abiertas y comandas por estación. Lo usan palapa, restaurante, comedor y taquería.
@@ -72,7 +73,8 @@ dining.patch('/tables/:id', ownerOnly, async (c) => {
 dining.get('/tables', (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
-  const rows = db.prepare('SELECT * FROM dining_tables WHERE business_id = ? AND active = 1 ORDER BY area, name').all(u.business_id) as { id: string; name: string; area: string; seats: number; status: string; min_consumption: number | null }[]
+  const br = scopeBranch(c)
+  const rows = db.prepare(`SELECT * FROM dining_tables WHERE business_id = ? AND active = 1 ${br ? 'AND branch_id = ?' : ''} ORDER BY area, name`).all(u.business_id, ...(br ? [br] : [])) as { id: string; name: string; area: string; seats: number; status: string; min_consumption: number | null }[]
   const soon = iso(new Date(now().getTime() + 60 * 60_000))
   return c.json({
     tables: rows.map((t) => {
@@ -134,7 +136,8 @@ dining.post('/tabs', requirePerm('sell'), async (c) => {
 dining.get('/tabs', requirePerm('sell'), (c) => {
   const { db } = c.get('deps')
   const kind = c.req.query('kind')
-  const rows = db.prepare(`SELECT * FROM tabs WHERE business_id = ? AND status IN ('abierta','por_cobrar') ${kind ? 'AND kind = ?' : ''} ORDER BY opened_at`).all(...[c.get('session').user.business_id, ...(kind ? [kind] : [])]) as TabRow[]
+  const br = scopeBranch(c)
+  const rows = db.prepare(`SELECT * FROM tabs WHERE business_id = ? AND status IN ('abierta','por_cobrar') ${kind ? 'AND kind = ?' : ''} ${br ? 'AND branch_id = ?' : ''} ORDER BY opened_at`).all(...[c.get('session').user.business_id, ...(kind ? [kind] : []), ...(br ? [br] : [])]) as TabRow[]
   return c.json({ tabs: rows.map((t) => tabView(db, t)) })
 })
 
@@ -233,7 +236,7 @@ dining.get('/kitchen', requirePerm('sell', 'kitchen'), (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const station = c.req.query('station')
-  const rows = db.prepare(`SELECT k.*, t.kind, t.order_number, t.table_id FROM comandas k JOIN tabs t ON t.id = k.tab_id WHERE k.business_id = ? AND k.status = 'en_preparacion' ${station ? 'AND k.station = ?' : ''} ORDER BY k.created_at`).all(...[u.business_id, ...(station ? [station] : [])]) as { id: string; station: string; created_at: string; kind: string; order_number: number | null; table_id: string | null }[]
+  const rows = db.prepare(`SELECT k.*, t.kind, t.order_number, t.table_id FROM comandas k JOIN tabs t ON t.id = k.tab_id WHERE k.business_id = ? AND k.status = 'en_preparacion' ${station ? 'AND k.station = ?' : ''} ${scopeBranch(c) ? 'AND t.branch_id = ?' : ''} ORDER BY k.created_at`).all(...[u.business_id, ...(station ? [station] : []), ...(scopeBranch(c) ? [scopeBranch(c)!] : [])]) as { id: string; station: string; created_at: string; kind: string; order_number: number | null; table_id: string | null }[]
   return c.json({
     comandas: rows.map((k) => ({
       id: k.id, station: k.station, createdAt: k.created_at, minutes: Math.floor((now().getTime() - Date.parse(k.created_at)) / 60_000),
@@ -406,7 +409,7 @@ dining.get('/table-reservations', requirePerm('sell'), (c) => {
   const { db, now } = c.get('deps')
   const date = c.req.query('date') ?? localDate(now())
   const start = new Date(`${date}T06:00:00.000Z`).toISOString()
-  const rows = db.prepare('SELECT r.*, t.name AS table_name FROM table_reservations r LEFT JOIN dining_tables t ON t.id = r.table_id WHERE r.business_id = ? AND r.starts_at >= ? AND r.starts_at < ? ORDER BY r.starts_at').all(c.get('session').user.business_id, start, new Date(Date.parse(start) + 86_400_000).toISOString())
+  const rows = db.prepare('SELECT r.*, t.name AS table_name FROM table_reservations r LEFT JOIN dining_tables t ON t.id = r.table_id WHERE r.business_id = ? AND r.starts_at >= ? AND r.starts_at < ? ' + (scopeBranch(c) ? 'AND t.branch_id = ? ' : '') + 'ORDER BY r.starts_at').all(c.get('session').user.business_id, start, new Date(Date.parse(start) + 86_400_000).toISOString(), ...(scopeBranch(c) ? [scopeBranch(c)!] : []))
   return c.json({ reservations: rows })
 })
 
@@ -481,7 +484,7 @@ dining.patch('/rental-assets/:id', ownerOnly, async (c) => {
 dining.get('/rentals', (c) => {
   const rows = c.get('deps').db.prepare(`SELECT ar.id, ar.quantity, ar.out_at AS outAt, a.name, t.id AS tabId, dt.name AS tableName, t.customer_name AS customerName
     FROM asset_rentals ar JOIN rental_assets a ON a.id = ar.asset_id JOIN tabs t ON t.id = ar.tab_id LEFT JOIN dining_tables dt ON dt.id = t.table_id
-    WHERE a.business_id = ? AND ar.returned_at IS NULL ORDER BY ar.out_at`).all(c.get('session').user.business_id)
+    WHERE a.business_id = ? AND ar.returned_at IS NULL ${scopeBranch(c) ? 'AND t.branch_id = ?' : ''} ORDER BY ar.out_at`).all(c.get('session').user.business_id, ...(scopeBranch(c) ? [scopeBranch(c)!] : []))
   return c.json({ rentals: rows })
 })
 

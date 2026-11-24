@@ -51,7 +51,7 @@ Giros: `abarrotes, ferreteria, papeleria, barberia, unas, perfumeria, banos, tur
 | Comando | Qué hace | Tiempo aprox. |
 |---|---|---|
 | `npm run typecheck` | Revisa tipos del servidor y de las pantallas | 20 s |
-| `npm test` | **254 pruebas** de servidor (vitest) sobre bases en memoria | 40 s |
+| `npm test` | **268 pruebas** de servidor (vitest) sobre bases en memoria | 40 s |
 | `npm run build` | Compila las pantallas | 10 s |
 | `npm run e2e` | Prueba de punta a punta en navegador real (31 pasos) | 2 min |
 | `npm run check` | Todo lo anterior, en orden. **Debe terminar sin errores antes de publicar.** | 3 min |

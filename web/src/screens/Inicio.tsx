@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, hora, mxn, everyVisible } from '../api'
-import { FIADO_GIROS, hasGiro, screensFor, toneStyle, type Me } from '../App'
+import { can, FIADO_GIROS, hasGiro, screensFor, toneStyle, type Me } from '../App'
 import { vocab } from '../giros'
 import { productOf } from '../products'
 
@@ -10,6 +10,29 @@ const KIND: Record<string, string> = { venta: 'Venta', retiro: 'Retiro de caja',
 
 /** Inicio (dashboard): indicadores del día, gráfica de la semana y movimientos recientes. Se actualiza solo. */
 export function Inicio({ me }: { me: Me }) {
+  // Quien no tiene «ver reportes» (un empleado) ve solo «Mi día»: sus propias ventas y su caja.
+  if (!can(me, 'view_reports')) return <MiDia me={me} />
+  return <InicioNegocio me={me} />
+}
+
+function MiDia({ me }: { me: Me }) {
+  const [d, setD] = useState<any>(null)
+  useEffect(() => { const l = () => api<any>('GET', '/dashboard/mine').then(setD).catch(() => {}); void l(); return everyVisible(l, 30_000) }, [])
+  return (
+    <div>
+      <div className="dash-head"><div><h1>Hola, {me.user.name.split(' ')[0]}</h1><p className="muted" style={{ marginTop: -6 }}>{me.business.name} · Mi día</p></div><div className="dash-status"><Clock /></div></div>
+      <div className="dash-kpis">
+        <div className="card dkpi"><div className="dkpi-top"><span className="dkpi-label">Mis ventas de hoy</span></div><div className="dkpi-value pos">{d ? mxn(d.total) : '—'}</div><div className="dkpi-sub">{d ? `${d.tickets} ${d.tickets === 1 ? 'venta' : 'ventas'}` : ''}</div></div>
+        <div className="card dkpi"><div className="dkpi-top"><span className="dkpi-label">Mi caja</span></div><div className="dkpi-value">{d?.shift ? 'Abierta' : 'Cerrada'}</div><div className="dkpi-sub">{d?.shift ? `Fondo ${mxn(d.shift.openingFloat)}` : 'Abre tu caja en «Caja» para vender'}</div></div>
+      </div>
+      <section className="card"><h2>Mis últimas ventas</h2>
+        {d?.recent?.length ? d.recent.map((s: any) => <div key={s.id} className="info-row"><span>#{s.folio} · {hora(s.createdAt)}{s.status === 'cancelada' ? ' · cancelada' : ''}</span><b>{mxn(s.total)}</b></div>) : <p className="muted">Todavía no has vendido hoy.</p>}
+      </section>
+    </div>
+  )
+}
+
+function InicioNegocio({ me }: { me: Me }) {
   const [db, setDb] = useState<any>(null)
   const [days, setDays] = useState<any[]>([])
   const [moves, setMoves] = useState<any[]>([])

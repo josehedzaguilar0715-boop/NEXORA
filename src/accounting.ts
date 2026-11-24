@@ -6,6 +6,7 @@ import type { Db } from './db.js'
 import { shiftTotals, type ShiftRow } from './cash.js'
 import { periodSummary, range, restockNeeded } from './finance.js'
 import { bad, localDate } from './util.js'
+import { wholeBusinessOnly } from './scope.js'
 
 /**
  * Finanzas y contabilidad del negocio (contabilidad administrativa, no fiscal):
@@ -13,6 +14,8 @@ import { bad, localDate } from './util.js'
  * Todo sale de los registros que ya existen (ventas, compras, gastos, fiado, devoluciones y caja).
  */
 export const accounting = new Hono<Env>()
+// Estados financieros, balance y libro juntan todas las sucursales: en un negocio con varias, solo el dueño (src/scope.ts).
+accounting.use('/accounting/*', wholeBusinessOnly)
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 

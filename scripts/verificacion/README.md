@@ -16,5 +16,6 @@ y las demos creadas (`POST /api/admin/demos/{giro}` con el token de soporte, o `
 | `productos14.cjs` | Los 14 productos: identidad al entrar por giro, páginas públicas (reservas, boletos, tarjeta) con la del negocio, y la base en acceso y super panel | `node scripts/verificacion/productos14.cjs <carpeta con demos.txt>` |
 | `carga.cjs` | Prueba de carga: varios negocios vendiendo a la vez; peticiones/s, latencias y cuadre de ventas | `B=<url> NEG=5 CONC=20 TOTAL=2000 node scripts/verificacion/carga.cjs` |
 | `bench-panel.ts` | Tiempo de las pantallas más consultadas con una base grande (40 negocios, meses de ventas) | `NEG=40 VENTAS=1500 npx tsx scripts/verificacion/bench-panel.ts <archivo.db>` |
+| `puestos.ts` | Los tres puestos con dos sucursales, escritorio y celular: alcance, `branchId` e ids manipulados, «Mi día» | `npm run build && npx tsx scripts/verificacion/puestos.ts <carpeta de capturas>` (todo en memoria) |
 | `pixdiff.cjs` | Compara píxel a píxel una pantalla con un CSS anterior | ver comentario del archivo |
 | `perf.cjs` | Tiempo de abrir la caja y agregar productos con CPU 4× más lenta, versión anterior contra actual | dos servidores en 3136 (anterior) y 3135 (actual) |

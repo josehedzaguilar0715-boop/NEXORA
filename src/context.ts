@@ -46,6 +46,8 @@ export interface UserRow {
   password_hash: string
   must_change_password: number
   permissions: string
+  /** 'encargado' | 'empleado' (null = se deduce de los permisos). El dueño es role = 'owner'. */
+  position: string | null
   auth_code_hash: string | null
   active: number
   failed_attempts: number
@@ -65,19 +67,26 @@ export type C = Context<Env>
 export const MAX_FAILED = 5
 export const LOCK_MINUTES = 15
 
-/** Permisos que tiene todo usuario y no se pueden quitar: ver reportes (solo lectura, sin modificar nada). */
-export const ALWAYS_GRANTED: Permission[] = ['view_reports']
-
 /**
- * Dueño o encargado (quien puede autorizar cancelaciones y descuentos). Ya no se usa "ver reportes" para esto,
- * porque ahora todos lo tienen.
+ * Ningún permiso es «gratis»: cada uno lo autoriza el dueño (antes todos podían ver reportes).
+ * El dueño tiene todos; el personal solo los que tenga marcados.
  */
-export function isManager(u: UserRow): boolean {
-  return u.role === 'owner' || (JSON.parse(u.permissions) as string[]).includes('cancel_discount')
+export function hasPerm(u: UserRow, p: Permission): boolean {
+  return u.role === 'owner' || (JSON.parse(u.permissions) as string[]).includes(p)
 }
 
-export function hasPerm(u: UserRow, p: Permission): boolean {
-  return u.role === 'owner' || ALWAYS_GRANTED.includes(p) || (JSON.parse(u.permissions) as string[]).includes(p)
+/** Puesto: dueño (todo el negocio), encargado (su sucursal) o empleado (lo propio). */
+export type Puesto = 'dueno' | 'encargado' | 'empleado'
+export function puestoOf(u: UserRow): Puesto {
+  if (u.role === 'owner') return 'dueno'
+  if (u.position === 'encargado' || u.position === 'empleado') return u.position
+  // Sin puesto guardado (usuarios anteriores): con «cancelar o descontar» es encargado, como siempre.
+  return (JSON.parse(u.permissions) as string[]).includes('cancel_discount') ? 'encargado' : 'empleado'
+}
+
+/** Dueño o encargado: quien autoriza cancelaciones y descuentos y ve lo de todo su alcance (no solo lo propio). */
+export function isManager(u: UserRow): boolean {
+  return puestoOf(u) !== 'empleado'
 }
 
 export function parse<T>(schema: ZodType<T>, data: unknown): T {

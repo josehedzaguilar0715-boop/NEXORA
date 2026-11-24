@@ -1,4 +1,4 @@
--- Esquema completo de NEXORA (SQLite), generado aplicando las 40 migraciones de src/db.ts a una base vacía.
+-- Esquema completo de NEXORA (SQLite), generado aplicando las 41 migraciones de src/db.ts a una base vacía.
 -- NO contiene datos. Referencia para traducir a Postgres (Floot). La fuente de verdad son las migraciones de src/db.ts.
 -- Tablas: 102 · índices: 47 · candados (triggers): 34
 
@@ -1161,7 +1161,7 @@ CREATE TABLE users (
     auth_failed_attempts INTEGER NOT NULL DEFAULT 0,
     auth_locked_until TEXT,
     created_at TEXT NOT NULL
-  , register_id TEXT REFERENCES registers(id), in_agenda INTEGER NOT NULL DEFAULT 0);
+  , register_id TEXT REFERENCES registers(id), in_agenda INTEGER NOT NULL DEFAULT 0, position TEXT CHECK (position IS NULL OR position IN ('encargado','empleado')));
 
 CREATE TABLE "verification_codes" (
     id TEXT PRIMARY KEY,

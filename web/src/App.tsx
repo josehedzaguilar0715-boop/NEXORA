@@ -62,7 +62,7 @@ const Configurar = lazyNamed(() => import('./screens/Configurar'), 'Configurar')
 const Apartados = lazyNamed(() => import('./screens/Apartados'), 'Apartados')
 
 export interface Me {
-  user: { id: string; name: string; phone?: string | null; role: 'owner' | 'staff'; branchId: string | null; mustChangePassword: boolean }
+  user: { id: string; name: string; phone?: string | null; role: 'owner' | 'staff'; position?: 'dueno' | 'encargado' | 'empleado'; branchId: string | null; mustChangePassword: boolean }
   permissions: 'todos' | string[]
   business: { id: string; code: string; name: string; phone: string | null; status: string; giro: string; giros?: string[]; trialEndsAt?: string | null; paidUntil?: string | null; free?: number }
   settings?: Record<string, any>
@@ -78,7 +78,7 @@ export { FIADO_GIROS }
 export const hasGiro = (me: Me, ...g: string[]) => (me.business.giros ?? [me.business.giro]).some((x) => g.includes(x))
 /** Ver reportes lo tiene todo usuario (solo lectura), igual que en el servidor. */
 /** Acepta varios permisos separados por «|» (basta uno). */
-export const can = (me: Me, p: string): boolean => (p.includes('|') ? p.split('|').some((x) => can(me, x)) : p === 'owner' ? me.user.role === 'owner' : p === 'view_reports' || me.permissions === 'todos' || me.permissions.includes(p))
+export const can = (me: Me, p: string): boolean => (p.includes('|') ? p.split('|').some((x) => can(me, x)) : p === 'owner' ? me.user.role === 'owner' : p === 'staff' || me.permissions === 'todos' || me.permissions.includes(p))
 
 type Icon = import('lucide-react').LucideIcon
 export type Screen = { key: string; label: string; perm: string; C: ComponentType<{ me: Me }>; giros?: string[]; group: string; icon: Icon; ownTitle?: boolean; desc?: string }
@@ -125,7 +125,7 @@ const DESC: Record<string, string> = {
   buzon: 'Dudas y solicitudes a soporte', importar: 'Traer datos de Excel u otro sistema', ajustes: 'Datos del negocio, módulos e instalar en otros equipos',
 }
 const SCREENS: Screen[] = [
-  { key: 'inicio', label: 'Inicio', perm: 'view_reports', C: Inicio, group: '', icon: LayoutDashboard, ownTitle: true },
+  { key: 'inicio', label: 'Inicio', perm: 'staff', C: Inicio, group: '', icon: LayoutDashboard, ownTitle: true },
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja, group: 'Operación', icon: ShoppingCart },
   { key: 'agenda', label: 'Agenda', perm: 'sell', C: Agenda, giros: ['barberia', 'unas'], group: 'Operación', icon: CalendarDays },
   { key: 'entradas', label: 'Entradas', perm: 'sell', C: Entradas, giros: ['banos'], group: 'Operación', icon: DoorOpen },
@@ -357,7 +357,7 @@ function Privada() {
         </nav>
         <div className="foot">
           <PendingBadge main />
-          <div className="who"><span className="avatar" aria-hidden>{me.user.name.trim().charAt(0).toUpperCase()}</span><span><b>{me.user.name}</b><small className="muted">{me.user.role === 'owner' ? 'Dueño' : 'Personal'}</small></span></div>
+          <div className="who"><span className="avatar" aria-hidden>{me.user.name.trim().charAt(0).toUpperCase()}</span><span><b>{me.user.name}</b><small className="muted">{me.user.role === 'owner' ? 'Dueño' : me.user.position === 'encargado' ? 'Encargado' : 'Empleado'}</small></span></div>
           <button className="logout" onClick={logout}><LogOut size={18} aria-hidden />Salir</button>
         </div>
       </aside>

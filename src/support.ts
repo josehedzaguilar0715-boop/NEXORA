@@ -74,7 +74,11 @@ support.post('/support/tickets/:id/messages', async (c) => {
 export const branches = new Hono<Env>()
 
 branches.get('/branches', (c) => {
-  const rows = c.get('deps').db.prepare('SELECT id, name, active FROM branches WHERE business_id = ? ORDER BY created_at').all(c.get('session').user.business_id)
+  // El dueño ve todas las sucursales; los demás, solo la suya.
+  const u = c.get('session').user
+  const rows = u.role === 'owner'
+    ? c.get('deps').db.prepare('SELECT id, name, active FROM branches WHERE business_id = ? ORDER BY created_at').all(u.business_id)
+    : c.get('deps').db.prepare('SELECT id, name, active FROM branches WHERE business_id = ? AND id = ? ORDER BY created_at').all(u.business_id, u.branch_id)
   return c.json({ branches: rows })
 })
 

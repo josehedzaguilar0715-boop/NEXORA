@@ -1,20 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { negocioListo } from './helpers.js'
 
-describe('reportes para todos, solo lectura, y arqueo antes del corte', () => {
-  it('cualquier empleado ve reportes y finanzas, pero no modifica', async () => {
+describe('reportes: solo con permiso del dueño, solo lectura, y arqueo antes del corte', () => {
+  it('un empleado nuevo NO ve reportes ni finanzas; con «ver reportes» autorizado por el dueño ve, pero no modifica', async () => {
     const { s, T, o } = await negocioListo()
     const caj = await s.createStaff(T, o.business.code, 'cajera', 'cajero')
     const piso = await s.createStaff(T, o.business.code, 'piso', 'empleado_piso', { permissions: ['attendance'] })
+    // Sin permiso: nada de reportes ni finanzas.
     for (const u of [caj, piso]) {
-      expect((await s.call('GET', '/reports/summary', { token: u.token })).status).toBe(200)
-      expect((await s.call('GET', '/accounting/income-statement', { token: u.token })).status).toBe(200)
-      expect((await s.call('GET', '/accounting/balance', { token: u.token })).status).toBe(200)
-      // Ver no es modificar: no registra gastos ni cambia gastos fijos.
-      expect((await s.call('POST', '/expenses', { token: u.token, body: { concept: 'Luz', amount: 100, kind: 'fijo', method: 'efectivo' } })).status).toBe(403)
-      expect((await s.call('POST', '/fixed-expenses', { token: u.token, body: { concept: 'Renta', monthlyAmount: 100 } })).status).toBe(403)
-      expect((await s.call('GET', '/reports/suggested-withdrawal', { token: u.token })).status).toBe(403)
+      expect((await s.call('GET', '/reports/summary', { token: u.token })).status).toBe(403)
+      expect((await s.call('GET', '/accounting/balance', { token: u.token })).status).toBe(403)
+      expect((await s.call('GET', '/dashboard/panel', { token: u.token })).status).toBe(403)
     }
+    // El dueño le autoriza «ver reportes» a la cajera (negocio de una sola sucursal).
+    await s.call('PATCH', `/users/${caj.id}`, { token: T, body: { permissions: ['sell', 'open_close_cash', 'view_reports'] } })
+    expect((await s.call('GET', '/reports/summary', { token: caj.token })).status).toBe(200)
+    expect((await s.call('GET', '/accounting/income-statement', { token: caj.token })).status).toBe(200)
+    // Ver no es modificar: no registra gastos ni cambia gastos fijos.
+    expect((await s.call('POST', '/expenses', { token: caj.token, body: { concept: 'Luz', amount: 100, kind: 'fijo', method: 'efectivo' } })).status).toBe(403)
+    expect((await s.call('POST', '/fixed-expenses', { token: caj.token, body: { concept: 'Renta', monthlyAmount: 100 } })).status).toBe(403)
+    expect((await s.call('GET', '/reports/suggested-withdrawal', { token: caj.token })).status).toBe(403)
   })
 
   it('arqueo: cuenta por billete y moneda y compara contra lo registrado', async () => {

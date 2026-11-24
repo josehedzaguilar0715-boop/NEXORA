@@ -7,6 +7,7 @@ import { body, parse, requirePerm, type Env } from './context.js'
 import type { Db } from './db.js'
 import { addLot, consume, currentPrice, fromMilli, getProduct, toMilli } from './inventory.js'
 import { AppError, bad, conflict, iso, newId, notFound } from './util.js'
+import { scopeBranch } from './scope.js'
 
 /** Taquería: carne del trompo o asada y costo por taco según su receta. */
 export const taqueria = new Hono<Env>()
@@ -40,7 +41,8 @@ taqueria.post('/meat/batches', requirePerm('sell'), async (c) => {
 taqueria.get('/meat/batches', requirePerm('sell'), (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
-  const rows = db.prepare('SELECT b.*, p.name FROM meat_batches b JOIN products p ON p.id = b.product_id WHERE b.business_id = ? AND (b.closed_at IS NULL OR b.closed_at >= ?) ORDER BY b.started_at DESC').all(u.business_id, new Date(now().getTime() - 86_400_000).toISOString()) as { id: string; name: string; branch_id: string; product_id: string; started_milli: number; started_at: string; closed_at: string | null; sold_milli: number | null; expected_milli: number | null; counted_milli: number | null; difference_milli: number | null }[]
+  const br = scopeBranch(c)
+  const rows = db.prepare(`SELECT b.*, p.name FROM meat_batches b JOIN products p ON p.id = b.product_id WHERE b.business_id = ? AND (b.closed_at IS NULL OR b.closed_at >= ?) ${br ? 'AND b.branch_id = ?' : ''} ORDER BY b.started_at DESC`).all(u.business_id, new Date(now().getTime() - 86_400_000).toISOString(), ...(br ? [br] : [])) as { id: string; name: string; branch_id: string; product_id: string; started_milli: number; started_at: string; closed_at: string | null; sold_milli: number | null; expected_milli: number | null; counted_milli: number | null; difference_milli: number | null }[]
   return c.json({
     batches: rows.map((b) => {
       const sold = b.closed_at ? b.sold_milli! : soldSince(db, b.branch_id, b.product_id, b.started_at, iso(now()))

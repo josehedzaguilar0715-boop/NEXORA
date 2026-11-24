@@ -6,6 +6,7 @@ import { body, hasPerm, parse, requirePerm, type C, type Env } from './context.j
 import { addLot, fromMilli, getProduct, toMilli } from './inventory.js'
 import { createSale, parseSale, tierPrice, type SaleRow } from './sales.js'
 import { bad, conflict, forbidden, iso, localDate, newId, notFound } from './util.js'
+import { scopeBranch } from './scope.js'
 import { assertCashAvailable } from './cash.js'
 
 /** Ferretería (y cualquier giro que lo necesite): escalas de precio, claves de proveedor, cotizaciones y devoluciones. */
@@ -123,7 +124,8 @@ hardware.post('/quotes', requirePerm('sell'), async (c) => {
 
 hardware.get('/quotes', requirePerm('sell'), (c) => {
   const status = c.req.query('status') ?? 'abierta'
-  const rows = c.get('deps').db.prepare('SELECT * FROM quotes WHERE business_id = ? AND status = ? ORDER BY folio DESC LIMIT 200').all(c.get('session').user.business_id, status) as QuoteRow[]
+  const br = scopeBranch(c)
+  const rows = c.get('deps').db.prepare(`SELECT * FROM quotes WHERE business_id = ? AND status = ? ${br ? 'AND branch_id = ?' : ''} ORDER BY folio DESC LIMIT 200`).all(c.get('session').user.business_id, status, ...(br ? [br] : [])) as QuoteRow[]
   return c.json({ quotes: rows.map(quoteView) })
 })
 

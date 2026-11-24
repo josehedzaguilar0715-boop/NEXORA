@@ -2,9 +2,10 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { audit } from './audit.js'
 import { authorize } from './authcode.js'
-import { body, hasPerm, parse, requirePerm, type C, type Env } from './context.js'
+import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Env } from './context.js'
 import type { Db } from './db.js'
 import { bad, clampTime, conflict, forbidden, iso, newId, notFound, type Clock } from './util.js'
+import { scopeBranch } from './scope.js'
 import { assertCashAvailable } from './cash.js'
 
 // Cantidades de inventario en milésimas de la unidad base (1 pieza = 1000, 1 kg = 1000 g).
@@ -441,7 +442,8 @@ inventory.post('/inventory/count', requirePerm('edit_inventory'), async (c) => {
 
 // ---------- Traspasos entre sucursales ----------
 
-inventory.post('/inventory/transfers', requirePerm('edit_inventory'), async (c) => {
+// Un traspaso toca el inventario de dos sucursales: lo hace el dueño (quien ve todas).
+inventory.post('/inventory/transfers', ownerOnly, async (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const d = parse(z.object({ fromBranchId: z.string(), toBranchId: z.string(), items: z.array(z.object({ productId: z.string(), quantity: z.number().positive() })).min(1).max(200) }), await body(c))
@@ -633,14 +635,16 @@ inventory.get('/purchases/:id', requirePerm('edit_inventory'), (c) => {
 /** Compras recientes (para consultar o devolver al proveedor). */
 inventory.get('/purchases', requirePerm('edit_inventory'), (c) => {
   const { db } = c.get('deps')
-  const rows = db.prepare('SELECT p.id, p.ticket_ref AS ticketRef, p.payment, p.created_at AS createdAt, s.name AS supplier FROM purchases p LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? ORDER BY p.created_at DESC LIMIT 50').all(c.get('session').user.business_id) as { id: string }[]
+  const br = scopeBranch(c) // dueño: todas; los demás: las compras de su sucursal
+  const rows = db.prepare(`SELECT p.id, p.ticket_ref AS ticketRef, p.payment, p.created_at AS createdAt, s.name AS supplier FROM purchases p LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? ${br ? 'AND p.branch_id = ?' : ''} ORDER BY p.created_at DESC LIMIT 50`).all(c.get('session').user.business_id, ...(br ? [br] : [])) as { id: string }[]
   return c.json({ purchases: rows.map((r) => ({ ...r, ...purchaseBalance(db, r.id), items: db.prepare('SELECT pi.id, pr.name, pr.unit, pi.qty_milli / 1000.0 AS quantity, l.qty_remaining_milli / 1000.0 AS remaining, pi.unit_cost AS unitCost FROM purchase_items pi JOIN products pr ON pr.id = pi.product_id JOIN lots l ON l.id = pi.lot_id WHERE pi.purchase_id = ?').all(r.id) })) })
 })
 
 // Cuentas por pagar.
 inventory.get('/payables', requirePerm('edit_inventory'), (c) => {
   const { db } = c.get('deps')
-  const rows = db.prepare("SELECT p.id, p.ticket_ref AS ticketRef, p.due_date AS dueDate, p.created_at AS createdAt, s.name AS supplier FROM purchases p LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? AND p.payment = 'credito' ORDER BY p.due_date").all(c.get('session').user.business_id) as { id: string }[]
+  const br = scopeBranch(c)
+  const rows = db.prepare(`SELECT p.id, p.ticket_ref AS ticketRef, p.due_date AS dueDate, p.created_at AS createdAt, s.name AS supplier FROM purchases p LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? AND p.payment = 'credito' ${br ? 'AND p.branch_id = ?' : ''} ORDER BY p.due_date`).all(c.get('session').user.business_id, ...(br ? [br] : [])) as { id: string }[]
   const list = rows.map((r) => ({ ...r, ...purchaseBalance(db, r.id) })).filter((r) => r.balance > 0)
   return c.json({ payables: list, total: list.reduce((a, r) => a + r.balance, 0) })
 })

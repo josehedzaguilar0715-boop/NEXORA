@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { audit } from './audit.js'
 import { body, hasPerm, parse, requirePerm, type Env } from './context.js'
 import { forbidden, iso, newId, notFound } from './util.js'
+import { isMultiBranch, scopeBranch } from './scope.js'
 
 /**
  * Idempotencia: si un equipo reenvía la misma operación (misma llave), se devuelve
@@ -102,6 +103,7 @@ sync.get('/sync/changes', (c) => {
 
 sync.get('/sync/conflicts', requirePerm('view_reports'), (c) => {
   const { db } = c.get('deps')
+  if (c.get('session').user.role !== 'owner' && isMultiBranch(db, c.get('session').user.business_id)) throw forbidden('Los choques de edición son de todo el negocio: solo los ve el dueño.')
   const status = c.req.query('status') === 'revisado' ? 'revisado' : 'pendiente'
   const rows = db.prepare('SELECT * FROM sync_conflicts WHERE business_id = ? AND status = ? ORDER BY created_at DESC').all(c.get('session').user.business_id, status) as { winner: string; loser: string }[]
   return c.json({ conflicts: rows.map((r) => ({ ...r, winner: JSON.parse(r.winner), loser: JSON.parse(r.loser) })) })
@@ -121,6 +123,8 @@ sync.get('/dashboard', requirePerm('view_reports'), (c) => {
   const { db, now } = c.get('deps')
   const u = c.get('session').user
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now())
+  // Dueño: todas las sucursales; los demás: solo la suya.
+  const br = scopeBranch(c)
   const branches = db
     .prepare(
       `SELECT b.id AS branchId, b.name,
@@ -130,12 +134,13 @@ sync.get('/dashboard', requirePerm('view_reports'), (c) => {
        FROM branches b
        LEFT JOIN shifts sh ON sh.branch_id = b.id AND sh.opened_date = ?
        LEFT JOIN sales s ON s.shift_id = sh.id
-       WHERE b.business_id = ? GROUP BY b.id ORDER BY b.name`,
+       WHERE b.business_id = ? ${br ? 'AND b.id = ?' : ''} GROUP BY b.id ORDER BY b.name`,
     )
-    .all(day, u.business_id)
+    .all(day, u.business_id, ...(br ? [br] : []))
   const openShifts = db
-    .prepare("SELECT sh.id, sh.branch_id AS branchId, us.name AS cashier, sh.opened_at AS openedAt FROM shifts sh JOIN users us ON us.id = sh.cashier_id WHERE sh.business_id = ? AND sh.status = 'abierto'")
-    .all(u.business_id)
-  const pending = (db.prepare("SELECT COUNT(*) n FROM sync_conflicts WHERE business_id = ? AND status = 'pendiente'").get(u.business_id) as { n: number }).n
+    .prepare(`SELECT sh.id, sh.branch_id AS branchId, us.name AS cashier, sh.opened_at AS openedAt FROM shifts sh JOIN users us ON us.id = sh.cashier_id WHERE sh.business_id = ? AND sh.status = 'abierto' ${br ? 'AND sh.branch_id = ?' : ''}`)
+    .all(u.business_id, ...(br ? [br] : []))
+  // Los choques de edición son del negocio completo: en un negocio con varias sucursales solo los ve el dueño.
+  const pending = u.role !== 'owner' && isMultiBranch(db, u.business_id) ? 0 : (db.prepare("SELECT COUNT(*) n FROM sync_conflicts WHERE business_id = ? AND status = 'pendiente'").get(u.business_id) as { n: number }).n
   return c.json({ date: day, branches, openShifts, pendingConflicts: pending, asOf: iso(now()) })
 })
