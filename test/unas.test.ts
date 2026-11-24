@@ -34,6 +34,7 @@ describe('estudio de uñas', () => {
     await s.call('PUT', '/commission-rules', { token: T, body: { rules: [{ targetType: 'category', targetId: 'acrilico', rateBp: 3500 }] } })
     await open(0)
     const a = (await s.call('POST', '/appointments', { token: T, body: { staffId: ana.id, serviceIds: [acrilico.id], startsAt: at('10:00'), customerName: 'Mariana' } })).json.appointment
+    await s.call('POST', `/appointments/${a.id}/complete`, { token: T }) // el servicio se termina en la agenda; el cobro es de Caja
     await s.call('POST', `/appointments/${a.id}/checkout`, { token: T, body: { paymentMethod: 'tarjeta', tips: [{ staffId: ana.id, amount: 5000, method: 'tarjeta' }] } })
     expect(await stock(gel.id)).toBeCloseTo(0.992)
     expect(await stock(lima.id)).toBe(99)
@@ -68,11 +69,13 @@ describe('estudio de uñas', () => {
     expect((await s.call('POST', '/appointments', { token: T, body: { staffId: ana.id, serviceIds: [mani.id], startsAt: at('13:10'), customerName: 'Otra' } })).status).toBe(201)
     // Cargo por traslado apagado por defecto.
     await open(0)
+    await s.call('POST', `/appointments/${a.id}/complete`, { token: T }) // el servicio se termina en la agenda; el cobro es de Caja
     const sinCargo = await s.call('POST', `/appointments/${a.id}/checkout`, { token: T, body: { paymentMethod: 'efectivo' } })
     expect(sinCargo.json.sale.total).toBe(20000)
     // Encendido: va en la cuenta pero no genera comisión.
     await s.call('PUT', '/settings', { token: T, body: { travelFee: 8000 } })
     const b = (await s.call('POST', '/appointments', { token: T, body: { staffId: ana.id, serviceIds: [mani.id], startsAt: at('16:00'), customerId: cli.id, travelMin: 20 } })).json.appointment
+    await s.call('POST', `/appointments/${b.id}/complete`, { token: T }) // el servicio se termina en la agenda; el cobro es de Caja
     const v = await s.call('POST', `/appointments/${b.id}/checkout`, { token: T, body: { paymentMethod: 'efectivo' } })
     expect(v.json.sale.total).toBe(28000)
     const com = s.db.prepare('SELECT SUM(amount) a FROM sale_commissions WHERE sale_id = ?').get(v.json.sale.id) as any
@@ -100,6 +103,7 @@ describe('estudio de uñas', () => {
     const { s, T, ana, acrilico, open } = await unas()
     await open(0)
     const a = (await s.call('POST', '/appointments', { token: T, body: { staffId: ana.id, serviceIds: [acrilico.id], startsAt: at('10:00'), customerName: 'Mariana', phone: '5544443333' } })).json.appointment
+    await s.call('POST', `/appointments/${a.id}/complete`, { token: T }) // el servicio se termina en la agenda; el cobro es de Caja
     await s.call('POST', `/appointments/${a.id}/checkout`, { token: T, body: { paymentMethod: 'efectivo' } })
     expect((await s.call('GET', '/reminders/retouch', { token: T })).json.error.code).toBe('modulo_inactivo')
     await s.call('PUT', '/modules', { token: T, body: { active: ['recordatorios'] } })

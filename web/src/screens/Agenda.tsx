@@ -36,19 +36,19 @@ function freeGaps(date: string, hours: { start: string; end: string }[], busy: [
 }
 
 /** Una cita: hora y estado arriba, cliente y servicios, y los botones acomodados en cuadrícula (no se enciman en el celular). */
-function Cita({ a, me, wa, act, onCobrar }: { a: any; me: Me; wa: string | null; act: (id: string, path: string, body?: unknown) => () => Promise<void>; onCobrar: () => void }) {
+function Cita({ a, me, wa, act }: { a: any; me: Me; wa: string | null; act: (id: string, path: string, body?: unknown) => () => Promise<void> }) {
   const off = ['cancelada', 'no_asistio'].includes(a.status)
   return (
     <div className={`appt appt-${a.status}`} style={{ opacity: off ? 0.55 : 1 }}>
-      <div className="appt-top"><b>{hm(a.startsAt)} – {hm(a.endsAt)}</b><span className="pill">{a.toCharge ? 'Por cobrar en Caja' : STATUS[a.status]}</span></div>
+      <div className="appt-top"><b>{hm(a.startsAt)} – {hm(a.endsAt)}</b><span className="pill">{a.toCharge ? 'Pendiente de cobro' : STATUS[a.status]}</span></div>
       <div className="appt-name">{a.customerName}</div>
       <div className="muted small">{a.services.map((s: any) => s.name).join(' + ')}{a.source === 'link' ? ' · reservó por link' : ''}{a.atHome ? ' · a domicilio' : ''}</div>
       {!off && a.status !== 'atendida' && (
         <div className="appt-actions">
           {a.status === 'pendiente' && <button className="primary" onClick={act(a.id, 'confirm')}>Confirmar</button>}
-          {['confirmada', 'en_atencion'].includes(a.status) && can(me, 'sell') && <button className="primary" onClick={onCobrar}>Cobrar</button>}
+          {a.toCharge && can(me, 'sell') && <button className="primary" onClick={() => { try { sessionStorage.setItem('nx_cita_cobrar', a.id) } catch { /* sin almacenamiento */ } location.hash = '#/caja' }}>Ver en Caja</button>}
           {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'start')}>Atender</button>}
-          {['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && !a.completedAt && <button onClick={act(a.id, 'complete')}>Terminar (pasa a Caja)</button>}
+          {['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && !a.completedAt && <button onClick={act(a.id, 'complete')}>Terminar</button>}
           {['pendiente', 'confirmada'].includes(a.status) && <button onClick={act(a.id, 'no-show')}>No vino</button>}
           {['pendiente', 'confirmada', 'en_atencion'].includes(a.status) && <button onClick={async () => { const r = await ask({ title: 'Cancelar cita', label: 'Motivo', placeholder: 'Ej. el cliente no puede venir', confirmLabel: 'Cancelar cita', danger: true }); if (r) void act(a.id, 'cancel', { reason: r })() }}>Cancelar</button>}
           {wa && <a className="button" href={wa} target="_blank" rel="noreferrer">WhatsApp</a>}
@@ -65,7 +65,6 @@ export function Agenda({ me }: { me: Me }) {
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [form, setForm] = useState<null | { walkIn: boolean; staffId?: string; time?: string }>(null)
-  const [checkout, setCheckout] = useState<any>(null)
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = async () => {
     setData(await api('GET', `/agenda?date=${date}`))
@@ -121,7 +120,7 @@ export function Agenda({ me }: { me: Me }) {
               ) : r.kind === 'bloqueo' ? (
                 <div key={r.b.id} className="slot-block">⛔ {hm(r.b.startsAt)} – {hm(r.b.endsAt)} · {r.b.reason}</div>
               ) : (
-                <Cita key={r.a.id} a={r.a} me={me} wa={wa(r.a)} act={act} onCobrar={() => setCheckout(r.a)} />
+                <Cita key={r.a.id} a={r.a} me={me} wa={wa(r.a)} act={act} />
               ))}
               {!rows.length && <p className="muted">{hours.length ? 'Sin citas.' : 'No trabaja este día.'}</p>}
             </section>
@@ -131,7 +130,6 @@ export function Agenda({ me }: { me: Me }) {
       {me.modules?.includes('recordatorios') && <Retoques />}
       {staff.length === 0 && <p className="card">Nadie está en la agenda todavía. En <a href="#/usuarios">Personal</a> abre a cada persona → «Horario de agenda» y marca «Atiende citas». Los servicios se dan de alta en <a href="#/configurar">Configurar negocio</a>.</p>}
       {form && <NuevaCita walkIn={form.walkIn} preset={form.staffId ? { staffId: form.staffId, time: form.time } : undefined} date={date} staff={staff} services={services} onClose={() => setForm(null)} onSaved={() => { setForm(null); setMsg({ ok: 'Cita guardada.' }); void load() }} />}
-      {checkout && <Cobro appt={checkout} onClose={() => setCheckout(null)} onDone={(t, l) => { setCheckout(null); setMsg({ ok: `Cobrado: ${mxn(t)}.${l ? ` ${loyaltyText(l)}.` : ''}` }); void load() }} />}
     </div>
   )
 }
@@ -184,32 +182,6 @@ function NuevaCita({ walkIn, preset, date, staff, services, onClose, onSaved }: 
         <p className="muted">Total: {mxn(total)}</p>
         {err && <p className="error">{err}</p>}
         <p className="row"><button onClick={onClose}>Cancelar</button><button className="primary" disabled={!f.serviceIds.length || f.name.trim().length < 2 || (!walkIn && !f.time)} onClick={save}>Guardar</button></p>
-      </div>
-    </div>
-  )
-}
-
-export function Cobro({ appt, onClose, onDone }: { appt: any; onClose: () => void; onDone: (total: number, loyalty?: Loyalty | null) => void }) {
-  const [method, setMethod] = useState('efectivo')
-  const [tip, setTip] = useState('')
-  const [err, setErr] = useState('')
-  const total = appt.services.reduce((a: number, s: any) => a + s.price, 0)
-  const pay = async () => {
-    try {
-      const r = await api<any>('POST', `/appointments/${appt.id}/checkout`, { id: crypto.randomUUID(), paymentMethod: method, ...(toCents(tip) > 0 ? { tips: [{ staffId: appt.staffId, amount: toCents(tip) }] } : {}) })
-      onDone(r.sale.total, r.loyalty)
-    } catch (e) { setErr((e as Error).message) }
-  }
-  return (
-    <div className="modal" onClick={onClose}>
-      <div className="card" onClick={(e) => e.stopPropagation()}>
-        <h2>Cobrar a {appt.customerName}</h2>
-        <p className="muted">{appt.services.map((s: any) => `${s.name} ${mxn(s.price)}`).join(' · ')} · atendió {appt.staffName}</p>
-        <div className="total">{mxn(total)}</div>
-        <div className="tabs">{['efectivo', 'transferencia', 'tarjeta'].map((m) => <button key={m} className={method === m ? 'on' : ''} onClick={() => setMethod(m)}>{m[0]!.toUpperCase() + m.slice(1)}</button>)}</div>
-        <label>Propina para {appt.staffName} (aparte)<input inputMode="decimal" placeholder="$0.00" value={tip} onChange={(e) => setTip(e.target.value)} /></label>
-        {err && <p className="error">{err}</p>}
-        <p className="row"><button onClick={onClose}>Volver</button><button className="primary big" onClick={pay}>Cobrar</button></p>
       </div>
     </div>
   )

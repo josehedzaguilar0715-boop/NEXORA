@@ -22,6 +22,10 @@ describe('agenda → caja', () => {
     const a = (await s.call('POST', '/appointments', { token: T, body: { staffId: me.id, serviceIds: [svc.id], startsAt: a11, customerName: 'Cliente Prueba', phone: '5511223344' } })).json.appointment
     expect(a?.id).toBeTruthy()
     expect((await s.call('GET', '/agenda/to-charge', { token: T })).json.appointments).toHaveLength(0)
+    // El cobro es de Caja: sin terminar el servicio no se puede cobrar.
+    const antes = await s.call('POST', `/appointments/${a.id}/checkout`, { token: T, body: { id: s.uuid(), paymentMethod: 'efectivo' } })
+    expect(antes.status).toBe(409)
+    expect(antes.json.error.code).toBe('terminar_primero')
     const t = await s.call('POST', `/appointments/${a.id}/complete`, { token: T })
     expect(t.status).toBe(200)
     expect(t.json.appointment).toMatchObject({ status: 'en_atencion', toCharge: true })
@@ -32,7 +36,9 @@ describe('agenda → caja', () => {
     const ch = await s.call('POST', `/appointments/${a.id}/checkout`, { token: T, body: { id: s.uuid(), paymentMethod: 'efectivo', cashReceived: 20000 } })
     expect(ch.status).toBe(201)
     expect((await s.call('GET', '/agenda/to-charge', { token: T })).json.appointments).toHaveLength(0)
-    expect((await s.call('POST', `/appointments/${a.id}/checkout`, { token: T, body: { id: s.uuid(), paymentMethod: 'efectivo' } })).status).toBe(409)
+    const dup = await s.call('POST', `/appointments/${a.id}/checkout`, { token: T, body: { id: s.uuid(), paymentMethod: 'efectivo' } })
+    expect(dup.status).toBe(409)
+    expect(dup.json.error.code).toBe('ya_cobrada') // sin cobros duplicados
     // La venta existe y la finanza la ve.
     expect((await s.call('GET', '/finanzas/resumen', { token: T })).json.vendido).toBe(15000)
   })

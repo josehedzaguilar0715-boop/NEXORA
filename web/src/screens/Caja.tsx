@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, ApiError, cache, flush, mxn, outbox, toCents } from '../api'
 import { ask, askCode } from '../Dialog'
-import { Cobro as CobroCita } from './Agenda'
+import { CobroCita } from './CobroCita'
 import { can, FIADO_GIROS, type Me, hasGiro } from '../App'
 
 export interface Product {
@@ -48,7 +48,7 @@ export function loyaltyText(l: Loyalty): string {
   return parts.join(' · ')
 }
 
-type Modal_ = null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product; qty?: number } | { kind: 'libre' } | { kind: 'cobro' } | { kind: 'fiado' } | { kind: 'ticket'; saleId?: string; text: string; change?: number | null; provisional: boolean; loyalty?: Loyalty | null } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'citas' } | { kind: 'descuento' } | { kind: 'espera' } | { kind: 'cliente' } | { kind: 'cancelar' }
+type Modal_ = null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product; qty?: number } | { kind: 'libre' } | { kind: 'cobro' } | { kind: 'fiado' } | { kind: 'ticket'; saleId?: string; text: string; change?: number | null; provisional: boolean; loyalty?: Loyalty | null } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'citas'; focusId?: string } | { kind: 'descuento' } | { kind: 'espera' } | { kind: 'cliente' } | { kind: 'cancelar' }
 
 /** Atajos de teclado de la caja (se muestran en cada botón). */
 const KEYS = { buscar: 'F2', cliente: 'F3', descuento: 'F4', espera: 'F6', mov: 'F7', libre: 'F8', ventas: 'F9', cobrar: 'F10' } as const
@@ -66,6 +66,7 @@ export function Caja({ me }: { me: Me }) {
   const [q, setQ] = useState('')
   const [pick, setPick] = useState(0)
   const [porCobrar, setPorCobrar] = useState(0)
+  useEffect(() => { try { const id = sessionStorage.getItem('nx_cita_cobrar'); if (id) { sessionStorage.removeItem('nx_cita_cobrar'); setModal({ kind: 'citas', focusId: id }) } } catch { /* sin almacenamiento */ } }, [])
   const loadCitas = () => hasGiro(me, 'barberia', 'unas') ? api<{ appointments: unknown[] }>('GET', '/agenda/to-charge').then((r) => setPorCobrar(r.appointments.length)).catch(() => setPorCobrar(0)) : Promise.resolve()
   useEffect(() => { void loadCitas(); const t = setInterval(() => void loadCitas(), 30_000); return () => clearInterval(t) }, [])
   const [cart, setCart] = useState<Line[]>([])
@@ -360,7 +361,7 @@ export function Caja({ me }: { me: Me }) {
           <button onClick={hold}>{cart.length ? 'Poner en espera' : 'Ventas en espera'} <K k={KEYS.espera} /></button>
           {can(me, 'cancel_discount') && <button disabled={!cart.length} onClick={() => setModal({ kind: 'descuento' })}>Descuento <K k={KEYS.descuento} /></button>}
           <button onClick={() => setModal({ kind: 'libre' })}>Artículo común <K k={KEYS.libre} /></button>
-          {hasGiro(me, 'barberia', 'unas') && <button className={porCobrar ? 'primary' : ''} onClick={() => setModal({ kind: 'citas' })}>Citas por cobrar{porCobrar ? ` (${porCobrar})` : ''}</button>}
+          {hasGiro(me, 'barberia', 'unas') && <button className={porCobrar ? 'primary' : ''} onClick={() => setModal({ kind: 'citas' })}>Pendientes de cobro{porCobrar ? ` (${porCobrar})` : ''}</button>}
           <button onClick={() => setModal({ kind: 'ventas' })}>Ventas del turno <K k={KEYS.ventas} /></button>
           {can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'mov' })}>Meter o sacar dinero <K k={KEYS.mov} /></button>}
           {hasGiro(me, 'papeleria') && can(me, 'open_close_cash') && <button onClick={() => setModal({ kind: 'contador' })}>Contador copiadora</button>}
@@ -418,7 +419,7 @@ export function Caja({ me }: { me: Me }) {
         </Modal>
       )}
       {modal?.kind === 'mov' && <Movimiento shift={shift} onClose={() => setModal(null)} />}
-      {modal?.kind === 'citas' && <CitasPorCobrar onClose={() => { setModal(null); void loadCitas() }} />}
+      {modal?.kind === 'citas' && <CitasPorCobrar focusId={modal.focusId} onClose={() => { setModal(null); void loadCitas() }} onPaid={async (saleId) => { const r = await api<{ text: string }>('GET', `/sales/${saleId}/ticket?paper=${papel()}`).catch(() => ({ text: '' })); void loadCitas(); setModal({ kind: 'ticket', saleId, text: r.text || 'Cobro registrado.', provisional: false }) }} />}
       {modal?.kind === 'ventas' && <VentasTurno shift={shift} me={me} onClose={() => setModal(null)} />}
       {modal?.kind === 'corte' && <Corte shift={shift} onClose={() => setModal(null)} onClosed={() => { setShift(null); cache.set('shift', null); setModal(null) }} />}
     </div>
@@ -661,17 +662,17 @@ function Movimiento({ shift, onClose }: { shift: Shift; onClose: () => void }) {
 }
 
 /** Citas que la agenda dejó terminadas: aquí se cobran (la venta y su ticket salen de Caja). */
-function CitasPorCobrar({ onClose }: { onClose: () => void }) {
+function CitasPorCobrar({ onClose, focusId, onPaid }: { onClose: () => void; focusId?: string; onPaid: (saleId: string) => void }) {
   const [list, setList] = useState<any[] | null>(null)
   const [sel, setSel] = useState<any>(null)
-  const [ok, setOk] = useState('')
   const [err, setErr] = useState('')
-  const load = () => api<{ appointments: any[] }>('GET', '/agenda/to-charge').then((r) => setList(r.appointments)).catch((e) => setErr(e.message))
-  useEffect(() => { void load() }, [])
+  const load = () => api<{ appointments: any[] }>('GET', '/agenda/to-charge').then((r) => { setList(r.appointments); return r.appointments }).catch((e) => { setErr(e.message); return [] as any[] })
+  // «Ver en Caja» desde la agenda abre directo la operación de esa cita.
+  useEffect(() => { void load().then((l) => { const f = focusId ? l.find((a: any) => a.id === focusId) : null; if (f) setSel(f); else if (focusId) setErr('Esa cita ya no está pendiente de cobro (quizá ya se cobró).') }) }, [])
   return (
     <Modal onClose={onClose}>
-      <h2>Citas por cobrar</h2>
-      {err && <p className="error">{err}</p>}{ok && <p className="okmsg">{ok}</p>}
+      <h2>Citas pendientes de cobro</h2>
+      {err && <p className="error">{err}</p>}
       {!list ? <p className="muted">Cargando…</p> : list.length === 0 ? <p className="muted">No hay citas terminadas por cobrar.</p> : (
         <div className="table-wrap"><table className="list"><tbody>
           {list.map((a) => (
@@ -684,7 +685,7 @@ function CitasPorCobrar({ onClose }: { onClose: () => void }) {
         </tbody></table></div>
       )}
       <p><button onClick={onClose}>Cerrar</button></p>
-      {sel && <CobroCita appt={sel} onClose={() => setSel(null)} onDone={(t) => { setSel(null); setOk(`Cobrado: ${mxn(t)}.`); void load() }} />}
+      {sel && <CobroCita appt={sel} onClose={() => setSel(null)} onDone={(_t, _l, saleId) => { setSel(null); void load(); onPaid(saleId) }} />}
     </Modal>
   )
 }

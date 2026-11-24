@@ -311,7 +311,10 @@ agenda.post('/appointments/:id/checkout', requirePerm('sell'), async (c) => {
   const { db, now } = deps
   const u = c.get('session').user
   const a = loadAppt(c)
+  if (a.sale_id || a.status === 'atendida') throw conflict('Esta cita ya fue cobrada.', 'ya_cobrada')
   if (!['confirmada', 'en_atencion', 'pendiente'].includes(a.status)) throw conflict(`La cita está ${a.status}.`, 'estado_invalido')
+  // El cobro es de Caja: primero se termina el servicio en la agenda (queda «pendiente de cobro»).
+  if (!a.completed_at) throw conflict('Primero termina el servicio en la Agenda; después se cobra en Caja.', 'terminar_primero')
   const raw = (await body(c)) as Record<string, unknown>
   const extra = Array.isArray(raw.items) ? (raw.items as Record<string, unknown>[]) : []
   const svc = (JSON.parse(a.services) as Svc[]).map((s) => ({ serviceId: s.serviceId, quantity: 1, unitPrice: s.price, staffId: a.staff_id ?? undefined }))

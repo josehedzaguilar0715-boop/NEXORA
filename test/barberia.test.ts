@@ -59,6 +59,7 @@ describe('barbería: cobro, comisiones y propinas', () => {
     await s.call('PUT', '/commission-rules', { token: T, body: { rules: [{ staffId: juan.id, targetType: 'service', targetId: corte.id, rateBp: 4000 }, { targetType: 'product', targetId: cera.id, rateBp: 1000 }] } })
     await open(0)
     const a = (await s.call('POST', '/appointments', { token: T, body: { staffId: juan.id, serviceIds: [corte.id], startsAt: at('10:00'), customerName: 'Pedro' } })).json.appointment
+    await s.call('POST', `/appointments/${a.id}/complete`, { token: T }) // el servicio se termina en la agenda; el cobro es de Caja
     const v = await s.call('POST', `/appointments/${a.id}/checkout`, { token: T, body: { paymentMethod: 'efectivo', items: [{ productId: cera.id, quantity: 1 }], discount: 3300, authCode: '4321', tips: [{ staffId: juan.id, amount: 5000 }] } })
     expect(v.status).toBe(201)
     expect(v.json.sale.total).toBe(15000 + 18000 - 3300) // 29 700; la propina no es ingreso del negocio
@@ -89,6 +90,7 @@ describe('barbería: cobro, comisiones y propinas', () => {
     await open(0)
     const a = (await s.call('POST', '/appointments', { token: T, body: { staffId: luis.id, serviceIds: [combo.id], startsAt: at('12:00'), customerName: 'Combo' } })).json.appointment
     expect(a.endsAt).toBe(at('12:50')) // duración = corte 30 + barba 20
+    await s.call('POST', `/appointments/${a.id}/complete`, { token: T }) // el servicio se termina en la agenda; el cobro es de Caja
     const v = await s.call('POST', `/appointments/${a.id}/checkout`, { token: T, body: { paymentMethod: 'tarjeta' } })
     expect(v.json.sale.total).toBe(22000)
     const com = s.db.prepare('SELECT base, amount FROM sale_commissions ORDER BY base DESC').all()
