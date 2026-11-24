@@ -44,6 +44,15 @@ export const auditoria = () => {
     const r = el.getBoundingClientRect(); const st = getComputedStyle(el)
     if (r.width < 4 || r.height < 4 || st.visibility === 'hidden' || el.closest('svg, [aria-hidden=true], .intro, .boot-loading, .buscador-lista, .bottom, .topbar')) continue
     if (r.bottom < 0 || r.top > innerHeight * 6) continue
+    // Contenido que queda recortado dentro de una zona con desplazamiento (no se ve) no cuenta.
+    let recortado = false
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const o = getComputedStyle(p).overflow
+      if (o === 'visible') continue
+      const pr = p.getBoundingClientRect()
+      if (r.top >= pr.bottom - 1 || r.bottom <= pr.top + 1 || r.left >= pr.right - 1 || r.right <= pr.left + 1) { recortado = true; break }
+    }
+    if (recortado) continue
     // Solo el texto propio del elemento (sin contar a sus hijos).
     const propio = [...el.childNodes].filter((n) => n.nodeType === 3 && n.textContent?.trim()).map((n) => n.textContent!.trim()).join(' ')
     if (propio) hojas.push({ el, r, rs: [...el.getClientRects()].filter((q) => q.width > 3 && q.height > 3), txt: propio.slice(0, 18) })
