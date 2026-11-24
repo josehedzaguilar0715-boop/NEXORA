@@ -315,6 +315,7 @@ function Privada() {
   const blocked = me.business.status === 'vencido' || me.business.status === 'suspendido'
   return (
     <div className="app2">
+      <a className="skip-link" href="#contenido" onClick={(e) => { e.preventDefault(); document.getElementById('contenido')?.focus() }}>Saltar al contenido</a>
       <header className="topbar">
         <div className="topbar-in">
           <a className="brand2" href="#/inicio" aria-label="Ir al inicio"><Logo size={34} /><span className="brand2-txt"><b>NEXORA{product.short ? ` ${product.short}` : ''}</b><small>{me.business.name}</small></span></a>
@@ -330,7 +331,7 @@ function Privada() {
       </header>
       <div className="shell2">
         <aside className="rail" aria-label="Módulos"><NavModulos allowed={allowed} current={current} pending={pending} /></aside>
-        <main>
+        <main id="contenido" tabIndex={-1}>
         {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
         {me.user.role === 'owner' && !blocked && <RenewNotice b={me.business} />}
         {/* Pantallas del mismo portal a un toque, sin abrir el menú. */}

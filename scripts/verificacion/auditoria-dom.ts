@@ -71,6 +71,15 @@ export const auditoria = () => {
     } if (cruce) break }
     if (cruce) { encimados.push(`«${a.txt}» con «${b.txt}»`); if (encimados.length >= 5) break }
   }
-  return { n, bad, small, overflow: document.documentElement.scrollWidth > innerWidth + 2, encimados }
+  // Controles sin nombre accesible (lector de pantalla): botón, enlace o campo sin texto, etiqueta ni aria-label.
+  const sinNombre: string[] = []
+  for (const el of document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=option]')) {
+    const r = el.getBoundingClientRect(); const st = getComputedStyle(el)
+    if (r.width === 0 || r.height === 0 || st.visibility === 'hidden' || el.closest('[aria-hidden=true]')) continue
+    const h = el as HTMLInputElement
+    const nombre = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title') || (el.textContent ?? '').trim() || (h.labels && h.labels.length ? 'etiqueta' : '') || h.placeholder || (h.type === 'checkbox' || h.type === 'radio' ? (el.closest('label')?.textContent ?? '').trim() : '')
+    if (!nombre) sinNombre.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.split(' ')[0] : ''}`)
+  }
+  return { n, bad, small, overflow: document.documentElement.scrollWidth > innerWidth + 2, encimados, sinNombre }
 }
 

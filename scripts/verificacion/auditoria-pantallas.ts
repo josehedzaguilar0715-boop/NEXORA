@@ -38,8 +38,8 @@ for (const giro of giros) {
       errs.length = 0
       await page.goto(`${base}/#/${key}`); await page.waitForTimeout(900); total++
       const a = await page.evaluate(auditoria)
-      const mal = errs.length || a.overflow || a.bad.length || a.small.length || a.encimados.length
-      if (mal) hallazgos.push(`${giro}/${key}/${vp}/${modo}: ${errs[0] ?? ''}${a.overflow ? ' DESBORDA' : ''}${a.bad.length ? ` contraste(${a.bad.length}): ${a.bad.slice(0, 2).join(' | ')}` : ''}${a.small.length ? ` letra<18(${a.small.length}): ${a.small.slice(0, 2).join(' | ')}` : ''}${a.encimados.length ? ` ENCIMADOS: ${a.encimados.slice(0, 2).join(' | ')}` : ''}`)
+      const mal = errs.length || a.overflow || a.bad.length || a.small.length || a.encimados.length || a.sinNombre.length
+      if (mal) hallazgos.push(`${giro}/${key}/${vp}/${modo}: ${errs[0] ?? ''}${a.overflow ? ' DESBORDA' : ''}${a.bad.length ? ` contraste(${a.bad.length}): ${a.bad.slice(0, 2).join(' | ')}` : ''}${a.small.length ? ` letra<18(${a.small.length}): ${a.small.slice(0, 2).join(' | ')}` : ''}${a.encimados.length ? ` ENCIMADOS: ${a.encimados.slice(0, 2).join(' | ')}` : ''}${a.sinNombre.length ? ` SIN NOMBRE(${a.sinNombre.length}): ${[...new Set(a.sinNombre)].slice(0, 3).join(', ')}` : ''}`)
     }
     await ctx.close()
   }

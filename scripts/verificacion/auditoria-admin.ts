@@ -34,8 +34,8 @@ for (const [vp, size] of Object.entries(VP)) for (const modo of ['claro', 'oscur
     else { await page.locator('.bottom').getByRole('button', { name: 'Más' }).click(); await page.waitForTimeout(250); await page.locator('.hoja').getByRole('button', { name: tab, exact: true }).click() }
     await page.waitForTimeout(700); n++
     const a = await page.evaluate(auditoria)
-    const bad = errs.length || a.overflow || a.bad.length || a.small.length || a.encimados.length
-    ok(!bad, `[${vp}/${modo}] ${tab}: ${errs[0] ?? ''}${a.overflow ? ' DESBORDA' : ''}${a.bad.length ? ` contraste(${a.bad.length}): ${a.bad.slice(0, 2).join(' | ')}` : ''}${a.small.length ? ` letra<18(${a.small.length}): ${a.small.slice(0, 2).join(' | ')}` : ''}${a.encimados.length ? ` ENCIMADOS: ${a.encimados.slice(0, 2).join(' | ')}` : ''}`)
+    const bad = errs.length || a.overflow || a.bad.length || a.small.length || a.encimados.length || a.sinNombre.length
+    ok(!bad, `[${vp}/${modo}] ${tab}: ${errs[0] ?? ''}${a.overflow ? ' DESBORDA' : ''}${a.bad.length ? ` contraste(${a.bad.length}): ${a.bad.slice(0, 2).join(' | ')}` : ''}${a.small.length ? ` letra<18(${a.small.length}): ${a.small.slice(0, 2).join(' | ')}` : ''}${a.encimados.length ? ` ENCIMADOS: ${a.encimados.slice(0, 2).join(' | ')}` : ''}${a.sinNombre.length ? ` SIN NOMBRE(${a.sinNombre.length}): ${[...new Set(a.sinNombre)].slice(0, 3).join(', ')}` : ''}`)
     if (modo === 'claro' || tab === 'Resumen') await page.screenshot({ path: `${shots}/${vp}-${tab.toLowerCase().replace(/ /g, '-')}-${modo}.png` })
   }
   await ctx.close()

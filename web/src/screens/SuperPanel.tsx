@@ -50,6 +50,7 @@ export function SuperPanel() {
   const baja = PESTANAS.slice(0, 3)
   return (
     <div className="app2 admin2">
+      <a className="skip-link" href="#contenido" onClick={(e) => { e.preventDefault(); document.getElementById('contenido')?.focus() }}>Saltar al contenido</a>
       <header className="topbar">
         <div className="topbar-in">
           <span className="brand2"><Logo size={34} /><span className="brand2-txt"><b>NEXORA</b><small>Super panel · soporte</small></span></span>
@@ -58,7 +59,7 @@ export function SuperPanel() {
       </header>
       <div className="shell2">
         <aside className="rail" aria-label="Módulos del panel"><nav className="rail-nav">{PESTANAS.map(item)}</nav></aside>
-        <main>
+        <main id="contenido" tabIndex={-1}>
           <header className="page-head"><div><span className={`screen-chip mod-${actual.mod}`}><actual.icon size={16} aria-hidden />{actual.label}</span><h1>{actual.label}</h1></div></header>
           {tab === 'resumen' ? <Resumen /> : tab === 'negocios' ? <Negocios /> : tab === 'buzon' ? <BuzonAdmin /> : tab === 'alta' ? <Alta onDone={() => setTab('negocios')} /> : tab === 'demos' ? <Demos /> : <AjustesAdmin />}
         </main>
