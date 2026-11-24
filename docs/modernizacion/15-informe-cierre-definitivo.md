@@ -85,7 +85,7 @@ En la columna Tipo: **automática** = base de prueba en memoria; **navegador** =
 
 ## 6. Versión exacta lista para publicar
 
-* **Rama `modernizacion`, commit el último de la rama (el código final es `f8ec8bf`; encima solo hay documentación).**
+* **Rama `modernizacion`. Código final: commit `ef0fc48`.** Los commits posteriores solo agregan documentación; publicar el último commit de la rama es equivalente. Staging (`f9c3271f`) se desplegó desde ese mismo código.
 * Migraciones de base: **hasta la 40**. Todas solo agregan. La 40 crea índices: en una base del tamaño actual (~1 MB) tarda menos de un segundo.
 * Staging tiene esta misma versión: `f9c3271f-0bc9-4679-88a7-253911d22e17`, desplegada el 24 nov.
 
