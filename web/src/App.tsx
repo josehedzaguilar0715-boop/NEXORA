@@ -332,7 +332,7 @@ function Privada() {
           <div className="topbar-search"><Buscador pantallas={allowed} rapidas={product.quick} senal={senalBuscar} onIr={(k) => { location.hash = `#/${k}`; setMasAbierto(false) }} /></div>
           <div className="topbar-actions">
             <button className="icon-btn2 solo-movil" aria-label="Buscar" onClick={() => { setBuscarMovil((v) => !v); setSenalBuscar((v) => v + 1) }}><Search size={22} aria-hidden /></button>
-            <PendingBadge />
+            <PendingBadge main />
             <BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} />
             <MenuUsuario me={me} logout={logout} />
           </div>
@@ -387,7 +387,7 @@ function NavModulos({ allowed, current, pending }: { allowed: Screen[]; current:
         const items = allowed.filter((s) => s.group === p.group)
         if (!items.length) return null
         return (
-          <div key={p.group} className="rail-grupo" role="group" aria-label={p.label}>
+          <div key={p.group} className="rail-grupo">
             <h3 className="rail-titulo">{p.label}</h3>
             {items.map((s) => <ItemModulo key={s.key} s={s} on={current?.key === s.key} pending={0} />)}
           </div>

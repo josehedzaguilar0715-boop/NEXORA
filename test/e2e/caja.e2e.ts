@@ -86,7 +86,7 @@ try {
   await page.getByText('Ventas de la semana').waitFor()
   await page.screenshot({ path: `${shots}/1-inicio.png` })
   check(true, 'inicio con indicadores, gráfica y movimientos')
-  await page.getByRole('link', { name: 'Caja' }).click()
+  await page.locator('.rail').getByRole('link', { name: 'Caja' }).click()
   await page.getByRole('heading', { name: 'Abrir caja' }).waitFor()
   check(true, 'entra el dueño con código por teléfono')
   await page.screenshot({ path: `${shots}/1-abrir-caja.png` })
