@@ -146,7 +146,7 @@ small { font-size: max(var(--fs-min), 0.85rem); }
 .trend:not(.pos):not(.neg) { background: none; padding: 0; border-radius: 0; font-weight: 500; }
 /* Acciones rápidas: botones compactos de 2 columnas, uno principal (v0) */
 .acciones h2 { margin-bottom: 12px; }
-.acciones .quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.acciones .quick-actions { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin: 0; }
 .acciones .quick-action { flex-direction: row; align-items: center; gap: 10px; min-height: 56px; padding: 8px 10px; border-radius: 12px; box-shadow: none; }
 .acciones .quick-action b { font-size: max(var(--fs-min), 0.95rem); line-height: 1.2; }
 .acciones .quick-action small { display: none; }
