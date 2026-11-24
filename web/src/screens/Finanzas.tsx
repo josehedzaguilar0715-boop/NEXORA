@@ -390,7 +390,7 @@ function Movimientos({ from, to, onErr }: { from: string; to: string; onErr: (e:
 }
 
 
-const BUCKET_TONE = { ops: '#fbbf24', owner: '#34d399', savings: '#22d3ee' } as const
+const BUCKET_TONE = { ops: 'var(--m-cocina)', owner: 'var(--m-dinero)', savings: 'var(--m-clientes)' } as const
 
 /** Plan 50/30/20: cómo repartir la utilidad bruta y cuánto puede retirar el dueño sin dejar el negocio en 0. */
 export function PlanFinanciero({ me, from, to, compact = false }: { me?: Me; from: string; to: string; compact?: boolean }) {
