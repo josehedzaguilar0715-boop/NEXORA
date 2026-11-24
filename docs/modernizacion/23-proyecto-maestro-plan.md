@@ -1,0 +1,23 @@
+# 23 · Proyecto maestro de rediseño (rama `diseno-v0`): plan, auditoría y criterios por fase
+
+Referencia principal: el ZIP de v0 (2 maquetas HTML: sistema de diseño y dashboards). Regla: solo presentación y navegación; **sin tocar lógica comercial, APIs, permisos, datos ni producción**. Nada se publica ni fusiona sin autorización expresa.
+
+## Fase 0 · Auditoría (hecha)
+* **v0** (`19-diagnostico-identidad-v0.md`): 2 archivos estáticos; aporta reglas (nombres completos, icono + texto, un botón principal, estados con color+icono+texto, ≥ 44 px), acentos por módulo, estructura de dashboard (KPI con icono y tendencia, dos columnas, «Requiere tu atención», acciones rápidas, lista de operaciones), buscador de módulos y barra inferior en celular.
+* **NEXORA**: React 18 + Vite; 30+ pantallas de negocio, 14 productos con identidad propia (`products/`), tema claro/oscuro (fase 1), cascarón nuevo (fases 2–3).
+* **Panel administrativo central** (`web/src/screens/SuperPanel.tsx`, `src/admin.ts`): acceso propio (usuario/contraseña, segundo paso por SMS o correo si están configurados). **Funciones existentes** (no se inventó ninguna): *Resumen* (ingreso mensual, negocios por estado, uso en 7 días, pruebas y mensualidades por vencer, vencidos); *Negocios* (lista y filtros por estado/gratis, ficha con plan, sucursales y paquetes de usuarios extra, giros, pagos, suspender/reactivar, cuenta gratis, módulos de pago, restablecer acceso del dueño y contraseñas de empleados, cambio de teléfono del dueño, reiniciar demo); *Buzón* (tickets de soporte con respuestas); *Alta asistida*; *Demos* (13 giros); *Ajustes* (valores por defecto, correo de privacidad, cambio de contraseña, salud del sistema, espacio de la base, respaldos y restauración, interruptores). 37 rutas `/admin/*`.
+* **Hallazgo**: el panel conservaba una barra superior oscura translúcida con el logotipo ilegible en modo claro y tablas/botones sin la jerarquía de v0.
+
+## Plan por fase (alcance · archivos · criterios de aceptación)
+| Fase | Estado | Alcance | Archivos | Criterios de aceptación |
+|---|---|---|---|---|
+| 1 Sistema de diseño | ✅ | Tokens de color por módulo, estados, tema claro/oscuro, letra ≥ 18 px | `tokens.css`, `tema.ts`, `modos.generated.*`, `Estado.tsx`, `modulos.ts` | Auditoría 84 combinaciones sin hallazgos; interruptor de tema verificado |
+| 2 Navegación y buscador | ✅ | Barra superior, menú agrupado, barra inferior, buscador global con permisos | `App.tsx`, `Buscador.tsx`, `buscar.ts`, `shell.css` | 139 comprobaciones de navegación; el empleado no encuentra lo que no puede abrir |
+| 3 Inicio / tableros | ✅ | Indicadores con icono, dos columnas, atención, acciones rápidas | `screens/Inicio.tsx`, `tokens.css` | 84 comprobaciones de dashboards; auditoría de Inicio 84 sin hallazgos |
+| 5 Panel administrativo | en curso | Cascarón propio (barra superior, menú de módulos, barra inferior), Resumen con indicadores, Negocios con estados con icono y buscador, tablas y formularios v0 | `screens/SuperPanel.tsx`, `shell.css`, `tokens.css`, `App.tsx` (exports) | Todas las funciones siguen disponibles; capturas en 3 tamaños, claro/oscuro; auditoría de contraste/letra/desborde/encimados |
+| 4 Pantallas operativas | pendiente | Caja (cuadrícula de productos + cobro), Productos y Clientes (tablas → tarjetas en celular), formularios por secciones, pantallas por giro | `screens/Caja.tsx`, `Productos.tsx`, `Clientes.tsx`, `Compras.tsx`, `Agenda.tsx`, `Mesas.tsx`, … | Auditoría por pantalla en 14 productos × 2 modos × 3 tamaños; e2e de caja |
+| 6 Identidad de los 14 productos | pendiente | Revisión de cada producto (marca, letra, formas) con la estructura común | `products/products.css`, `modos.generated.css` | Capturas de los 14 en claro y oscuro, sin colisiones de estilo |
+| 7 Responsive y accesibilidad | pendiente | Tableta como caso propio, foco visible, teclado, etiquetas | `shell.css`, `v0.css` | Recorrido con teclado; sin desbordes en 3 tamaños |
+| 8 Auditoría final y documentación | pendiente | Auditoría completa, correcciones, documento final, lista de commits y pendientes | `docs/modernizacion/` | 298+ pruebas, e2e, auditorías de todas las pantallas, capturas |
+
+Cada fase deja un commit propio en `diseno-v0` (reversible con `git revert`).
