@@ -177,7 +177,7 @@ export function saleView(deps: Deps, s: SaleRow) {
   const payments = deps.db.prepare('SELECT method, amount FROM sale_payments WHERE sale_id = ? ORDER BY rowid').all(s.id) as { method: string; amount: number }[]
   const cashPart = payments.length ? payments.filter((p) => p.method === 'efectivo').reduce((a, p) => a + p.amount, 0) : s.total
   return {
-    id: s.id, folio: s.folio, shiftId: s.shift_id, subtotal: s.subtotal, promoDiscount: s.promo_discount, discount: s.discount, total: s.total, customerId: s.customer_id,
+    id: s.id, folio: s.folio, branchId: s.branch_id, shiftId: s.shift_id, subtotal: s.subtotal, promoDiscount: s.promo_discount, discount: s.discount, total: s.total, customerId: s.customer_id,
     paymentMethod: payments.length > 1 ? 'mixto' : payments[0]?.method ?? s.payment_method, payments, cashReceived: s.cash_received, change: s.cash_received != null ? s.cash_received - cashPart : null,
     status: s.status, cancelReason: s.cancel_reason, createdAt: s.created_at, items,
   }

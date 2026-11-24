@@ -174,3 +174,10 @@ Publicar el commit anterior que se quiera conservar (`git checkout <commit> && n
 * Migraciones hasta la **40**: la 40 solo agrega índices.
 * Scripts de verificación nuevos en `scripts/verificacion/`: `impresion.cjs`, `productos14.cjs`, `carga.cjs` y `bench-panel.ts`.
 * **Antes de cualquier prueba de carga contra staging**: staging y producción comparten la cuota diaria del plan gratis.
+
+## Puestos y sucursales: cierre (24 nov 2026)
+
+* Código: `737af1a` (puestos Dueño/Encargado/Empleado en el servidor) + commit de cierre de decisiones (ver `git log`). Migración 41 aditiva (`users.position`).
+* Verificado: tipos, 277 pruebas (55 archivos), compilación y navegador escritorio 1366×900 y celular 390×844 (`scripts/verificacion/puestos.ts`, 32 comprobaciones). Compatibilidad de la migración 41 sobre una base v40 con datos: `test/migracion-41.test.ts`.
+* Staging: **no desplegado** desde esta sesión (sin credencial de Cloudflare en el entorno; `npm run deploy` pide `CLOUDFLARE_API_TOKEN`). Última versión en staging: `f9c3271f` (anterior a los puestos). Producción: `2c16921e`, sin cambios y sin autorización de publicar.
+* Detalle completo del modelo: `16-permisos-por-sucursal.md`.

@@ -72,7 +72,11 @@ export const LOCK_MINUTES = 15
  * El dueño tiene todos; el personal solo los que tenga marcados.
  */
 export function hasPerm(u: UserRow, p: Permission): boolean {
-  return u.role === 'owner' || (JSON.parse(u.permissions) as string[]).includes(p)
+  if (u.role === 'owner') return true
+  // Un empleado anterior al sistema de puestos (sin puesto guardado) no conserva «ver reportes» de antes: ampliaría su alcance.
+  // El dueño debe autorizarlo de nuevo (al guardar sus permisos queda registrado su puesto).
+  if (p === 'view_reports' && u.position == null && puestoOf(u) === 'empleado') return false
+  return (JSON.parse(u.permissions) as string[]).includes(p)
 }
 
 /** Puesto: dueño (todo el negocio), encargado (su sucursal) o empleado (lo propio). */

@@ -19,16 +19,20 @@ Decisión del propietario: **tres puestos, ni uno más**. No se agrega un cuarto
 * Traspasos entre sucursales: solo dueño.
 * Para el empleado, el Inicio es **«Mi día»** (`GET /dashboard/mine`): solo sus ventas del día y su caja.
 
-## Decisiones que conviene conocer
+## Decisiones (resueltas por el propietario, 24 nov 2026)
 
-1. Clientes y fiado se comparten entre sucursales (un cliente es del negocio).
-2. Permisos ya guardados no se tocaron: un empleado que ya tenía `view_reports` guardado lo conserva hasta que el dueño lo quite.
-3. `/staff/sellers` muestra nombres de compañeros de la misma sucursal (para elegir quién atendió).
-4. La agenda es de la sucursal (no por empleado).
-5. En negocios de una sola sucursal, «su sucursal» y «el negocio» coinciden: contabilidad sigue disponible para quien tenga «ver reportes».
+1. **Clientes compartidos** entre sucursales; el historial de operaciones siempre indica su sucursal (`branchId` en ventas y en cada movimiento de fiado).
+2. **Fiado y saldos compartidos**: un cliente tiene un solo saldo; cargos y abonos se pueden hacer desde cualquier sucursal, quedan con quién y en qué sucursal (`createdBy`, `branchId`) y reenviar el mismo identificador no duplica la deuda.
+3. **Traspasos entre sucursales**: solo dueño.
+4. **Contabilidad consolidada, estados financieros y gastos fijos**: solo dueño en negocios con varias sucursales (con una sola, siguen disponibles para quien tenga «ver reportes»).
+5. **Permisos antiguos no amplían el alcance**: un empleado anterior al sistema de puestos (sin puesto guardado) ya **no** conserva «ver reportes» de antes; el dueño debe autorizarlo de nuevo, y al guardar sus permisos queda registrado su puesto. Los encargados anteriores conservan su alcance de sucursal.
+6. **Nombres de compañeros**: `/staff/sellers` entrega solo `id` y `nombre` de los compañeros de la misma sucursal (para saber quién atendió), sin datos privados.
+7. **Agenda**: compartida dentro de cada sucursal (citas, bloqueos y horarios), nunca entre sucursales.
 
 ## Pruebas
 
-* `test/puestos-sucursales.test.ts` (14): encargado de la sucursal 2 no lee ni modifica la 1 (exploración de todas las rutas GET con marcas de la sucursal 1, más lectura/escritura por identificador); empleado no ve operaciones de otro; `branchId`/ids manipulados en dirección y cuerpo; el dueño lee y administra ambas; «Mi día».
+* `test/puestos-decisiones.test.ts` (7): decisiones 1–7 (fiado compartido sin duplicar, `branchId` en historial, permisos antiguos, nombres, traspasos y contabilidad, agenda por sucursal).
+* `test/migracion-41.test.ts` (1): base en versión 40 con datos → migración 41 aditiva, sin cambiar usuarios, ventas ni puestos.
+* `test/puestos-sucursales.test.ts` (15): encargado de la sucursal 2 no lee ni modifica la 1 (exploración de todas las rutas GET con marcas de la sucursal 1, más lectura/escritura por identificador); empleado no ve operaciones de otro; `branchId`/ids manipulados en dirección y cuerpo; el dueño lee y administra ambas; «Mi día».
 * `scripts/verificacion/puestos.ts`: navegador real, escritorio 1366×900 y celular 390×844, con dueño, encargado 2 y empleado (32 comprobaciones).
 * `test/permisos-reportes.test.ts` actualizado a la nueva política.

@@ -21,7 +21,7 @@ function MiDia({ me }: { me: Me }) {
   return (
     <div>
       <div className="dash-head"><div><h1>Hola, {me.user.name.split(' ')[0]}</h1><p className="muted" style={{ marginTop: -6 }}>{me.business.name} · Mi día</p></div><div className="dash-status"><Clock /></div></div>
-      <div className="dash-kpis">
+      <div className="dash-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: 14 }}>
         <div className="card dkpi"><div className="dkpi-top"><span className="dkpi-label">Mis ventas de hoy</span></div><div className="dkpi-value pos">{d ? mxn(d.total) : '—'}</div><div className="dkpi-sub">{d ? `${d.tickets} ${d.tickets === 1 ? 'venta' : 'ventas'}` : ''}</div></div>
         <div className="card dkpi"><div className="dkpi-top"><span className="dkpi-label">Mi caja</span></div><div className="dkpi-value">{d?.shift ? 'Abierta' : 'Cerrada'}</div><div className="dkpi-sub">{d?.shift ? `Fondo ${mxn(d.shift.openingFloat)}` : 'Abre tu caja en «Caja» para vender'}</div></div>
       </div>

@@ -19,7 +19,7 @@
 | Cron diario de Cloudflare (respaldo) | Tareas programadas de Floot y respaldos propios de Postgres | El respaldo propio pasa a ser opcional. |
 | Pantallas React 18 + Vite, ruteo por `#/` | React 19, carpetas `pages/`, `components/`, `helpers/`, React Router, CSS Modules y kit de componentes de Floot | Las 30 pantallas se reutilizan en su lógica. Hay que repartirlas en `pages/` y `components/`, y pasar los estilos globales a `base.css` y a módulos CSS. |
 | Identidad por giro con `data-product` y variables CSS | `base.css` con variables (modo claro y oscuro) | Las 13 paletas de `web/src/products/products.css` se copian como variables. |
-| Pruebas vitest (268) | Floot solo ejecuta pruebas de *helpers* (`.spec.tsx`) | Conservar la lógica de negocio en *helpers* puros y migrar sus pruebas. Las pruebas de este ZIP sirven como **especificación** de qué debe dar cada caso. |
+| Pruebas vitest (277) | Floot solo ejecuta pruebas de *helpers* (`.spec.tsx`) | Conservar la lógica de negocio en *helpers* puros y migrar sus pruebas. Las pruebas de este ZIP sirven como **especificación** de qué debe dar cada caso. |
 
 ## 2. Lo que se reutiliza casi sin cambios
 

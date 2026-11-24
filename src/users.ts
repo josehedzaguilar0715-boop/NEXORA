@@ -129,7 +129,7 @@ users.patch('/users/:id', requirePerm('create_employees'), async (c) => {
     granted ? JSON.stringify(granted) : target.permissions,
     d.active === undefined ? target.active : d.active ? 1 : 0,
     d.branchId ?? target.branch_id,
-    d.position ?? target.position,
+    d.position ?? target.position ?? puestoOf(target), // al guardar, el puesto queda registrado (autorización expresa del dueño)
     target.id,
   )
   const fresh = db.prepare('SELECT * FROM users WHERE id = ?').get(target.id) as UserRow

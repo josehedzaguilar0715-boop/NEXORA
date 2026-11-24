@@ -33,7 +33,7 @@ finance.get('/customers/:id/credit', requirePerm('customers_credit'), (c) => {
   const { db } = c.get('deps')
   const cu = loadCustomer(c)
   const limit = (db.prepare('SELECT credit_limit FROM customers WHERE id = ?').get(cu.id) as { credit_limit: number }).credit_limit
-  const ledger = db.prepare('SELECT l.id, l.delta, l.kind, l.method, l.sale_id AS saleId, l.note, l.reverses_id AS reversesId, l.created_at AS createdAt, EXISTS (SELECT 1 FROM credit_ledger r WHERE r.reverses_id = l.id) AS voided FROM credit_ledger l WHERE l.customer_id = ? ORDER BY l.created_at DESC, l.rowid DESC LIMIT 500').all(cu.id)
+  const ledger = db.prepare('SELECT l.id, l.delta, l.kind, l.method, l.sale_id AS saleId, l.note, l.reverses_id AS reversesId, l.created_by AS createdBy, COALESCE((SELECT branch_id FROM shifts WHERE id = l.shift_id), (SELECT branch_id FROM sales WHERE id = l.sale_id)) AS branchId, l.created_at AS createdAt, EXISTS (SELECT 1 FROM credit_ledger r WHERE r.reverses_id = l.id) AS voided FROM credit_ledger l WHERE l.customer_id = ? ORDER BY l.created_at DESC, l.rowid DESC LIMIT 500').all(cu.id)
   const balance = customerBalance(db, cu.id)
   return c.json({ balance, limit, available: Math.max(0, limit - balance), ledger })
 })

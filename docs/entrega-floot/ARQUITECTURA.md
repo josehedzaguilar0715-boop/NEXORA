@@ -99,7 +99,7 @@ Desarrollo local: src/server.ts (Node + better-sqlite3) corre la MISMA app Hono 
 
 ## 8. Pruebas
 
-* `test/*.test.ts` (53 archivos, 268 pruebas) con vitest sobre SQLite en memoria. Cubren:
+* `test/*.test.ts` (55 archivos, 277 pruebas) con vitest sobre SQLite en memoria. Cubren:
   * un archivo por giro;
   * días completos (`dia-completo.test.ts`);
   * permisos (`permisos-barrido.test.ts`), los tres puestos por sucursal (`puestos-sucursales.test.ts`) y aislamiento;
