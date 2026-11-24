@@ -88,8 +88,8 @@ Cómo funciona hoy:
 
 **Observación (decisión del propietario, no es una fuga):**
 
-* Dentro de **un mismo negocio**, los reportes muestran todas las sucursales a quien tenga permiso de verlos, y hoy **todos los empleados lo tienen**.
-* Si se quiere que un empleado de una sucursal vea solo la suya, hay que decidirlo; es un cambio pequeño.
+* Dentro de **un mismo negocio**, la sucursal asignada no limita: un empleado ve la información de todas las sucursales, y el encargado puede editar el inventario de otra (comprobado con una prueba real).
+* Recomendación por rol y plan de implementación: `16-permisos-por-sucursal.md`.
 
 ## 5. Pruebas de carga
 

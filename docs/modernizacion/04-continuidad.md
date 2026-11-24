@@ -149,7 +149,7 @@ Publicar el commit anterior que se quiera conservar (`git checkout <commit> && n
   * Barrido de permisos.
   * Monitor de espacio.
   * Análisis de la base compartida: **decisión pendiente**; se recomienda un objeto por negocio antes de ~10 negocios.
-* Migraciones al día: **39** (número real en `_migrations`).
+* Migraciones al día: **39** en esa fecha (número real en `_migrations`; desde el 24 nov son **40**, ver §14).
 
 ## 13. Cierre del plan maestro (23 nov)
 
@@ -169,6 +169,7 @@ Publicar el commit anterior que se quiera conservar (`git checkout <commit> && n
   * `12-respaldos-y-recuperacion.md`;
   * `13-dispositivos-y-proveedores.md`;
   * `14-estrategia-de-crecimiento.md`.
+  * `16-permisos-por-sucursal.md` (recomendación de permisos por rol; pendiente de tu decisión).
 * Producción confirmada = commit `efb75ff` exacto (versión `2c16921e-6ccb-41c8-8399-1069ca9a8ca3`).
 * Migraciones hasta la **40**: la 40 solo agrega índices.
 * Scripts de verificación nuevos en `scripts/verificacion/`: `impresion.cjs`, `productos14.cjs`, `carga.cjs` y `bench-panel.ts`.

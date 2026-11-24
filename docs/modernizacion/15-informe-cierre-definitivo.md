@@ -12,7 +12,7 @@ Este informe cierra los 10 puntos del pedido de cierre. Los detalles de cada pun
 | 2 | **Restauración y recuperación** | Restauración **dentro de Cloudflare** en un objeto vacío (nunca sobre datos existentes), **probada en el motor de Cloudflare**: 98 tablas, 503 renglones, **0 diferencias**. Procedimientos escritos para tres casos: revisar en una computadora, pérdida total y volver de versión. |
 | 3 | **Push, SMS, correo e impresoras** | Probado todo lo que se puede sin equipos: formato exacto de Twilio y Resend, firma VAPID verificada criptográficamente e impresión en PDF de 58 y 80 mm. Lo que falta está listado con exactitud en §4. |
 | 4 | **Carga y límites reales** | Medidos (§3). Se encontró y corrigió un **cuello de botella grave**. |
-| 5 | **Multiempresa, aislamiento, sucursales y permisos** | Barrido de **87 listas y reportes** más **~90 rutas con id**: ningún negocio ve datos de otro. Más de 100 rutas con permiso revisadas. |
+| 5 | **Multiempresa, aislamiento, sucursales y permisos** | Barrido de **87 listas y reportes** más **~90 rutas con id**: ningún negocio ve datos de otro. Más de 100 rutas con permiso revisadas. **Sucursales:** dentro de un mismo negocio, la sucursal asignada hoy **no limita** lo que el empleado ve ni lo que el encargado edita (comprobado con una prueba real). La recomendación por rol (dueño, administrador, encargado y empleado) está en `16-permisos-por-sucursal.md`; implementarla queda a tu decisión. |
 | 6 | **Los 14 productos** | Son la base «NEXORA» más los 13 de giro; ninguno faltaba en la lista. **Lo pendiente real:** las páginas públicas que ve el cliente final (reservar, boletos, tarjeta de sellos) salían con la identidad genérica. Ya muestran la del negocio. Los 14 se verificaron en el navegador. |
 | 7 | **Base compartida** | Estrategia por etapas y reversible. Ya hechas y probadas las piezas que no tocan datos: índices, clasificación de las 102 tablas, extracción por negocio con suma exacta en los 13 giros, y restauración en un objeto aparte (`14-estrategia-de-crecimiento.md`). |
 | 8 | **Aviso de privacidad** | El código ya no trae tu correo personal. El correo del negocio se captura en *Super panel → Ajustes*. Mientras no se capture, el aviso indica el buzón de Soporte y **no inventa ninguna dirección**. |
@@ -44,7 +44,7 @@ En la columna Tipo: **automática** = base de prueba en memoria; **navegador** =
 | `npm run check`: tipos, **254 pruebas en 52 archivos**, compilación y prueba de punta a punta (31 pasos) | automática + navegador | ✅ todo pasa |
 | Los 14 productos: identidad al entrar, páginas públicas (reservas, boletos, tarjeta) y la base en acceso y super panel | navegador | ✅ **TODO OK** (`productos14.cjs`) |
 | Recorrido profundo: 13 giros × dueño y empleado × celular y computadora | navegador | ✅ **Sin hallazgos**: sin errores de JS ni de servidor, ni desbordes |
-| Flujos completos de 6 giros (`giros6.cjs`) | navegador | ✅ **43/43 en computadora, 43/43 en celular** |
+| Flujos completos de 6 giros (`giros6.cjs`) | navegador | ✅ **43/43 en computadora y 43/43 en celular**: comedor 6, palapa 6, perfumería 10, taquería 7, uñas 9 y verdulería 5 pasos en cada tamaño; 0 fallas |
 | Impresión: ticket y corte X en 58 y 80 mm, boletos con QR | navegador (impresora simulada en PDF) | ✅ 1 hoja cada uno, renglones completos, QR presentes |
 | Carga, una sola base, 1 conexión | workerd | venta p50 12 ms; panel 24 ms; 0 errores |
 | Carga, 30 conexiones simultáneas, 4 negocios | workerd | **~98 peticiones/s**, p95 403 ms, **0 errores, todas las ventas cuadran** |
@@ -56,7 +56,7 @@ En la columna Tipo: **automática** = base de prueba en memoria; **navegador** =
 | 13 demos en el motor de Cloudflare | workerd | ✅ **TODO OK** (las 13, con todas sus pantallas) |
 | Separar por negocio: 13 giros, suma exacta y cada negocio solo da el mismo resumen | automática | ✅ |
 | Versión de producción contra el commit `efb75ff` | solo lectura | ✅ 35 de 35 archivos idénticos |
-| Staging con esta versión | staging | ✅ versión `f9c3271f` desplegada en **staging** (no en producción). Comprobaciones de dinero 7/7. Carga pequeña (2 negocios, 200 peticiones): mediana 112 ms medida desde aquí, **0 errores**, todas las ventas cuadran. |
+| Staging con esta versión | staging | ✅ versión `f9c3271f-0bc9-4679-88a7-253911d22e17`, desplegada en **staging** (no en producción) desde el mismo código de la rama. Prueba repetida el 24 nov: comprobaciones de dinero **7/7**; carga pequeña (2 negocios, 200 peticiones, 5 simultáneas) con mediana de 89 ms y p95 de 136 ms medidos desde aquí, **0 errores**, todas las ventas cuadran. |
 
 ## 4. Lo que sigue pendiente (depende de equipos, credenciales o decisiones tuyas)
 
@@ -70,18 +70,19 @@ En la columna Tipo: **automática** = base de prueba en memoria; **navegador** =
 | Push en un teléfono real | Un Android con Chrome, o un iPhone con iOS 16.4 o más reciente y la app agregada al inicio | $0 |
 | Impresora térmica real | La impresora del negocio con su controlador; en el diálogo, papel = rollo y márgenes = ninguno | $0 |
 | Separar la base por negocio (etapas 4 a 6) | Tu decisión; desarrollo de ~1.5 semanas | $5 USD/mes al pasar al plan de pago (a partir de ~30 a 100 negocios) |
-| ¿Los empleados de una sucursal ven solo su sucursal en los reportes? | Tu decisión. Hoy ven todo su negocio. | $0 |
+| **Permisos por sucursal** (`16-permisos-por-sucursal.md`) | Tu decisión. Hoy un empleado ve la información de todas las sucursales de su negocio, y el encargado puede editar el inventario de otra sucursal. Se recomienda limitar a su sucursal y crear el rol Administrador; serían 2 a 3 días. | $0 |
 | Cajón de dinero, báscula conectada, impresión por Bluetooth sin diálogo | No existen hoy; serían mejoras nuevas | — |
 | El correo personal sigue en el **historial** de git (commits viejos) | Borrarlo del historial requiere reescribirlo (destructivo). No se hizo: decisión tuya. | — |
 
 ## 5. Riesgos que quedan
 
-1. **Una sola base para todos los negocios.** Con los índices alcanza para ~100 a 150 negocios. Para 500 hay que separarla (§7 de la estrategia). El super panel avisa al 70 % y al 85 % del espacio.
-2. **Respaldos sin cifrar en producción** hasta que actives la llave. Si pierdes la llave después de activarla, los respaldos cifrados no se recuperan.
-3. **Cuota compartida** entre staging y producción en el plan gratis (100,000 peticiones y 100,000 escrituras al día). Una prueba de carga fuerte contra staging podría afectar a producción; por eso no se hizo.
-4. **Cambio de comportamiento al publicar:** ya no se permite sacar de la caja más efectivo del que hay (compras, gastos, devoluciones, cancelaciones). Conviene avisar a los 3 negocios.
-5. **Cambio visual leve** en los 3 negocios (identidades de la Fase 5; Nails, un tono de gris).
-6. Push, SMS, correo e impresión **no verificados con equipos reales** (§4).
+1. **Sucursales:** en negocios con más de una sucursal, cualquier empleado ve la información de todas y el encargado puede ajustar el inventario de otra sucursal. No afecta a negocios de una sola sucursal ni cruza entre negocios. Ver `16-permisos-por-sucursal.md`.
+2. **Una sola base para todos los negocios.** Con los índices alcanza para ~100 a 150 negocios. Para 500 hay que separarla (§7 de la estrategia). El super panel avisa al 70 % y al 85 % del espacio.
+3. **Respaldos sin cifrar en producción** hasta que actives la llave. Si pierdes la llave después de activarla, los respaldos cifrados no se recuperan.
+4. **Cuota compartida** entre staging y producción en el plan gratis (100,000 peticiones y 100,000 escrituras al día). Una prueba de carga fuerte contra staging podría afectar a producción; por eso no se hizo.
+5. **Cambio de comportamiento al publicar:** ya no se permite sacar de la caja más efectivo del que hay (compras, gastos, devoluciones, cancelaciones). Conviene avisar a los 3 negocios.
+6. **Cambio visual leve** en los 3 negocios (identidades de la Fase 5; Nails, un tono de gris).
+7. Push, SMS, correo e impresión **no verificados con equipos reales** (§4).
 
 ## 6. Versión exacta lista para publicar
 

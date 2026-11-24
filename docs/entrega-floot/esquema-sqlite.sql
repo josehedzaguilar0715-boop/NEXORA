@@ -1,6 +1,6 @@
--- Esquema completo de NEXORA (SQLite), generado aplicando las 39 migraciones de src/db.ts a una base vacía.
+-- Esquema completo de NEXORA (SQLite), generado aplicando las 40 migraciones de src/db.ts a una base vacía.
 -- NO contiene datos. Referencia para traducir a Postgres (Floot). La fuente de verdad son las migraciones de src/db.ts.
--- Tablas: 102 · índices: 38 · candados (triggers): 34
+-- Tablas: 102 · índices: 47 · candados (triggers): 34
 
 CREATE TABLE _migrations (version INTEGER PRIMARY KEY);
 
@@ -1195,7 +1195,11 @@ CREATE UNIQUE INDEX businesses_public_slug ON businesses(public_slug) WHERE publ
 
 CREATE UNIQUE INDEX campaign_awards_one ON campaign_awards(campaign_id, customer_id);
 
+CREATE INDEX cash_movements_shift ON cash_movements(shift_id);
+
 CREATE INDEX comandas_station ON comandas(business_id, station, status);
+
+CREATE INDEX credit_ledger_business ON credit_ledger(business_id, created_at);
 
 CREATE INDEX credit_ledger_customer ON credit_ledger(customer_id);
 
@@ -1206,6 +1210,8 @@ CREATE INDEX customers_business ON customers(business_id, name);
 CREATE INDEX entry_tickets_order ON entry_tickets(order_token);
 
 CREATE INDEX entry_tickets_slot ON entry_tickets(business_id, date, start);
+
+CREATE INDEX expenses_business_date ON expenses(business_id, date);
 
 CREATE INDEX layaway_items_product ON layaway_items(product_id);
 
@@ -1225,9 +1231,17 @@ CREATE UNIQUE INDEX products_barcode ON products(business_id, barcode) WHERE bar
 
 CREATE INDEX push_subscriptions_user ON push_subscriptions(user_id);
 
+CREATE INDEX returns_business_created ON returns(business_id, created_at);
+
+CREATE INDEX sale_commissions_business ON sale_commissions(business_id, created_at);
+
 CREATE INDEX sale_commissions_staff ON sale_commissions(staff_id, created_at);
 
+CREATE INDEX sale_items_sale ON sale_items(sale_id);
+
 CREATE INDEX sale_payments_sale ON sale_payments(sale_id);
+
+CREATE INDEX sales_business_created ON sales(business_id, created_at);
 
 CREATE INDEX sales_customer ON sales(customer_id);
 
@@ -1240,6 +1254,8 @@ CREATE UNIQUE INDEX shifts_one_open_register ON shifts(register_id) WHERE status
 CREATE INDEX staff_payouts_business ON staff_payouts(business_id, created_at);
 
 CREATE INDEX staff_schedules_user ON staff_schedules(user_id, weekday);
+
+CREATE INDEX stock_movements_business_type ON stock_movements(business_id, type, created_at);
 
 CREATE INDEX stock_movements_product ON stock_movements(branch_id, product_id);
 
@@ -1254,6 +1270,8 @@ CREATE INDEX tab_items_tab ON tab_items(tab_id);
 CREATE INDEX tabs_open ON tabs(business_id, status);
 
 CREATE INDEX tickets_business ON tickets(business_id, updated_at);
+
+CREATE INDEX tips_business ON tips(business_id, created_at);
 
 CREATE UNIQUE INDEX users_owner_phone ON users(phone) WHERE role = 'owner';
 
