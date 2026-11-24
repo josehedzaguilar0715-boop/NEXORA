@@ -13,5 +13,8 @@ y las demos creadas (`POST /api/admin/demos/{giro}` con el token de soporte, o `
 | `deepwalk.cjs` | Cada pantalla y pestaña, dueño y empleado, celular y computadora: desbordes, botones cortados, errores | `node scripts/verificacion/deepwalk.cjs <carpeta> [giro1,giro2]` (necesita `<carpeta>/demos.txt` con «giro teléfono» por línea) |
 | `leaks.py` | Palabras de un giro que aparecen en otro (sobre la salida de un recorrido de texto) | `python3 scripts/verificacion/leaks.py textos.json` |
 | `impresion.cjs` | Ticket, corte X y boletos con QR tal como los recibe la impresora (PDF 58 y 80 mm): una hoja, renglones completos, QR | `node scripts/verificacion/impresion.cjs <carpeta>` (necesita poppler: `pdfinfo`, `pdftotext`) |
+| `productos14.cjs` | Los 14 productos: identidad al entrar por giro, páginas públicas (reservas, boletos, tarjeta) con la del negocio, y la base en acceso y super panel | `node scripts/verificacion/productos14.cjs <carpeta con demos.txt>` |
+| `carga.cjs` | Prueba de carga: varios negocios vendiendo a la vez; peticiones/s, latencias y cuadre de ventas | `B=<url> NEG=5 CONC=20 TOTAL=2000 node scripts/verificacion/carga.cjs` |
+| `bench-panel.ts` | Tiempo de las pantallas más consultadas con una base grande (40 negocios, meses de ventas) | `NEG=40 VENTAS=1500 npx tsx scripts/verificacion/bench-panel.ts <archivo.db>` |
 | `pixdiff.cjs` | Compara píxel a píxel una pantalla con un CSS anterior | ver comentario del archivo |
 | `perf.cjs` | Tiempo de abrir la caja y agregar productos con CPU 4× más lenta, versión anterior contra actual | dos servidores en 3136 (anterior) y 3135 (actual) |
