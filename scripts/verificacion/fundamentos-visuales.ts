@@ -46,10 +46,10 @@ for (const [vpName, vp] of Object.entries(VP).filter(([n]) => !process.env.VPS |
   const a = await page.evaluate(auditoria)
   const okProd = giro === 'base' ? prod === 'nexora' : prod === EXPECT[giro]
   const okModo = mode === (modo === 'claro' ? 'light' : 'dark')
-  const falla = errs.length || a.overflow || a.bad.length || a.small.length || a.encimados.length || a.sinNombre.length || !okProd || !okModo
+  const falla = errs.length || a.overflow || a.bad.length || a.small.length || a.encimados.length || a.sinNombre.length || a.cortados.length || !okProd || !okModo
   if (falla) {
     fails++
-    resumen.push(`✗ [${vpName}] ${giro} ${modo}: ${errs[0] ?? ''}${a.overflow ? ' DESBORDA' : ''}${!okProd ? ` producto=${prod}` : ''}${!okModo ? ` modo=${mode}` : ''}${a.bad.length ? ` contraste(${a.bad.length}): ${a.bad.slice(0, 3).join(' | ')}` : ''}${a.small.length ? ` letra<18(${a.small.length}): ${a.small.slice(0, 3).join(' | ')}` : ''}${a.encimados.length ? ` ENCIMADOS: ${a.encimados.join(' | ')}` : ''}${a.sinNombre.length ? ` SIN NOMBRE(${a.sinNombre.length}): ${[...new Set(a.sinNombre)].slice(0, 3).join(', ')}` : ''}`)
+    resumen.push(`✗ [${vpName}] ${giro} ${modo}: ${errs[0] ?? ''}${a.overflow ? ' DESBORDA' : ''}${!okProd ? ` producto=${prod}` : ''}${!okModo ? ` modo=${mode}` : ''}${a.bad.length ? ` contraste(${a.bad.length}): ${a.bad.slice(0, 3).join(' | ')}` : ''}${a.small.length ? ` letra<18(${a.small.length}): ${a.small.slice(0, 3).join(' | ')}` : ''}${a.encimados.length ? ` ENCIMADOS: ${a.encimados.join(' | ')}` : ''}${a.sinNombre.length ? ` SIN NOMBRE(${a.sinNombre.length}): ${[...new Set(a.sinNombre)].slice(0, 3).join(', ')}` : ''}${a.cortados.length ? ` TEXTO CORTADO(${a.cortados.length}): ${a.cortados.slice(0, 3).join(' | ')}` : ''}`)
   }
   if (pantalla === 'guia-visual' || vpName !== 'tableta') await page.screenshot({ path: `${shots}/${vpName}-${giro}-${modo}.png`, fullPage: false })
   await ctx.close()

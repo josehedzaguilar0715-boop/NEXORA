@@ -71,6 +71,21 @@ export const auditoria = () => {
     } if (cruce) break }
     if (cruce) { encimados.push(`«${a.txt}» con «${b.txt}»`); if (encimados.length >= 5) break }
   }
+  // Texto cortado o que se sale de su caja: la palabra más larga no cabe, o el recuadro recorta lo que no cabe (sin puntos suspensivos).
+  const cortados: string[] = []
+  for (const el of seen) {
+    const st = getComputedStyle(el); const r = el.getBoundingClientRect()
+    if (r.width < 8 || r.height < 8 || st.visibility === 'hidden' || el.closest('svg, [aria-hidden=true], .intro, .boot-loading, .buscador-lista, .topbar')) continue
+    if (st.display === 'inline') continue
+    const rec = (st.overflowX !== 'visible' && st.textOverflow !== 'ellipsis' && el.scrollWidth > el.clientWidth + 2 && st.overflowX !== 'auto' && st.overflowX !== 'scroll')
+    let derrame = false
+    for (const nd of el.childNodes) {
+      if (nd.nodeType !== 3 || !nd.textContent?.trim()) continue
+      const rg = document.createRange(); rg.selectNodeContents(nd)
+      for (const q of rg.getClientRects()) if (q.width > 2 && (q.right > r.right + 2 || q.left < r.left - 2) && st.overflowX === 'visible' && !el.closest('.table-wrap, .portal-tabs, .periodo, .subtabs, .tabs')) derrame = true
+    }
+    if (rec || derrame) cortados.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.split(' ')[0] : ''} «${(el.textContent ?? '').trim().slice(0, 18)}»`)
+  }
   // Controles sin nombre accesible (lector de pantalla): botón, enlace o campo sin texto, etiqueta ni aria-label.
   const sinNombre: string[] = []
   for (const el of document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=option]')) {
@@ -80,6 +95,6 @@ export const auditoria = () => {
     const nombre = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title') || (el.textContent ?? '').trim() || (h.labels && h.labels.length ? 'etiqueta' : '') || h.placeholder || (h.type === 'checkbox' || h.type === 'radio' ? (el.closest('label')?.textContent ?? '').trim() : '')
     if (!nombre) sinNombre.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.split(' ')[0] : ''}`)
   }
-  return { n, bad, small, overflow: document.documentElement.scrollWidth > innerWidth + 2, encimados, sinNombre }
+  return { n, bad, small, overflow: document.documentElement.scrollWidth > innerWidth + 2, encimados, sinNombre, cortados }
 }
 

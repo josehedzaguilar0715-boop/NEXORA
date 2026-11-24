@@ -34,7 +34,7 @@ export function Reservar({ code }: { code: string }) {
           <button key={s.id} className={f.serviceIds.includes(s.id) ? 'primary' : ''} onClick={() => setF({ ...f, time: '', serviceIds: f.serviceIds.includes(s.id) ? f.serviceIds.filter((x) => x !== s.id) : [...f.serviceIds, s.id] })}>{s.name}<small>{mxn(s.price)} · {s.duration} min</small></button>
         ))}</div>
         <h2 style={{ marginTop: 16 }}>2. ¿Con quién?</h2>
-        <div className="row">{[{ id: 'any', name: 'El primero disponible' }, ...info.staff].map((s: any) => <button key={s.id} className={f.staffId === s.id ? 'primary' : ''} onClick={() => setF({ ...f, staffId: s.id, time: '' })}>{s.name}</button>)}</div>
+        <div className="row chips">{[{ id: 'any', name: 'El primero disponible' }, ...info.staff].map((s: any) => <button key={s.id} className={f.staffId === s.id ? 'primary' : ''} onClick={() => setF({ ...f, staffId: s.id, time: '' })}>{s.name}</button>)}</div>
         <h2 style={{ marginTop: 16 }}>3. Día y hora</h2>
         <label>Día<input type="date" min={today()} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value, time: '' })} /></label>
         {f.serviceIds.length === 0 ? <p className="muted">Elige un servicio para ver las horas libres.</p> : slots.length === 0 ? <p className="muted">No hay horas libres ese día.</p> : (
