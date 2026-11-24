@@ -71,9 +71,10 @@ const auditoria = () => {
 
 const browser = await chromium.launch()
 const VP = { escritorio: { width: 1366, height: 900 }, tableta: { width: 768, height: 1024 }, celular: { width: 390, height: 844 } } as const
-const resumen: string[] = []; let fails = 0
+const resumen: string[] = []; let fails = 0; let n = 0
 const productos = [...DEMOS.map((d) => d.giro), 'base'].filter((p) => !process.env.SOLO || process.env.SOLO.split(',').includes(p))
 for (const [vpName, vp] of Object.entries(VP).filter(([n]) => !process.env.VPS || process.env.VPS.split(',').includes(n))) for (const modo of ['claro', 'oscuro']) for (const giro of productos) {
+  n++
   const ctx = await browser.newContext({ viewport: vp })
   await ctx.addInitScript(([t, m]: [string | null, string]) => { (window as any).__name = (f: unknown) => f; sessionStorage.setItem('nx_intro', '1'); localStorage.setItem('nx_modo', m); if (t) localStorage.setItem('nx_token', t) }, [tokens[giro] ?? null, modo])
   const page = await ctx.newPage(); const errs: string[] = []
@@ -95,5 +96,5 @@ for (const [vpName, vp] of Object.entries(VP).filter(([n]) => !process.env.VPS |
 }
 writeFileSync(`${shots}/resumen.txt`, resumen.join('\n'))
 console.log(resumen.join('\n') || 'Sin hallazgos')
-console.log(`\n${productos.length * 2 * 3} combinaciones (14 productos × 2 modos × 3 tamaños) · pantalla «${pantalla}» · con hallazgos: ${fails}`)
+console.log(`\n${n} combinaciones (${productos.length} productos × 2 modos × ${Object.keys(VP).filter((x) => !process.env.VPS || process.env.VPS.split(",").includes(x)).length} tamaños) · pantalla «${pantalla}» · con hallazgos: ${fails}`)
 await browser.close(); server.close(); process.exit(fails ? 1 : 0)
