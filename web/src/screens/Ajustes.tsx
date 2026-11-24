@@ -1,3 +1,4 @@
+import { MetasSucursal } from './ResumenSucursal'
 import { useEffect, useState } from 'react'
 import { api, cache, mxn, outbox, toCents, publicSlug, setPublicSlugCache } from '../api'
 import { hasGiro, type Me } from '../App'
@@ -46,6 +47,7 @@ export function Ajustes({ me }: { me: Me }) {
         })}
         <p><button className="primary" disabled={!ready.mods} onClick={run(() => api('PUT', '/modules', { active: mods }))}>{ready.mods ? 'Guardar módulos' : 'Cargando…'}</button></p>
         {mods.includes('reservas') && <EnlacePublico me={me} />}
+        <MetasSucursal me={me} />
       </section>
       <section className="card">
         <h2>Opciones</h2>

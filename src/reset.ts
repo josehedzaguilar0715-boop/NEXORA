@@ -66,6 +66,7 @@ export const STEPS: [table: string, sql: string][] = [
   ['counter_readings', `DELETE FROM counter_readings WHERE shift_id IN ${SHIFTS}`],
   ['cleaning_log', 'DELETE FROM cleaning_log WHERE business_id = ?'],
   ['owner_withdrawals', 'DELETE FROM owner_withdrawals WHERE business_id = ?'],
+  ['balance_entries', 'DELETE FROM balance_entries WHERE business_id = ?'],
   ['cash_movements', `DELETE FROM cash_movements WHERE shift_id IN ${SHIFTS}`],
   ['supplier_payments', `UPDATE supplier_payments SET from_cash_shift = NULL WHERE from_cash_shift IN ${SHIFTS}`],
   ['supplier_returns', `UPDATE supplier_returns SET shift_id = NULL WHERE shift_id IN ${SHIFTS}`],
@@ -76,7 +77,7 @@ export const STEPS: [table: string, sql: string][] = [
 ]
 
 /** Tablas cuyos candados contra borrado se quitan un momento (dentro de la misma transacción) y se vuelven a poner. */
-const LOCKED = ['tab_items', 'tabs', 'sale_payments', 'sale_commissions', 'tips', 'staff_payouts', 'entry_tickets', 'accesses', 'layaway_payments', 'layaways', 'credit_ledger', 'loyalty_ledger', 'visits', 'membership_uses', 'staff_attendance', 'stock_movements', 'sale_items', 'sales', 'cleaning_log', 'cash_movements', 'expenses', 'shifts']
+const LOCKED = ['balance_entries', 'tab_items', 'tabs', 'sale_payments', 'sale_commissions', 'tips', 'staff_payouts', 'entry_tickets', 'accesses', 'layaway_payments', 'layaways', 'credit_ledger', 'loyalty_ledger', 'visits', 'membership_uses', 'staff_attendance', 'stock_movements', 'sale_items', 'sales', 'cleaning_log', 'cash_movements', 'expenses', 'shifts']
 
 export function resetDemoData(db: Db, businessId: string): { sales: number } {
   const sales = (db.prepare('SELECT COUNT(*) n FROM sales WHERE business_id = ?').get(businessId) as { n: number }).n

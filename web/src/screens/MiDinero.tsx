@@ -50,7 +50,7 @@ export function MiDinero({ me, from, to, go }: { me: Me; from: string; to: strin
         <Card label="Ganancia real" value={mxn(r.gananciaReal)} tone={r.gananciaReal < 0 ? 'neg' : 'pos'} how="Lo vendido, menos lo que costó lo vendido, menos gastos, comisiones y mermas. Es lo que el negocio ganó de verdad, aunque parte siga por cobrar." />
       </div>
       <div className="kpis">
-        <Card label="Dinero disponible" value={mxn(r.disponible)} tone={r.disponible < 0 ? 'neg' : undefined} how="Todo lo que ha entrado menos todo lo que ha salido, según lo que has registrado en NEXORA (efectivo y banco). No incluye dinero que no hayas capturado." />
+        <Card label="Dinero disponible" value={mxn(r.disponible)} tone={r.disponible < 0 ? 'neg' : undefined} how="Todo lo que ha entrado menos todo lo que ha salido, según lo que has registrado en NEXORA (efectivo y banco). Si registraste saldos iniciales en «Saldos», parte de ahí. No incluye dinero que no hayas capturado." />
         <Card label="Por reservar" value={mxn(r.porReservar.total)} how="Lo que debes apartar antes de pensar en retirar: pagos a proveedores, personal pendiente, anticipos de clientes, gastos fijos y reposición de inventario." />
         <Card big label="Puedes retirar" value={mxn(r.retirable)} tone="pos" how="Lo menor entre (dinero disponible − por reservar) y la ganancia del periodo que aún no has retirado. Así no te llevas el capital del negocio." />
         {ahorro !== null && <Card label="Para ahorrar o reinvertir" value={mxn(ahorro)} how={`Según tu reparto «${r.plan!.name}»: la suma de tus partidas de ahorro, reinversión e inversiones.`} />}

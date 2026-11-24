@@ -69,8 +69,33 @@ const planOf = (r: { id: string; name: string; base: string; items: string; acti
 export const listPlans = (db: Db, businessId: string) => (db.prepare('SELECT * FROM distribution_plans WHERE business_id = ? ORDER BY legacy, created_at').all(businessId) as Parameters<typeof planOf>[0][]).map(planOf)
 
 /** Retiros del dueño que no pasaron por una caja (los de caja ya están en el flujo como «retiros»). */
-const looseWithdrawals = (db: Db, businessId: string, from?: string, to?: string) =>
-  (db.prepare(`SELECT COALESCE(SUM(amount),0) v FROM owner_withdrawals WHERE business_id = ? AND cash_movement_id IS NULL ${from ? 'AND date BETWEEN ? AND ?' : ''}`).get(...(from ? [businessId, from, to] : [businessId])) as { v: number }).v
+const looseWithdrawals = (db: Db, businessId: string, from?: string, to?: string, method?: 'efectivo' | 'transferencia') =>
+  (db.prepare(`SELECT COALESCE(SUM(amount),0) v FROM owner_withdrawals WHERE business_id = ? AND cash_movement_id IS NULL ${method ? 'AND method = ?' : ''} ${from ? 'AND date BETWEEN ? AND ?' : ''}`).get(...[businessId, ...(method ? [method] : []), ...(from ? [from, to] : [])]) as { v: number }).v
+
+/**
+ * Saldos esperados por tipo de dinero. El saldo inicial es lo que había AL EMPEZAR ese día; solo los movimientos de esa fecha en adelante se suman
+ * (así no se duplica lo anterior ni se mezcla con ingresos nuevos). Los ajustes se suman siempre. Sin saldo inicial se cuenta lo registrado desde el principio.
+ * Limitación: los movimientos de banco no traen cuenta, así que el flujo se aplica al total de bancos, no a cada cuenta.
+ */
+export function saldos(db: Db, businessId: string, today: string) {
+  const entries = db.prepare('SELECT id, account_type AS accountType, account_name AS accountName, kind, amount, date, description, created_at AS createdAt FROM balance_entries WHERE business_id = ? ORDER BY date DESC, created_at DESC, rowid DESC').all(businessId) as { id: string; accountType: 'efectivo' | 'banco'; accountName: string; kind: 'inicial' | 'ajuste'; amount: number; date: string; description: string; createdAt: string }[]
+  const since = (t: 'efectivo' | 'banco') => entries.filter((e) => e.accountType === t && e.kind === 'inicial').map((e) => e.date).sort()[0] ?? null
+  const expected = (t: 'efectivo' | 'banco') => {
+    const from = since(t) ?? '2000-01-01'
+    const flow = cashFlow(db, businessId, from, today)
+    const base = entries.filter((e) => e.accountType === t).reduce((a, e) => a + e.amount, 0)
+    return base + (t === 'efectivo' ? flow.cashNet - looseWithdrawals(db, businessId, from, today, 'efectivo') : flow.bankNet - looseWithdrawals(db, businessId, from, today, 'transferencia'))
+  }
+  const accounts = new Map<string, { type: 'efectivo' | 'banco'; name: string; initial: number; adjustments: number }>()
+  for (const e of entries) {
+    const k = `${e.accountType}|${e.accountName}`
+    const a = accounts.get(k) ?? { type: e.accountType, name: e.accountName, initial: 0, adjustments: 0 }
+    if (e.kind === 'inicial') a.initial += e.amount; else a.adjustments += e.amount
+    accounts.set(k, a)
+  }
+  const efectivo = expected('efectivo'), banco = expected('banco')
+  return { efectivo, banco, total: efectivo + banco, since: { efectivo: since('efectivo'), banco: since('banco') }, accounts: [...accounts.values()].map((a) => ({ ...a, balance: a.initial + a.adjustments })), entries: entries.slice(0, 60) }
+}
 
 function period(q: (k: string) => string | undefined, today: string) {
   const from = q('from') ?? `${today.slice(0, 8)}01`
@@ -88,9 +113,9 @@ export function resumenInteligente(db: Db, businessId: string, from: string, to:
   const entro = flow.totalIn
   const salio = flow.totalOut + loosePeriod
   const retiradoPeriodo = (db.prepare('SELECT COALESCE(SUM(amount),0) v FROM owner_withdrawals WHERE business_id = ? AND date BETWEEN ? AND ?').get(businessId, from, to) as { v: number }).v
-  // Dinero disponible según los registros de NEXORA: todo lo que ha entrado menos todo lo que ha salido (efectivo y banco).
-  const all = cashFlow(db, businessId, '2000-01-01', today)
-  const disponible = all.net - looseWithdrawals(db, businessId)
+  // Dinero disponible: saldos iniciales y ajustes (si el dueño los registró) más lo que entró y salió desde esa fecha (efectivo y banco).
+  const sal = saldos(db, businessId, today)
+  const disponible = sal.total
   // Lo que hay que apartar antes de retirar.
   const staff = db.prepare('SELECT id FROM users WHERE business_id = ?').all(businessId) as { id: string }[]
   const nomina = Math.max(0, staff.reduce((a, s) => { const p = pendingFor(db, businessId, s.id); return a + p.commission + p.adjustments }, 0))
@@ -274,4 +299,57 @@ finanzas.post('/finanzas/sugerencia/rechazar', requireFinance('manage'), async (
   const d = parse(z.object({ amount: z.number().int().min(0), reason: z.string().trim().max(200).optional() }), await body(c))
   audit(db, now, { businessId: u.business_id, userId: u.id, action: 'finanzas.sugerencia_rechazada', newValue: { amount: d.amount }, reason: d.reason })
   return c.json({ ok: true })
+})
+
+// ---------- Saldos iniciales, ajustes y conciliación ----------
+
+finanzas.get('/finanzas/saldos', requireFinance('finance'), (c) => {
+  const { db, now } = c.get('deps')
+  return c.json(saldos(db, c.get('session').user.business_id, localDate(now())))
+})
+
+const accountSchema = { accountType: z.enum(['efectivo', 'banco']), accountName: z.string().trim().min(2).max(40) }
+const descSchema = z.string().trim().min(5, 'Explica el motivo en pocas palabras.').max(200)
+
+/** Saldo inicial de una cuenta (una sola vez por cuenta; después, solo ajustes documentados). */
+finanzas.post('/finanzas/saldos', requireFinance('manage'), async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ ...accountSchema, amount: z.number().int().min(0).max(100_000_000_000), date: z.string().regex(DATE), description: descSchema }), await body(c))
+  const today = localDate(now())
+  if (d.date > today) throw bad('La fecha del saldo inicial no puede ser futura.')
+  if (db.prepare("SELECT 1 FROM balance_entries WHERE business_id = ? AND account_type = ? AND account_name = ? AND kind = 'inicial'").get(u.business_id, d.accountType, d.accountName))
+    throw conflict('Esa cuenta ya tiene saldo inicial. Para corregirla registra un ajuste con su motivo.', 'saldo_ya_registrado')
+  const id = newId()
+  db.prepare("INSERT INTO balance_entries (id, business_id, account_type, account_name, kind, amount, date, description, created_by, created_at) VALUES (?,?,?,?,'inicial',?,?,?,?,?)").run(id, u.business_id, d.accountType, d.accountName, d.amount, d.date, d.description, u.id, iso(now()))
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'finanzas.saldo_inicial', entity: 'balance_entry', entityId: id, newValue: { account: `${d.accountType}:${d.accountName}`, amount: d.amount, date: d.date }, reason: d.description })
+  return c.json(saldos(db, u.business_id, today), 201)
+})
+
+/** Ajuste documentado (suma o resta) a una cuenta. */
+finanzas.post('/finanzas/saldos/ajuste', requireFinance('manage'), async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ ...accountSchema, amount: z.number().int().refine((n) => n !== 0, 'El ajuste no puede ser cero.'), description: descSchema }), await body(c))
+  const id = newId()
+  db.prepare("INSERT INTO balance_entries (id, business_id, account_type, account_name, kind, amount, date, description, created_by, created_at) VALUES (?,?,?,?,'ajuste',?,?,?,?,?)").run(id, u.business_id, d.accountType, d.accountName, d.amount, localDate(now()), d.description, u.id, iso(now()))
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'finanzas.saldo_ajuste', entity: 'balance_entry', entityId: id, newValue: { account: `${d.accountType}:${d.accountName}`, amount: d.amount }, reason: d.description })
+  return c.json(saldos(db, u.business_id, localDate(now())), 201)
+})
+
+/** Conciliación: el dueño dice cuánto hay de verdad (efectivo contado o suma de sus cuentas); si no coincide con lo esperado, queda un ajuste documentado. */
+finanzas.post('/finanzas/saldos/conciliar', requireFinance('manage'), async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const d = parse(z.object({ ...accountSchema, counted: z.number().int().min(0).max(100_000_000_000), description: z.string().trim().max(200).optional() }), await body(c))
+  const today = localDate(now())
+  const before = saldos(db, u.business_id, today)
+  const expected = d.accountType === 'efectivo' ? before.efectivo : before.banco
+  const diff = d.counted - expected
+  if (diff === 0) return c.json({ matches: true, expected, counted: d.counted, difference: 0 })
+  if (!d.description || d.description.length < 5) throw bad(`No coincide: el sistema esperaba ${(expected / 100).toFixed(2)} y hay ${(d.counted / 100).toFixed(2)} (diferencia ${(diff / 100).toFixed(2)}). Explica el motivo para registrar el ajuste.`, 'falta_motivo')
+  const id = newId()
+  db.prepare("INSERT INTO balance_entries (id, business_id, account_type, account_name, kind, amount, date, description, created_by, created_at) VALUES (?,?,?,?,'ajuste',?,?,?,?,?)").run(id, u.business_id, d.accountType, d.accountName, diff, today, `Conciliación: ${d.description}`, u.id, iso(now()))
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'finanzas.conciliacion', entity: 'balance_entry', entityId: id, newValue: { type: d.accountType, expected, counted: d.counted, difference: diff }, reason: d.description })
+  return c.json({ matches: false, expected, counted: d.counted, difference: diff, adjustment: id })
 })

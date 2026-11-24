@@ -5,6 +5,7 @@ import { vocab } from '../giros'
 import { productOf } from '../products'
 import { Estado, type TipoEstado } from '../Estado'
 import { moduloDe } from '../modulos'
+import { ResumenSucursal } from './ResumenSucursal'
 import { LayoutDashboard, Landmark, PiggyBank, Scale, ShoppingCart, TrendingDown, Users } from 'lucide-react'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
@@ -14,7 +15,8 @@ const KIND: Record<string, string> = { venta: 'Venta', retiro: 'Retiro de caja',
 /** Inicio (dashboard): indicadores del día, gráfica de la semana y movimientos recientes. Se actualiza solo. */
 export function Inicio({ me }: { me: Me }) {
   // El panel general es del dueño y de quien él autorice. Todos los demás ven solo «Mi día»: sus propias ventas y su caja.
-  if (!can(me, 'fin:dashboard')) return <MiDia me={me} />
+  // El encargado además ve el resumen operativo de su sucursal (ventas, sin utilidades).
+  if (!can(me, 'fin:dashboard')) return me.user.position === 'encargado' ? <div className="stack"><ResumenSucursal /><MiDia me={me} /></div> : <MiDia me={me} />
   return <InicioNegocio me={me} />
 }
 

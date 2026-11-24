@@ -27,7 +27,7 @@ export const auditoria = () => {
     const el = t.parentElement; if (!el || seen.has(el) || !t.textContent?.trim()) continue
     seen.add(el)
     const st = getComputedStyle(el); const r = el.getBoundingClientRect()
-    if (st.visibility === 'hidden' || st.display === 'none' || r.width === 0 || r.height === 0 || el.closest('svg, [aria-hidden=true], .intro, .boot-loading')) continue
+    if (st.visibility === 'hidden' || st.display === 'none' || r.width === 0 || r.height === 0 || el.closest('svg, [aria-hidden=true], .intro, .boot-loading') || (el.closest('details:not([open])') && !el.closest('summary'))) continue
     const fg = parse(st.color); if (!fg || fg.a === 0 || st.webkitTextFillColor === 'rgba(0, 0, 0, 0)' || /text/.test(st.webkitBackgroundClip || st.backgroundClip)) continue // texto con degradado de marca (logotipo)
     const { bg, extra } = bgOf(el)
     const size = parseFloat(st.fontSize); const bold = Number(st.fontWeight) >= 700
@@ -42,7 +42,7 @@ export const auditoria = () => {
   const hojas: { el: Element; r: DOMRect; rs: DOMRect[]; txt: string }[] = []
   for (const el of seen) {
     const r = el.getBoundingClientRect(); const st = getComputedStyle(el)
-    if (r.width < 4 || r.height < 4 || st.visibility === 'hidden' || el.closest('svg, [aria-hidden=true], .intro, .boot-loading, .buscador-lista, .bottom, .topbar')) continue
+    if (r.width < 4 || r.height < 4 || st.visibility === 'hidden' || el.closest('svg, [aria-hidden=true], .intro, .boot-loading, .buscador-lista, .bottom, .topbar') || (el.closest('details:not([open])') && !el.closest('summary'))) continue
     if (r.bottom < 0 || r.top > innerHeight * 6) continue
     // Contenido que queda recortado dentro de una zona con desplazamiento (no se ve) no cuenta.
     let recortado = false
@@ -75,7 +75,7 @@ export const auditoria = () => {
   const cortados: string[] = []
   for (const el of seen) {
     const st = getComputedStyle(el); const r = el.getBoundingClientRect()
-    if (r.width < 8 || r.height < 8 || st.visibility === 'hidden' || el.closest('svg, [aria-hidden=true], .intro, .boot-loading, .buscador-lista, .topbar')) continue
+    if (r.width < 8 || r.height < 8 || st.visibility === 'hidden' || el.closest('svg, [aria-hidden=true], .intro, .boot-loading, .buscador-lista, .topbar') || (el.closest('details:not([open])') && !el.closest('summary'))) continue
     if (st.display === 'inline') continue
     const rec = (st.overflowX !== 'visible' && st.textOverflow !== 'ellipsis' && el.scrollWidth > el.clientWidth + 2 && st.overflowX !== 'auto' && st.overflowX !== 'scroll')
     let derrame = false

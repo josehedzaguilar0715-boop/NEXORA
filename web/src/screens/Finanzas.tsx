@@ -6,6 +6,7 @@ import { vocab } from '../giros'
 import { ask, askCode } from '../Dialog'
 import { MiDinero, Reparto, Retiros } from './MiDinero'
 import { Rentabilidad } from './Rentabilidad'
+import { Saldos } from './Saldos'
 
 /** Finanzas y contabilidad: estado de resultados, flujo de efectivo, balance, gastos y libro de movimientos. */
 
@@ -41,8 +42,8 @@ async function download(kind: string, from: string, to: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
-type Tab = 'dinero' | 'rentabilidad' | 'reparto' | 'retiros' | 'gastos' | 'reportes'
-const TABS: [Tab, string][] = [['dinero', 'Mi dinero'], ['rentabilidad', 'Qué deja ganancia'], ['reparto', 'Reparto'], ['retiros', 'Retiros'], ['gastos', 'Gastos'], ['reportes', 'Reportes']]
+type Tab = 'dinero' | 'rentabilidad' | 'reparto' | 'retiros' | 'saldos' | 'gastos' | 'reportes'
+const TABS: [Tab, string][] = [['dinero', 'Mi dinero'], ['rentabilidad', 'Qué deja ganancia'], ['reparto', 'Reparto'], ['retiros', 'Retiros'], ['saldos', 'Saldos'], ['gastos', 'Gastos'], ['reportes', 'Reportes']]
 /** Reportes contables clásicos: quedan aparte, como consulta. */
 type Rep = 'resumen' | 'resultados' | 'flujo' | 'balance' | 'movimientos'
 const REPS: [Rep, string][] = [['resumen', 'Resumen'], ['resultados', 'Estado de resultados'], ['flujo', 'Flujo de efectivo'], ['balance', 'Balance'], ['movimientos', 'Movimientos']]
@@ -75,6 +76,7 @@ export function Finanzas({ me }: { me: Me }) {
       {tab === 'rentabilidad' && <Rentabilidad me={me} from={from} to={to} />}
       {tab === 'reparto' && <Reparto me={me} from={from} to={to} />}
       {tab === 'retiros' && <Retiros me={me} from={from} to={to} />}
+      {tab === 'saldos' && <Saldos me={me} />}
       {tab === 'gastos' && <Gastos from={from} to={to} onErr={setErr} canEdit={can(me, 'edit_inventory')} owner={me.user.role === 'owner'} />}
       {tab === 'reportes' && (<>
         <nav className="subtabs" aria-label="Reportes">{REPS.map(([k, v]) => <button key={k} className={rep === k ? 'on' : ''} onClick={() => setRep(k)}>{v}</button>)}</nav>

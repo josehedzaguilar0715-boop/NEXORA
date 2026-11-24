@@ -68,6 +68,18 @@ for (const [dev, vp] of [['escritorio', { width: 1366, height: 900 }], ['celular
   await page.getByRole('button', { name: 'Sí' }).click(); await page.waitForTimeout(800)
   ok(/Retiro registrado/.test(await page.locator('main').innerText()) && /Prueba de retiro/.test(await page.locator('main').innerText()), `[${dev}] retiro registrado con motivo, fecha y responsable`)
   await page.screenshot({ path: `${shots}/${dev}-retiros.png` })
+  // Saldos: registrar el saldo inicial una vez y comparar con lo contado.
+  await page.getByRole('button', { name: 'Saldos', exact: true }).click(); await page.waitForTimeout(500)
+  if (dev === 'escritorio') {
+    const hoyServidor = (await s.call('GET', '/finanzas/resumen', { token: T })).json.to as string
+    await page.getByLabel('Al empezar el día').fill(hoyServidor)
+    await page.getByLabel('¿Cuánto había?').fill('500.00'); await page.getByLabel('Descripción').fill('Efectivo en el cajón al empezar')
+    await page.getByRole('button', { name: 'Guardar saldo inicial' }).click(); await page.waitForTimeout(700)
+    ok(/Saldo inicial registrado/.test(await page.locator('main').innerText()) && /Mis cuentas/.test(await page.locator('main').innerText()), `[${dev}] el saldo inicial se registra y aparece en «Mis cuentas»${(await page.locator('.error').allInnerTexts()).join('|')}`)
+    await page.getByLabel('¿Cuánto hay de verdad?').fill('1.00'); await page.getByRole('button', { name: 'Comparar' }).click(); await page.waitForTimeout(600)
+    ok(/Explica el motivo|motivo/i.test(await page.locator('main').innerText()), `[${dev}] si no cuadra, pide el motivo antes de ajustar`)
+    await page.screenshot({ path: `${shots}/${dev}-saldos.png`, fullPage: true })
+  }
   ok(!(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2)) && !errs.length, `[${dev}] sin desborde ni errores${errs[0] ? ' ' + errs[0] : ''}`)
   await ctx.close()
 }
@@ -92,6 +104,7 @@ for (const [dev, vp] of [['escritorio', { width: 1366, height: 900 }], ['celular
   const { ctx, page } = await abrir(enc.token, vp, '/#/inicio')
   const t = await page.locator('body').innerText()
   ok(/Mi día/.test(t) && !/Ganancia real|Utilidad|Dinero disponible/.test(t), `[encargado/${dev}] Inicio sin utilidades (ve «Mi día»)`)
+  ok(/Mi sucursal hoy/.test(t) && /Ventas del día/.test(t) && !/margen|utilidad|ganancia|costo|retiro/i.test(await page.locator('main').innerText()), `[encargado/${dev}] ve el resumen operativo de su sucursal, sin nada financiero`)
   if (dev === 'escritorio') ok(!/Finanzas/.test(t) && /Caja/.test(t) && /Productos/.test(t), '[encargado] el menú no tiene Finanzas y conserva Caja y Productos')
   await page.goto(base + '/#/finanzas'); await page.waitForTimeout(800)
   ok(!/Vendiste|Dinero disponible|Puedes retirar/.test(await page.locator('body').innerText()), `[encargado/${dev}] entrar a #/finanzas por la dirección no muestra cifras`)
@@ -116,7 +129,7 @@ for (const modo of ['claro', 'oscuro']) for (const [dev, vp] of [['escritorio', 
   const page = await ctx.newPage(); const errs: string[] = []
   page.on('pageerror', (e: Error) => errs.push(e.message))
   await page.goto(base + '/#/finanzas'); await page.waitForTimeout(1000)
-  const pasos: [string, string?][] = [['Mi dinero'], ['Reparto'], ['Retiros'], ['Gastos'], ['Reportes', 'Resumen'], ['Reportes', 'Estado de resultados'], ['Reportes', 'Flujo de efectivo'], ['Reportes', 'Balance'], ['Reportes', 'Movimientos']]
+  const pasos: [string, string?][] = [['Mi dinero'], ['Qué deja ganancia'], ['Reparto'], ['Retiros'], ['Saldos'], ['Gastos'], ['Reportes', 'Resumen'], ['Reportes', 'Estado de resultados'], ['Reportes', 'Flujo de efectivo'], ['Reportes', 'Balance'], ['Reportes', 'Movimientos']]
   const malos: string[] = []
   for (const [tab, sub] of pasos) {
     await page.getByRole('button', { name: tab, exact: true }).first().click(); await page.waitForTimeout(500)
@@ -125,7 +138,7 @@ for (const modo of ['claro', 'oscuro']) for (const [dev, vp] of [['escritorio', 
     const n = a.overflow || a.bad.length || a.small.length || a.encimados.length || a.sinNombre.length || a.cortados.length
     if (n) malos.push(`${tab}${sub ? '/' + sub : ''}:${a.overflow ? ' DESBORDA' : ''}${a.bad.length ? ` contraste ${a.bad.slice(0, 2).join(' | ')}` : ''}${a.small.length ? ` letra ${a.small.slice(0, 2).join(' | ')}` : ''}${a.encimados.length ? ` encimados ${a.encimados.slice(0, 2).join(' | ')}` : ''}${a.sinNombre.length ? ` sin nombre ${a.sinNombre.slice(0, 2).join(' | ')}` : ''}${a.cortados.length ? ` cortados ${a.cortados.slice(0, 2).join(' | ')}` : ''}`)
   }
-  ok(malos.length === 0 && !errs.length, `[auditoría ${modo}/${dev}] 9 pestañas de Finanzas sin hallazgos${malos.length ? ': ' + malos.join(' || ') : ''}${errs[0] ? ' ' + errs[0] : ''}`)
+  ok(malos.length === 0 && !errs.length, `[auditoría ${modo}/${dev}] 11 pantallas de Finanzas sin hallazgos${malos.length ? ': ' + malos.join(' || ') : ''}${errs[0] ? ' ' + errs[0] : ''}`)
   await ctx.close()
 }
 await browser.close(); server.close()

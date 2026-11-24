@@ -1568,6 +1568,23 @@ const MIGRATIONS: Migration[] = [
   // Comprobante digital: enlace privado e imposible de adivinar para compartir el ticket de una venta. Solo una columna nula.
   `ALTER TABLE sales ADD COLUMN receipt_token TEXT;
   CREATE UNIQUE INDEX sales_receipt_token ON sales(receipt_token) WHERE receipt_token IS NOT NULL;`,
+  // Saldos iniciales y ajustes del dinero (efectivo y cuentas bancarias por separado). Solo se agrega: no se edita ni se borra;
+  // una corrección es un ajuste nuevo con su descripción. Tabla nueva: no cambia ningún dato existente.
+  `CREATE TABLE balance_entries (
+    id TEXT PRIMARY KEY,
+    business_id TEXT NOT NULL REFERENCES businesses(id),
+    account_type TEXT NOT NULL CHECK (account_type IN ('efectivo','banco')),
+    account_name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('inicial','ajuste')),
+    amount INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    description TEXT NOT NULL,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX balance_entries_business ON balance_entries(business_id, account_type, date);
+  CREATE TRIGGER balance_entries_no_update BEFORE UPDATE ON balance_entries BEGIN SELECT RAISE(ABORT, 'Los saldos no se editan: registra un ajuste'); END;
+  CREATE TRIGGER balance_entries_no_delete BEFORE DELETE ON balance_entries BEGIN SELECT RAISE(ABORT, 'Los saldos no se borran: registra un ajuste'); END;`,
 ]
 export const SCHEMA_VERSION = MIGRATIONS.length
 
