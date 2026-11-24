@@ -497,7 +497,21 @@ admin.post('/admin/password', async (c) => {
   return c.json({ ok: true })
 })
 
-admin.get('/admin/settings', (c) => c.json({ settings: Object.fromEntries((c.get('deps').db.prepare('SELECT key, value FROM settings').all() as { key: string; value: string }[]).map((r) => [r.key, Number(r.value)])) }))
+admin.get('/admin/settings', (c) => c.json({ settings: Object.fromEntries((c.get('deps').db.prepare("SELECT key, value FROM settings WHERE key != 'privacy_email'").all() as { key: string; value: string }[]).map((r) => [r.key, Number(r.value)])) }))
+
+/**
+ * Correo de contacto del aviso de privacidad: lo captura el propietario (un correo del negocio, no personal).
+ * Vive en la base, no en el código. Vacío = el aviso indica escribir por el buzón de soporte.
+ */
+admin.get('/admin/privacy-contact', (c) => c.json({ email: (c.get('deps').db.prepare("SELECT value FROM settings WHERE key = 'privacy_email'").get() as { value: string } | undefined)?.value ?? null }))
+admin.put('/admin/privacy-contact', async (c) => {
+  const { db, now } = c.get('deps')
+  const d = parse(z.object({ email: z.string().trim().email('Escribe un correo válido').max(120).nullable() }), await body(c))
+  if (d.email) db.prepare("INSERT INTO settings (key, value) VALUES ('privacy_email', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(d.email)
+  else db.prepare("DELETE FROM settings WHERE key = 'privacy_email'").run()
+  audit(db, now, { businessId: null, userId: c.get('admin').id, action: 'admin.correo_privacidad', newValue: { email: d.email } })
+  return c.json({ email: d.email })
+})
 
 admin.put('/admin/settings', async (c) => {
   const { db, now } = c.get('deps')

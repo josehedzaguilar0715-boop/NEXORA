@@ -62,16 +62,16 @@ export function unclassified(db: Db): string[] {
 
 /** Todo lo de un negocio, con el mismo formato que un respaldo (se carga con importAll en una base vacía). */
 export function exportBusiness(db: Db, businessId: string, opts: { withGlobals?: boolean } = {}) {
-  const tables: Record<string, unknown[]> = {}
+  const tables: Record<string, Record<string, unknown>[]> = {}
   for (const t of tablesOf(db)) {
     if ((GLOBAL_TABLES as readonly string[]).includes(t)) {
       // Las llaves del push (VAPID) y los ajustes generales se copian para que el negocio siga funcionando igual.
-      if (opts.withGlobals && ['app_keys', 'settings'].includes(t)) tables[t] = db.prepare(`SELECT * FROM "${t}"`).all()
+      if (opts.withGlobals && ['app_keys', 'settings'].includes(t)) tables[t] = db.prepare(`SELECT * FROM "${t}"`).all() as Record<string, unknown>[]
       continue
     }
     const f = businessFilter(db, t)
     const n = (f.match(/\?/g) ?? []).length
-    tables[t] = db.prepare(`SELECT * FROM "${t}" WHERE ${f}`).all(...Array(n).fill(businessId))
+    tables[t] = db.prepare(`SELECT * FROM "${t}" WHERE ${f}`).all(...Array(n).fill(businessId)) as Record<string, unknown>[]
   }
   return { version: (db.prepare('SELECT MAX(version) v FROM _migrations').get() as { v: number }).v, businessId, tables }
 }

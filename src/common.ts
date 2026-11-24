@@ -129,6 +129,9 @@ function customerStatus(db: Db, now: Clock, customerId: string) {
 // ---------- QR público para que el cliente lo descargue ----------
 
 export const publicCommon = new Hono<Env>()
+/** Contacto del aviso de privacidad (lo configura el propietario en el super panel). */
+publicCommon.get('/public/privacy-contact', (c) => c.json({ email: (c.get('deps').db.prepare("SELECT value FROM settings WHERE key = 'privacy_email'").get() as { value: string } | undefined)?.value ?? null }))
+
 publicCommon.get('/public/qr/:code', async (c) => {
   const code = c.req.param('code').replace(/\.svg$/, '')
   const cu = c.get('deps').db.prepare('SELECT c.code, b.name AS business FROM customers c JOIN businesses b ON b.id = c.business_id WHERE c.code = ? AND c.active = 1').get(code) as { code: string; business: string } | undefined

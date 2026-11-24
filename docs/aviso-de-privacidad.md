@@ -6,7 +6,7 @@
 
 José Hernández, con domicilio en Nuevo Villaflores, es responsable del tratamiento de los datos personales que se recaban a través de NEXORA, de conformidad con la Ley Federal de Protección de Datos Personales en Posesión de los Particulares y demás normativa aplicable.
 
-Contacto para temas de privacidad: josehedzaguilar0715@gmail.com.
+Contacto para temas de privacidad: {{CORREO_PRIVACIDAD}}.
 
 ## 2. Dos papeles distintos
 
@@ -41,7 +41,7 @@ Contacto para temas de privacidad: josehedzaguilar0715@gmail.com.
 1. Avisarte de mejoras, nuevas funciones o promociones de NEXORA.
 2. Encuestas de satisfacción.
 
-Si no quieres que usemos tus datos para las finalidades adicionales, escríbenos a josehedzaguilar0715@gmail.com.
+Si no quieres que usemos tus datos para las finalidades adicionales, escríbenos a {{CORREO_PRIVACIDAD}}.
 
 ## 5. Con quién compartimos tus datos
 
@@ -55,7 +55,7 @@ Estos proveedores pueden estar fuera de México. Solo compartiremos datos con au
 
 ## 6. Tus derechos (ARCO) y cómo ejercerlos
 
-Puedes **acceder** a tus datos, **rectificarlos**, **cancelarlos** u **oponerte** a su uso, así como **revocar tu consentimiento** o limitar su uso, enviando un correo a josehedzaguilar0715@gmail.com con:
+Puedes **acceder** a tus datos, **rectificarlos**, **cancelarlos** u **oponerte** a su uso, así como **revocar tu consentimiento** o limitar su uso, enviando tu solicitud a {{CORREO_PRIVACIDAD}} con:
 
 - tu nombre y un medio para responderte;
 - una copia de tu identificación (o la de tu representante, con el documento que lo acredite);

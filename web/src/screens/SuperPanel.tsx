@@ -286,6 +286,8 @@ function AjustesAdmin() {
       <label>Días vencido antes de poder suspender<input inputMode="numeric" value={s.suspend_after_days} onChange={(e) => setS({ ...s, suspend_after_days: Number(e.target.value) || 0 })} /></label>
       <p><button className="primary" onClick={async () => { await adm('PUT', '/admin/settings', s); setMsg('Guardado.') }}>Guardar</button></p>
       {msg && <p className="muted">{msg}</p>}
+      <h2 style={{ marginTop: 16 }}>Contacto del aviso de privacidad</h2>
+      <CorreoPrivacidad />
       <h2 style={{ marginTop: 16 }}>Cambiar mi contraseña</h2>
       <CambiarClave />
       <h2 style={{ marginTop: 16 }}>Espacio de la base</h2>
@@ -311,6 +313,21 @@ function CambiarClave() {
         if (f.b !== f.c) return setMsg({ err: 'Las contraseñas nuevas no coinciden.' })
         try { await adm('POST', '/admin/password', { currentPassword: f.a, newPassword: f.b }); setF({ a: '', b: '', c: '' }); setMsg({ ok: 'Contraseña cambiada.' }) } catch (e) { setMsg({ err: (e as Error).message }) }
       }}>Cambiar contraseña</button></p>
+    </>
+  )
+}
+
+/** Correo que aparece en el aviso de privacidad (/privacidad). Debe ser del negocio, no personal. */
+function CorreoPrivacidad() {
+  const [email, setEmail] = useState('')
+  const [msg, setMsg] = useState('')
+  useEffect(() => { adm('GET', '/admin/privacy-contact').then((r) => setEmail(r.email ?? '')).catch(() => {}) }, [])
+  return (
+    <>
+      <p className="muted small">Aparece en el aviso de privacidad. Sin correo, el aviso pide escribir por el buzón de Soporte de la app.</p>
+      <label>Correo para temas de privacidad<input type="email" value={email} placeholder="privacidad@tunegocio.mx" onChange={(e) => setEmail(e.target.value)} /></label>
+      <p><button className="primary" onClick={async () => { try { await adm('PUT', '/admin/privacy-contact', { email: email.trim() || null }); setMsg('Guardado. Revísalo en /privacidad.') } catch (e) { setMsg((e as Error).message) } }}>Guardar correo</button></p>
+      {msg && <p className="muted">{msg}</p>}
     </>
   )
 }

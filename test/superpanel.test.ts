@@ -331,3 +331,24 @@ describe('métricas comerciales y aviso de renovación', () => {
     expect((await s.call('GET', '/admin/metrics', { token: a.token })).status).toBe(401)
   })
 })
+
+describe('contacto del aviso de privacidad', () => {
+  it('el propietario captura un correo del negocio; sin capturar no se inventa ninguno; el aviso no trae correos fijos', async () => {
+    const { readFileSync } = await import('node:fs')
+    const md = readFileSync('docs/aviso-de-privacidad.md', 'utf8')
+    expect(md).toContain('{{CORREO_PRIVACIDAD}}')
+    expect(md).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/)
+    const { setup } = await import('./helpers.js')
+    const s = setup()
+    const pub = async () => (await (await s.app.request('/public/privacy-contact')).json()) as any
+    expect((await pub()).email).toBeNull()
+    const T = await s.adminToken()
+    expect((await s.call('PUT', '/admin/privacy-contact', { token: T, body: { email: 'no-es-correo' } })).status).toBe(400)
+    expect((await s.call('PUT', '/admin/privacy-contact', { token: T, body: { email: 'privacidad@ejemplo.mx' } })).json.email).toBe('privacidad@ejemplo.mx')
+    expect((await pub()).email).toBe('privacidad@ejemplo.mx')
+    // Los ajustes numéricos no se ven afectados.
+    expect((await s.call('GET', '/admin/settings', { token: T })).json.settings).toEqual({ default_trial_days: 14, suspend_after_days: 30 })
+    await s.call('PUT', '/admin/privacy-contact', { token: T, body: { email: null } })
+    expect((await pub()).email).toBeNull()
+  })
+})
