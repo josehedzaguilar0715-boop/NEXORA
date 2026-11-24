@@ -32,7 +32,8 @@ for (const [giro, native] of [['barberia', 'dark'], ['unas', 'light'], ['taqueri
     await page.goto(base + '/#/inicio'); await page.waitForTimeout(1200)
     const a = await st()
     ok(a.mode === 'light' && a.saved === null, `[${giro}/${dev}] arranca en modo claro por defecto (sin preferencia guardada)`)
-    if (dev === 'celular') { await page.getByLabel('Abrir menú').click(); await page.waitForTimeout(300) }
+    const abrirMenu = async () => { if (dev === 'celular') await page.getByRole('button', { name: 'Más' }).click(); else await page.getByRole('button', { name: /^Cuenta de/ }).click(); await page.waitForTimeout(300) }
+    await abrirMenu()
     await page.getByRole('button', { name: 'Modo oscuro' }).click(); await page.waitForTimeout(300)
     const b = await st()
     ok(b.mode === 'dark' && b.saved === 'oscuro' && b.bg !== a.bg && b.meta !== a.meta, `[${giro}/${dev}] un toque cambia a oscuro, guarda la preferencia y cambia fondo y barra del navegador`)
@@ -43,7 +44,7 @@ for (const [giro, native] of [['barberia', 'dark'], ['unas', 'light'], ['taqueri
     await page.evaluate(() => localStorage.removeItem('nx_token')); await page.reload(); await page.waitForTimeout(800)
     ok((await st()).mode === 'dark', `[${giro}/${dev}] en la pantalla de acceso también se respeta el modo`)
     await page.evaluate((t: string) => localStorage.setItem('nx_token', t), token); await page.goto(base + '/#/inicio'); await page.reload(); await page.waitForTimeout(1200)
-    if (dev === 'celular') { await page.getByLabel('Abrir menú').click(); await page.waitForTimeout(300) }
+    await abrirMenu()
     await page.getByRole('button', { name: 'Modo claro' }).click(); await page.waitForTimeout(300)
     const d = await st()
     ok(d.mode === 'light' && d.saved === 'claro' && d.bg === a.bg, `[${giro}/${dev}] vuelve a claro y queda igual que al inicio`)
