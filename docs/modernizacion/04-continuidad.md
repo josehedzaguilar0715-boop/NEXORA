@@ -181,3 +181,7 @@ Publicar el commit anterior que se quiera conservar (`git checkout <commit> && n
 * Verificado: tipos, 277 pruebas (55 archivos), compilación y navegador escritorio 1366×900 y celular 390×844 (`scripts/verificacion/puestos.ts`, 32 comprobaciones). Compatibilidad de la migración 41 sobre una base v40 con datos: `test/migracion-41.test.ts`.
 * Staging: **no desplegado** desde esta sesión (sin credencial de Cloudflare en el entorno; `npm run deploy` pide `CLOUDFLARE_API_TOKEN`). Última versión en staging: `f9c3271f` (anterior a los puestos). Producción: `2c16921e`, sin cambios y sin autorización de publicar.
 * Detalle completo del modelo: `16-permisos-por-sucursal.md`.
+
+### Publicación (24 nov 2026, autorizada por el propietario)
+* Commit publicado: `5128fe5`. Staging: `91669ab7`. **Producción: `c67e5fc0`** (anterior: `2c16921e`, para revertir: `git checkout efb75ff && npm run deploy:prod`).
+* La migración 41 solo agrega `users.position`; no cambia datos de los negocios. Comprobación de salud de ambos Workers: 200.
