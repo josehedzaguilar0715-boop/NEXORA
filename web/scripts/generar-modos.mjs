@@ -108,7 +108,7 @@ for (const id of ids) {
   if (isHex(acc)) fix['--on-accent'] = pickOn(acc)
   out.push(`:root[data-product='${id}'][data-mode='${nativeDark ? 'dark' : 'light'}'] {\n${Object.entries(fix).map(([k, x]) => `  ${k}: ${x};`).join('\n')}\n}`)
   ts[id] = { native: nativeDark ? 'dark' : 'light', [mode]: v['--bg'] }
-  out.push(`:root[data-product='${id}'][data-mode='${mode}'] .card { box-shadow: var(--elev-2); border-color: var(--line); }\n:root[data-product='${id}'][data-mode='${mode}'] button.primary { text-shadow: none; }\n:root[data-product='${id}'][data-mode='${mode}'] {\n  color-scheme: ${mode};\n${Object.entries(v).map(([k, x]) => `  ${k}: ${x};`).join('\n')}\n}`)
+  out.push(`:root[data-product='${id}'][data-mode='${mode}'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }\n:root[data-product='${id}'][data-mode='${mode}'] button.primary { text-shadow: none; }\n:root[data-product='${id}'][data-mode='${mode}'] {\n  color-scheme: ${mode};\n${Object.entries(v).map(([k, x]) => `  ${k}: ${x};`).join('\n')}\n}`)
 }
 writeFileSync('src/products/modos.generated.css', out.join('\n\n') + '\n')
 writeFileSync('src/products/modos.generated.ts', `// GENERADO por web/scripts/generar-modos.mjs — no editar a mano.\nexport const MODOS: Record<string, { native: 'light' | 'dark'; light?: string; dark?: string }> = ${JSON.stringify(ts, null, 2)}\n`)

@@ -3,6 +3,7 @@ import { api, hora, mxn, everyVisible } from '../api'
 import { can, FIADO_GIROS, hasGiro, screensFor, toneStyle, type Me } from '../App'
 import { vocab } from '../giros'
 import { productOf } from '../products'
+import { Estado, type TipoEstado } from '../Estado'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const day = (d: string) => new Date(`${d}T12:00:00-06:00`).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' })
@@ -35,19 +36,20 @@ function MiDia({ me }: { me: Me }) {
 function InicioNegocio({ me }: { me: Me }) {
   const [db, setDb] = useState<any>(null)
   const [days, setDays] = useState<any[]>([])
+  const [periodo, setPeriodo] = useState<7 | 30>(7)
   const [moves, setMoves] = useState<any[]>([])
   const [rec, setRec] = useState<number | null>(null)
   const owner = me.user.role === 'owner'
   const load = async () => {
     const [a, c, d] = await Promise.all([
       api<any>('GET', '/dashboard/panel'),
-      api<any>('GET', '/reports/daily?days=7'),
+      api<any>('GET', `/reports/daily?days=${periodo}`),
       api<any>('GET', '/reports/recent?limit=8'),
     ])
     setDb(a); setDays(c.days); setMoves(d.movements)
     if (hasGiro(me, ...FIADO_GIROS)) api<any>('GET', '/receivables').then((r) => setRec(r.total)).catch(() => setRec(null))
   }
-  useEffect(() => { void load().catch(() => {}); return everyVisible(() => void load().catch(() => {}), 30_000) }, [])
+  useEffect(() => { void load().catch(() => {}); return everyVisible(() => void load().catch(() => {}), 30_000) }, [periodo])
   const max = Math.max(1, ...days.map((d) => d.total))
   const W = 640, H = 220, pad = 28, bw = (W - pad * 2) / Math.max(1, days.length)
   const T = db?.today, M = db?.month, R = db?.real
@@ -107,23 +109,23 @@ function InicioNegocio({ me }: { me: Me }) {
           </div>
         )}
       </div>
+      <Pendientes />
       {/* Barbería y uñas: lo más importante del día es la agenda. */}
       {productOf(me.business.giro).home === 'agenda' && <AgendaHoy me={me} />}
       {/* Ganancia real: lo que de verdad entró, por forma de pago, menos costos y egresos. */}
       {R && (
         <GananciaReal R={R} title="Ganancia real del mes" />
       )}
-      <Pendientes />
       <QuickActions me={me} />
       <div className="grid2 dash-grid">
-        <section className="card">
+        <section className="card seccion mod-reportes">
           <h2>Lo que más ganancia dejó hoy</h2>
           <div className="table-wrap"><table className="list"><tbody>
             {db?.topProfit.map((p: any) => <tr key={p.name}><td>{p.name}<br /><small className="muted">{Math.round(p.qty * 1000) / 1000} vendidos · {mxn(p.sales)}</small></td><td className="num pos">{mxn(p.profit)}</td></tr>)}
             {db && db.topProfit.length === 0 && <tr><td className="muted">Todavía no hay ventas hoy.</td></tr>}
           </tbody></table></div>
         </section>
-        <section className="card">
+        <section className="card seccion mod-inventario">
           <div className="card-head"><h2>Stock bajo</h2>{db?.lowStockCount > 0 && <a className="mini-link" href="#/productos">Armar pedido</a>}</div>
           <div className="table-wrap"><table className="list"><tbody>
             {db?.lowStock.map((p: any) => <tr key={p.name}><td>{p.name}</td><td className="num"><span className="stock-badge">{p.stock} {p.unit === 'pieza' ? 'pzas' : p.unit}</span></td></tr>)}
@@ -132,9 +134,13 @@ function InicioNegocio({ me }: { me: Me }) {
         </section>
       </div>
       <div className="grid2 dash-grid" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
-        <section className="card">
-          <h2>Ventas de la semana</h2>
-          <svg className="chart" viewBox={`0 0 ${W} ${H + 30}`} role="img" aria-label="Ventas de los últimos 7 días">
+        <section className="card seccion mod-ventas">
+          <div className="card-head"><h2>{periodo === 7 ? 'Ventas de la semana' : 'Ventas de 30 días'}</h2>
+            <div className="periodo" role="group" aria-label="Periodo de la gráfica">
+              {([7, 30] as const).map((n) => <button key={n} type="button" aria-pressed={periodo === n} className={periodo === n ? 'on' : ''} onClick={() => setPeriodo(n)}>{n === 7 ? '7 días' : '30 días'}</button>)}
+            </div>
+          </div>
+          <svg className="chart" viewBox={`0 0 ${W} ${H + 30}`} role="img" aria-label={`Ventas de los últimos ${periodo} días`}>
             <defs>
               <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: 'var(--chart-bar-1)' }} /><stop offset="1" style={{ stopColor: 'var(--chart-bar-2)' }} /></linearGradient>
             </defs>
@@ -143,17 +149,17 @@ function InicioNegocio({ me }: { me: Me }) {
               const h = ((H - 20) * d.total) / max
               return (
                 <g key={d.date}>
-                  <rect x={pad + i * bw + bw * 0.18} y={H - h} width={bw * 0.64} height={Math.max(h, 2)} rx={8} fill="url(#bar)" opacity={d.date === today() ? 1 : 0.65}>
+                  <rect x={pad + i * bw + bw * 0.18} y={H - h} width={bw * 0.64} height={Math.max(h, 2)} rx={periodo === 7 ? 8 : 3} fill="url(#bar)" opacity={d.date === today() ? 1 : 0.65}>
                     <title>{`${day(d.date)}: ${mxn(d.total)} (${d.tickets} tickets)`}</title>
                   </rect>
-                  <text x={pad + i * bw + bw / 2} y={H + 22} textAnchor="middle" style={{ fill: 'var(--muted)' }} fontSize="14">{day(d.date)}</text>
+                  {(periodo === 7 || i % 5 === 0 || i === days.length - 1) && <text x={pad + i * bw + bw / 2} y={H + 22} textAnchor="middle" style={{ fill: 'var(--muted)' }} fontSize="14">{periodo === 7 ? day(d.date) : d.date.slice(8)}</text>}
                 </g>
               )
             })}
           </svg>
-          <p className="muted">Total de la semana: <b style={{ color: 'var(--ink)' }}>{mxn(days.reduce((a, d) => a + d.total, 0))}</b></p>
+          <p className="muted">Total de {periodo === 7 ? 'la semana' : 'los 30 días'}: <b style={{ color: 'var(--ink)' }}>{mxn(days.reduce((a, d) => a + d.total, 0))}</b></p>
         </section>
-        <section className="card">
+        <section className="card seccion mod-ventas">
           <h2>Movimientos recientes</h2>
           <div className="table-wrap"><table className="list"><tbody>{moves.map((m, i) => (
             <tr key={i}>
@@ -222,7 +228,8 @@ function QuickActions({ me }: { me: Me }) {
   )
 }
 
-const TONE_TASK: Record<string, string> = { urgente: 'var(--danger)', aviso: 'var(--accent)', info: 'var(--cyan)' }
+const TONE_TASK: Record<string, string> = { urgente: 'var(--st-danger)', aviso: 'var(--st-warn)', info: 'var(--st-info)' }
+const ESTADO_TASK: Record<string, [TipoEstado, string]> = { urgente: ['danger', 'Urgente'], aviso: ['warn', 'Aviso'], info: ['info', 'Para hoy'] }
 
 /** Lo que toca hacer hoy, armado por el sistema: con el botón para resolverlo y los mensajes de WhatsApp listos. */
 function Pendientes() {
@@ -238,11 +245,11 @@ function Pendientes() {
   const wa = (phone: string | null | undefined, msg: string) => `https://wa.me/${phone && String(phone).replace(/\D/g, '').length >= 10 ? `52${String(phone).replace(/\D/g, '').slice(-10)}` : ''}?text=${encodeURIComponent(msg)}`
   return (
     <section className="card tasks">
-      <h2>Pendientes de hoy <span className="pill">{tasks.length}</span></h2>
+      <h2>Requiere tu atención <span className="pill">{tasks.length}</span></h2>
       {tasks.map((t) => (
         <div key={t.key} className="task" style={{ '--task': TONE_TASK[t.tone] } as React.CSSProperties}>
           <div className="task-head">
-            <div><b>{t.title}</b><small className="muted">{t.detail}</small></div>
+            <div><span className="task-estado">{(() => { const [tp, tx] = ESTADO_TASK[t.tone] ?? ESTADO_TASK.info!; return <Estado tipo={tp}>{tx}</Estado> })()}</span><b>{t.title}</b><small className="muted">{t.detail}</small></div>
             <div className="row" style={{ flex: '0 0 auto', gap: 6 }}>
               {t.items?.length ? <button className="mini" onClick={() => setOpen(open === t.key ? null : t.key)}>{open === t.key ? 'Ocultar' : 'Ver'}</button> : null}
               <a className="button mini-link" href={`#/${t.screen}`} onClick={() => { if (t.key === 'surtir') sessionStorage.setItem('nx_open', 'pedido') }}>{t.action ?? 'Ir'}</a>
@@ -311,7 +318,7 @@ function GoalRing({ value, goal }: { value: number; goal: number }) {
 /** Ganancia real por forma de cobro: lo que entró, lo que salió y lo que queda. */
 export function GananciaReal({ R, title }: { R: any; title: string }) {
   return (
-    <section className="card real">
+    <section className="card real seccion mod-dinero">
       <div className="card-head"><h2>{title}</h2><span className="pill">por forma de cobro</span></div>
       <div className="real-grid">
         {[['Efectivo', R.efectivo, 'pos'], ['Transferencia', R.transferencia, ''], ['Tarjeta', R.tarjeta, ''], ...(R.abonos ? [['Abonos de fiado', R.abonos, 'warn']] : []), ...(R.apartados ? [['Apartados', R.apartados, 'warn']] : [])].map(([l, v, c]) => (
@@ -344,7 +351,7 @@ function AgendaHoy({ me }: { me: Me }) {
   const done = list.filter((a) => a.status === 'atendida').length
   const who = vocab(me).staff
   return (
-    <section className="card agenda-today">
+    <section className="card agenda-today seccion mod-agenda">
       <div className="card-head"><h2>Agenda de hoy</h2><a className="mini-link" href="#/agenda">Abrir agenda</a></div>
       <div className="at-stats">
         <div><b>{list.length}</b><span>citas</span></div>

@@ -110,3 +110,13 @@ small { font-size: max(var(--fs-min), 0.85rem); }
 @media (max-width: 900px) {
   .side { background: var(--card); backdrop-filter: none; box-shadow: var(--shadow-lg); }
 }
+
+/* ---------- Dashboards (fase 3) ---------- */
+.card.seccion { border-top: 4px solid var(--mc, var(--line)); }
+.task { border-left-color: var(--task, var(--st-info)); }
+.task-estado { display: block; margin-bottom: 6px; }
+.task-head b { font-size: var(--fs-body); }
+.periodo { display: inline-flex; gap: 4px; padding: 3px; border-radius: var(--radius-full); background: var(--input); border: 1px solid var(--line); }
+.periodo button { min-height: 40px; padding: 0 14px; border-radius: var(--radius-full); border: 0; background: transparent; color: var(--muted); font-weight: 700; font-size: max(var(--fs-min), 0.85rem); }
+.periodo button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow-sm); }
+@media (max-width: 600px) { .dash-kpis .dkpi-value { font-size: 1.55rem; } .dash-grid { grid-template-columns: minmax(0, 1fr) !important; } }

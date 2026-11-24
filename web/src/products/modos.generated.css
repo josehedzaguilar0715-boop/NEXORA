@@ -8,7 +8,7 @@
   --on-accent: #14171d;
 }
 
-:root[data-product='nexora'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='nexora'][data-mode='light'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='nexora'][data-mode='light'] button.primary { text-shadow: none; }
 :root[data-product='nexora'][data-mode='light'] {
   color-scheme: light;
@@ -66,7 +66,7 @@
   --on-accent: #14171d;
 }
 
-:root[data-product='barber'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='barber'][data-mode='light'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='barber'][data-mode='light'] button.primary { text-shadow: none; }
 :root[data-product='barber'][data-mode='light'] {
   color-scheme: light;
@@ -130,7 +130,7 @@
   --on-accent: #ffffff;
 }
 
-:root[data-product='nails'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='nails'][data-mode='dark'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='nails'][data-mode='dark'] button.primary { text-shadow: none; }
 :root[data-product='nails'][data-mode='dark'] {
   color-scheme: dark;
@@ -191,7 +191,7 @@
   --on-accent: #ffffff;
 }
 
-:root[data-product='market'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='market'][data-mode='dark'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='market'][data-mode='dark'] button.primary { text-shadow: none; }
 :root[data-product='market'][data-mode='dark'] {
   color-scheme: dark;
@@ -246,7 +246,7 @@
   --on-accent: #14171d;
 }
 
-:root[data-product='tools'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='tools'][data-mode='light'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='tools'][data-mode='light'] button.primary { text-shadow: none; }
 :root[data-product='tools'][data-mode='light'] {
   color-scheme: light;
@@ -307,7 +307,7 @@
   --on-accent: #ffffff;
 }
 
-:root[data-product='paper'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='paper'][data-mode='dark'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='paper'][data-mode='dark'] button.primary { text-shadow: none; }
 :root[data-product='paper'][data-mode='dark'] {
   color-scheme: dark;
@@ -362,7 +362,7 @@
   --on-accent: #14171d;
 }
 
-:root[data-product='scent'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='scent'][data-mode='light'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='scent'][data-mode='light'] button.primary { text-shadow: none; }
 :root[data-product='scent'][data-mode='light'] {
   color-scheme: light;
@@ -423,7 +423,7 @@
   --on-accent: #ffffff;
 }
 
-:root[data-product='access'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='access'][data-mode='dark'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='access'][data-mode='dark'] button.primary { text-shadow: none; }
 :root[data-product='access'][data-mode='dark'] {
   color-scheme: dark;
@@ -481,7 +481,7 @@
   --on-accent: #ffffff;
 }
 
-:root[data-product='tour'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='tour'][data-mode='dark'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='tour'][data-mode='dark'] button.primary { text-shadow: none; }
 :root[data-product='tour'][data-mode='dark'] {
   color-scheme: dark;
@@ -542,7 +542,7 @@
   --on-accent: #ffffff;
 }
 
-:root[data-product='beach'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='beach'][data-mode='dark'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='beach'][data-mode='dark'] button.primary { text-shadow: none; }
 :root[data-product='beach'][data-mode='dark'] {
   color-scheme: dark;
@@ -600,7 +600,7 @@
   --on-accent: #ffffff;
 }
 
-:root[data-product='dining'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='dining'][data-mode='dark'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='dining'][data-mode='dark'] button.primary { text-shadow: none; }
 :root[data-product='dining'][data-mode='dark'] {
   color-scheme: dark;
@@ -658,7 +658,7 @@
   --on-accent: #ffffff;
 }
 
-:root[data-product='fonda'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='fonda'][data-mode='dark'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='fonda'][data-mode='dark'] button.primary { text-shadow: none; }
 :root[data-product='fonda'][data-mode='dark'] {
   color-scheme: dark;
@@ -713,7 +713,7 @@
   --on-accent: #14171d;
 }
 
-:root[data-product='taco'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='taco'][data-mode='light'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='taco'][data-mode='light'] button.primary { text-shadow: none; }
 :root[data-product='taco'][data-mode='light'] {
   color-scheme: light;
@@ -777,7 +777,7 @@
   --on-accent: #ffffff;
 }
 
-:root[data-product='greens'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='greens'][data-mode='dark'] .card:not(.seccion) { box-shadow: var(--elev-2); border-color: var(--line); }
 :root[data-product='greens'][data-mode='dark'] button.primary { text-shadow: none; }
 :root[data-product='greens'][data-mode='dark'] {
   color-scheme: dark;
