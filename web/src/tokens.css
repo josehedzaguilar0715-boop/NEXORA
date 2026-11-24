@@ -173,3 +173,16 @@ small { font-size: max(var(--fs-min), 0.85rem); }
 .dkpi, .real-cell { container-type: inline-size; }
 .dkpi .dkpi-value, .dash-kpis .dkpi-value, .rep-kpis .dkpi-value, .dash-kpis > .dkpi:first-child .dkpi-value { font-size: clamp(0.9rem, 13.5cqw, 1.6rem); white-space: nowrap; }
 .real-cell b { font-size: clamp(0.9rem, 13cqw, 1.25rem); white-space: nowrap; }
+
+/* ---- Finanzas inteligentes (Mi dinero, Reparto, Retiros) ---- */
+.how { margin-top: 6px; }
+.how summary { cursor: pointer; font-size: var(--fs-sm, 0.9rem); color: var(--cyan); min-height: 32px; display: flex; align-items: center; }
+.how p { margin: 4px 0 0; }
+.kpi-main { border-color: var(--ok); }
+.notice { padding: 10px 14px; border: 1px solid var(--line-strong); border-left: 4px solid var(--accent); border-radius: 10px; background: var(--card); margin: 0 0 12px; }
+.reparto-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) 84px minmax(0, 0.8fr) auto auto; gap: 8px; align-items: center; }
+.reparto-row .num { text-align: right; white-space: nowrap; }
+@media (max-width: 720px) {
+  .reparto-row { grid-template-columns: 1fr 1fr; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+  .reparto-row > input:first-child { grid-column: 1 / -1; }
+}

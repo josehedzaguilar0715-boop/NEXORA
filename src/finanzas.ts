@@ -243,7 +243,7 @@ finanzas.post('/finanzas/retiros', requireFinance('manage'), async (c) => {
   const r = resumenInteligente(db, u.business_id, `${date.slice(0, 8)}01`, date, today)
   const exceeded = d.amount > r.retirable
   // Es dinero del dueño: puede sacar más, pero debe confirmarlo sabiendo que descapitaliza el negocio.
-  if (exceeded && !d.force) throw conflict(`Esto es más de lo que conviene retirar (${(r.retirable / 100).toFixed(2)}). Si aun así lo necesitas, confírmalo.`, 'excede_retirable')
+  if (exceeded && !d.force) throw conflict(`Ahora conviene retirar hasta $${(r.retirable / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Si aun así lo necesitas, confírmalo.`, 'excede_retirable')
   const suggested = r.sugerido.monto
   const decision = d.amount === suggested && suggested > 0 ? 'aceptado' : suggested > 0 ? 'modificado' : 'propio'
   const id = newId()

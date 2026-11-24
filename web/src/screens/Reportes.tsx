@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { api, fechaHora, hora, mxn, toCents } from '../api'
 import type { Me } from '../App'
 import { vocab } from '../giros'
-import { PlanFinanciero } from './Finanzas'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -139,7 +138,7 @@ export function Reportes({ me }: { me: Me }) {
       {owner && (
         <section className="card">
           <h2>Gastos fijos y reserva</h2>
-          <p className="muted small">El retiro sugerido y el plan 50/30/20 (abajo) guardan primero estos días de gastos fijos para que el negocio nunca se quede en 0.</p>
+          <p className="muted small">En Finanzas → Mi dinero, el dinero «por reservar» guarda primero estos días de gastos fijos para que el negocio nunca se quede en 0.</p>
           <h3 style={{ marginTop: 18 }}>Días de reserva</h3>
           <p className="muted small">Cuántos días de gastos fijos quieres tener guardados siempre. {fixed?.reserveDays != null ? `Hoy: ${fixed.reserveDays} días.` : 'Si no lo cambias, se guardan 30 días.'}</p>
           <div className="row"><input aria-label="Días de reserva" inputMode="numeric" placeholder={fixed?.reserveDays != null ? String(fixed.reserveDays) : 'Ej. 30'} value={f.days} onChange={(e) => setF({ ...f, days: e.target.value })} /><button style={{ flex: '0 0 auto' }} disabled={f.days.trim() === ''} onClick={run(async () => { await api('PUT', '/reserve-days', { days: Number(f.days) }); setF({ ...f, days: '' }) })}>Guardar días</button></div>
@@ -150,12 +149,6 @@ export function Reportes({ me }: { me: Me }) {
           </tbody></table></div>
           <label>Concepto<input placeholder="Ej. Renta del local" value={f.concept} onChange={(e) => setF({ ...f, concept: e.target.value })} /></label>
           <div className="row"><label>Cuánto al mes<input inputMode="decimal" placeholder="$0.00" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></label><button style={{ flex: '0 0 auto', alignSelf: 'end' }} disabled={!(toCents(f.amount) > 0 && f.concept.trim().length >= 2)} onClick={run(async () => { await api('POST', '/fixed-expenses', { concept: f.concept, monthlyAmount: toCents(f.amount) }); setF({ ...f, concept: '', amount: '' }) })}>Agregar</button></div>
-        </section>
-      )}
-      {owner && (
-        <section className="plan-wrap">
-          <div className="card-head"><h2>Plan 50/30/20 y retiro sugerido del mes</h2></div>
-          <PlanFinanciero me={me} key={`${to}${fixed?.reserveDays}${fixed?.fixedExpenses?.length}`} from={custom ? from : `${to.slice(0, 8)}01`} to={to} />
         </section>
       )}
       </div>

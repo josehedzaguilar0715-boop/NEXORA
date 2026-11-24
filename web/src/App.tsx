@@ -126,7 +126,7 @@ const DESC: Record<string, string> = {
   encargos: 'Trabajos con anticipo', devoluciones: 'Con ticket y código', escanear: 'Dar sello, registrar entrada o usar membresía',
   productos: 'Altas, precios, existencias y mayoreo', precios: 'Actualizar el precio de hoy', compras: 'Lo que compras a proveedores',
   cierre: 'Merma y conteo al cerrar', clientes: 'Lista, saldo, sellos y su QR', lealtad: 'Tarjeta de sellos, premios, rifa y promociones',
-  finanzas: 'Estado de resultados, gastos y contabilidad', reportes: 'Ventas del periodo y retiro sugerido', comisiones: 'Comisiones y propinas del personal',
+  finanzas: 'Estado de resultados, gastos y contabilidad', reportes: 'Ventas del periodo, más vendidos y bitácora', comisiones: 'Comisiones y propinas del personal',
   configurar: 'Servicios, mesas, horarios y catálogo', asistencia: 'Mi entrada y salida', usuarios: 'Empleados, permisos y horarios',
   buzon: 'Dudas y solicitudes a soporte', importar: 'Traer datos de Excel u otro sistema', ajustes: 'Datos del negocio, módulos e instalar en otros equipos',
 }
@@ -154,7 +154,7 @@ const SCREENS: Screen[] = [
   { key: 'clientes', label: 'Clientes y fiado', perm: 'customers_credit', C: Clientes, group: 'Clientes', icon: Users },
   { key: 'lealtad', label: 'Membresías y promos', perm: 'owner', C: Lealtad, group: 'Clientes', icon: Gift },
   { key: 'finanzas', label: 'Finanzas', perm: 'fin:finance', C: Finanzas, group: 'Finanzas', icon: Landmark, ownTitle: true },
-  { key: 'reportes', label: 'Ventas y retiro', perm: 'fin:dashboard', C: Reportes, group: 'Finanzas', icon: ChartColumn },
+  { key: 'reportes', label: 'Ventas', perm: 'fin:dashboard', C: Reportes, group: 'Finanzas', icon: ChartColumn },
   { key: 'comisiones', label: 'Comisiones', perm: 'view_commissions|cancel_discount', C: Comisiones, giros: ['barberia', 'unas', 'perfumeria', 'palapa', 'restaurante'], group: 'Finanzas', icon: Percent },
   { key: 'configurar', label: 'Configurar negocio', perm: 'configure_catalog', C: Configurar, group: 'Administración', icon: SlidersHorizontal },
   { key: 'asistencia', label: 'Mi asistencia', perm: 'attendance', C: MiAsistencia, group: 'Administración', icon: Clock },
