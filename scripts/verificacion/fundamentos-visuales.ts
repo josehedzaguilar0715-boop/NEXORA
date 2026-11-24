@@ -66,7 +66,24 @@ const auditoria = () => {
     if (c < need) bad.push(`${label} contraste ${c.toFixed(2)} < ${need}`)
     if (innerWidth <= 600 && size < 17.95) small.push(label)
   }
-  return { n, bad, small, overflow: document.documentElement.scrollWidth > innerWidth + 2 }
+  // Textos encimados: dos textos visibles (que no se contienen) cuyo recuadro se cruza de forma apreciable.
+  const hojas: { el: Element; r: DOMRect; txt: string }[] = []
+  for (const el of seen) {
+    const r = el.getBoundingClientRect(); const st = getComputedStyle(el)
+    if (r.width < 4 || r.height < 4 || st.visibility === 'hidden' || el.closest('svg, [aria-hidden=true], .intro, .boot-loading, .buscador-lista, .bottom, .topbar')) continue
+    if (r.bottom < 0 || r.top > innerHeight * 6) continue
+    // Solo el texto propio del elemento (sin contar a sus hijos).
+    const propio = [...el.childNodes].filter((n) => n.nodeType === 3 && n.textContent?.trim()).map((n) => n.textContent!.trim()).join(' ')
+    if (propio) hojas.push({ el, r, txt: propio.slice(0, 18) })
+  }
+  const encimados: string[] = []
+  for (let i = 0; i < hojas.length && encimados.length < 5; i++) for (let j = i + 1; j < hojas.length; j++) {
+    const a = hojas[i]!, b = hojas[j]!
+    if (a.el.contains(b.el) || b.el.contains(a.el)) continue
+    const w = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), h = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top)
+    if (w > 3 && h > 5 && (w * h) / Math.min(a.r.width * a.r.height, b.r.width * b.r.height) > 0.25) { encimados.push(`«${a.txt}» con «${b.txt}»`); if (encimados.length >= 5) break }
+  }
+  return { n, bad, small, overflow: document.documentElement.scrollWidth > innerWidth + 2, encimados }
 }
 
 const browser = await chromium.launch()
@@ -86,10 +103,10 @@ for (const [vpName, vp] of Object.entries(VP).filter(([n]) => !process.env.VPS |
   const a = await page.evaluate(auditoria)
   const okProd = giro === 'base' ? prod === 'nexora' : prod === EXPECT[giro]
   const okModo = mode === (modo === 'claro' ? 'light' : 'dark')
-  const falla = errs.length || a.overflow || a.bad.length || a.small.length || !okProd || !okModo
+  const falla = errs.length || a.overflow || a.bad.length || a.small.length || a.encimados.length || !okProd || !okModo
   if (falla) {
     fails++
-    resumen.push(`✗ [${vpName}] ${giro} ${modo}: ${errs[0] ?? ''}${a.overflow ? ' DESBORDA' : ''}${!okProd ? ` producto=${prod}` : ''}${!okModo ? ` modo=${mode}` : ''}${a.bad.length ? ` contraste(${a.bad.length}): ${a.bad.slice(0, 3).join(' | ')}` : ''}${a.small.length ? ` letra<18(${a.small.length}): ${a.small.slice(0, 3).join(' | ')}` : ''}`)
+    resumen.push(`✗ [${vpName}] ${giro} ${modo}: ${errs[0] ?? ''}${a.overflow ? ' DESBORDA' : ''}${!okProd ? ` producto=${prod}` : ''}${!okModo ? ` modo=${mode}` : ''}${a.bad.length ? ` contraste(${a.bad.length}): ${a.bad.slice(0, 3).join(' | ')}` : ''}${a.small.length ? ` letra<18(${a.small.length}): ${a.small.slice(0, 3).join(' | ')}` : ''}${a.encimados.length ? ` ENCIMADOS: ${a.encimados.join(' | ')}` : ''}`)
   }
   if (pantalla === 'guia-visual' || vpName !== 'tableta') await page.screenshot({ path: `${shots}/${vpName}-${giro}-${modo}.png`, fullPage: false })
   await ctx.close()
