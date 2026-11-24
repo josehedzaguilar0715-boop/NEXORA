@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore, type ComponentType, type CSSProperties } from 'react'
-import { api, auth, cache, flush, outbox, setPublicSlugCache } from './api'
+import { api, auth, cache, flush, outbox, setPublicSlugCache, everyVisible } from './api'
 import { AvisosPanel, BellButton, forgetPush, NoticeToast, useNotices } from './Avisos'
 import { Caja } from './screens/Caja'
 import { Inicio } from './screens/Inicio'
@@ -261,7 +261,7 @@ function Privada() {
   useEffect(() => {
     if (!me) return
     const load = () => api<{ tasks: { tone: string }[] }>('GET', '/today').then((r) => setPending(r.tasks.filter((t) => t.tone !== 'info').length)).catch(() => {})
-    void load(); const t = setInterval(load, 120_000); return () => clearInterval(t)
+    void load(); return everyVisible(load, 120_000)
   }, [me?.user.id, hash])
   useEffect(() => { setPortal(null) }, [hash])
   // Identidad visual del producto de este negocio.

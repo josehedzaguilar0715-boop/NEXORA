@@ -159,3 +159,16 @@ export async function ensureSynced(what = 'contar el inventario') {
   const n = outbox.pending()
   if (n > 0) throw new Error(`Hay ${n} ${n === 1 ? 'movimiento' : 'movimientos'} de este equipo sin enviar (ventas sin internet). Conéctate y espera a que diga «Todo enviado» antes de ${what}; si no, el conteo quedaría con diferencias falsas.`)
 }
+
+/**
+ * Repite una consulta cada `ms` solo mientras la pantalla está a la vista: con la pestaña oculta o el celular
+ * bloqueado no se consulta al servidor (con cientos de negocios, las consultas de fondo eran la mayor carga).
+ * Al volver a la pantalla se actualiza de inmediato. Regresa la función para detenerla (para useEffect).
+ */
+export function everyVisible(fn: () => unknown, ms: number): () => void {
+  const tick = () => { if (typeof document === 'undefined' || document.visibilityState !== 'hidden') void fn() }
+  const t = setInterval(tick, ms)
+  const onVis = () => { if (document.visibilityState === 'visible') void fn() }
+  document.addEventListener('visibilitychange', onVis)
+  return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis) }
+}

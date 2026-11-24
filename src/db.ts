@@ -1488,6 +1488,17 @@ const MIGRATIONS: Migration[] = [
   );
   CREATE INDEX supplier_returns_purchase ON supplier_returns(purchase_id);
   CREATE TRIGGER supplier_returns_no_delete BEFORE DELETE ON supplier_returns BEGIN SELECT RAISE(ABORT, 'No se puede borrar'); END;`,
+  // Rendimiento: los reportes y el panel filtran por negocio y fecha. Sin estos índices cada consulta recorría
+  // las ventas de TODOS los negocios (con 40 negocios y 39 mil ventas el panel tardaba 3 s). Solo agrega índices.
+  `CREATE INDEX IF NOT EXISTS sales_business_created ON sales(business_id, created_at);
+  CREATE INDEX IF NOT EXISTS stock_movements_business_type ON stock_movements(business_id, type, created_at);
+  CREATE INDEX IF NOT EXISTS expenses_business_date ON expenses(business_id, date);
+  CREATE INDEX IF NOT EXISTS returns_business_created ON returns(business_id, created_at);
+  CREATE INDEX IF NOT EXISTS sale_commissions_business ON sale_commissions(business_id, created_at);
+  CREATE INDEX IF NOT EXISTS sale_items_sale ON sale_items(sale_id);
+  CREATE INDEX IF NOT EXISTS credit_ledger_business ON credit_ledger(business_id, created_at);
+  CREATE INDEX IF NOT EXISTS cash_movements_shift ON cash_movements(shift_id);
+  CREATE INDEX IF NOT EXISTS tips_business ON tips(business_id, created_at);`,
 ]
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */

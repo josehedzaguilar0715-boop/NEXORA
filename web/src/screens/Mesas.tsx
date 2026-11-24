@@ -1,6 +1,6 @@
 import { TimeSelect } from '../TimeSelect'
 import { useEffect, useRef, useState } from 'react'
-import { api, mxn, toCents } from '../api'
+import { api, mxn, toCents, everyVisible } from '../api'
 import { ask, askCode } from '../Dialog'
 import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
@@ -16,7 +16,7 @@ export function Mesas({ me }: { me: Me }) {
   const [msg, setMsg] = useState('')
   const [panel, setPanel] = useState<'' | 'reservas' | 'rentas'>('')
   const load = async () => setTables((await api<any>('GET', '/tables')).tables)
-  useEffect(() => { void load(); const t = setInterval(load, 15_000); return () => clearInterval(t) }, [])
+  useEffect(() => { void load(); return everyVisible(load, 15_000) }, [])
   const openTable = async (t: any) => {
     try {
       if (t.status === 'limpieza') { await api('POST', `/tables/${t.id}/free`); return void load() }
@@ -166,7 +166,7 @@ export function Cocina(_: { me: Me }) {
     seen.current = ids
     setList(r.comandas)
   }).catch(() => {})
-  useEffect(() => { void load(); const t = setInterval(load, 8_000); return () => clearInterval(t) }, [station])
+  useEffect(() => { void load(); return everyVisible(load, 8_000) }, [station])
   // Solo las estaciones que este negocio usa en su menú (un comedor no ve «barra» ni «postres» si no los tiene).
   const [used, setUsed] = useState<string[]>([])
   useEffect(() => { api<any>('GET', '/products').then((r) => setUsed([...new Set<string>(r.products.map((p: any) => p.attrs?.station).filter(Boolean))])).catch(() => {}) }, [])
@@ -206,7 +206,7 @@ export function Pedidos({ me }: { me: Me }) {
   const [f, setF] = useState({ kind: 'llevar', name: '', phone: '' })
   const [err, setErr] = useState('')
   const load = async () => setTabs((await api<any>('GET', '/tabs')).tabs.filter((t: any) => t.kind !== 'mesa'))
-  useEffect(() => { void load(); const t = setInterval(load, 10_000); return () => clearInterval(t) }, [])
+  useEffect(() => { void load(); return everyVisible(load, 10_000) }, [])
   if (tab) return <Cuenta me={me} tab={tab} onClose={() => { setTab(null); void load() }} />
   const create = async () => {
     try { setTab((await api<any>('POST', '/tabs', { id: crypto.randomUUID(), kind: f.kind, customerName: f.name || undefined, phone: f.phone || undefined })).tab) } catch (e) { setErr((e as Error).message) }

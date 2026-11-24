@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { applyPublicProduct } from '../products'
 import { printElement } from '../print'
 import { ScanButton } from '../Scanner'
-import { api, h12, mxn } from '../api'
+import { api, h12, mxn, everyVisible } from '../api'
 import type { Me } from '../App'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
@@ -77,7 +77,7 @@ export function Acceso(_: { me: Me }) {
   const [inside, setInside] = useState(0)
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
   const load = () => api<any>('GET', '/tourism/occupancy').then((r) => setInside(r.inside)).catch(() => {})
-  useEffect(() => { void load(); const t = setInterval(load, 10_000); return () => clearInterval(t) }, [])
+  useEffect(() => { void load(); return everyVisible(load, 10_000) }, [])
   const scan = async (c = code) => {
     try { const r = await api<any>('POST', '/tourism/scan', { code: c }); setInside(r.occupancy); setMsg({ ok: `✔ Adelante (${r.type})` }) } catch (e) { setMsg({ err: `✘ ${(e as Error).message}` }) }
     setCode('')

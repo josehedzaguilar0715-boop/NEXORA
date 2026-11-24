@@ -1,6 +1,6 @@
 import { Bell } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { api, auth, fechaHora } from './api'
+import { api, auth, everyVisible, fechaHora } from './api'
 
 /**
  * Avisos del negocio: campana con contador, panel con la lista y opción de recibirlos en el celular (Web Push).
@@ -99,8 +99,7 @@ export function useNotices(userId: string | undefined) {
     lastSeen.current = null
     // Avisos al celular: si ya hay permiso, se reactivan solos antes de la primera consulta.
     void syncPush().finally(() => void load().catch(() => {}))
-    const t = setInterval(() => void load().catch(() => {}), 30_000)
-    return () => clearInterval(t)
+    return everyVisible(() => load().catch(() => {}), 30_000)
   }, [userId])
   return { data, reload: load, toast, closeToast: () => setToast(null) }
 }

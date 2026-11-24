@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, ensureSynced } from '../api'
+import { api, ensureSynced, everyVisible } from '../api'
 import { ask, askCode } from '../Dialog'
 import type { Me } from '../App'
 
@@ -15,7 +15,7 @@ export function Trompo(_: { me: Me }) {
     setMeats(m)
     setF((x) => ({ ...x, productId: x.productId || m[0]?.id || '' }))
   }
-  useEffect(() => { void load().catch((e) => setMsg({ err: e.message })); const t = setInterval(() => void load().catch(() => {}), 20_000); return () => clearInterval(t) }, [])
+  useEffect(() => { void load().catch((e) => setMsg({ err: e.message })); return everyVisible(() => void load().catch(() => {}), 20_000) }, [])
   const start = async () => {
     try { await api('POST', '/meat/batches', { productId: f.productId, kg: Number(f.kg) }); setF({ ...f, kg: '' }); setMsg({ ok: 'Registrado.' }); void load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }

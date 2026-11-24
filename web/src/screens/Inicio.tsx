@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api, hora, mxn } from '../api'
+import { api, hora, mxn, everyVisible } from '../api'
 import { FIADO_GIROS, hasGiro, screensFor, toneStyle, type Me } from '../App'
 import { vocab } from '../giros'
 import { productOf } from '../products'
@@ -24,7 +24,7 @@ export function Inicio({ me }: { me: Me }) {
     setDb(a); setDays(c.days); setMoves(d.movements)
     if (hasGiro(me, ...FIADO_GIROS)) api<any>('GET', '/receivables').then((r) => setRec(r.total)).catch(() => setRec(null))
   }
-  useEffect(() => { void load().catch(() => {}); const t = setInterval(() => void load().catch(() => {}), 30_000); return () => clearInterval(t) }, [])
+  useEffect(() => { void load().catch(() => {}); return everyVisible(() => void load().catch(() => {}), 30_000) }, [])
   const max = Math.max(1, ...days.map((d) => d.total))
   const W = 640, H = 220, pad = 28, bw = (W - pad * 2) / Math.max(1, days.length)
   const T = db?.today, M = db?.month, R = db?.real
@@ -208,7 +208,7 @@ function Pendientes() {
   const [sent, setSent] = useState<string[]>([])
   useEffect(() => {
     const load = () => api<any>('GET', '/today').then((r) => setTasks(r.tasks)).catch(() => setTasks([]))
-    void load(); const t = setInterval(load, 60_000); return () => clearInterval(t)
+    void load(); return everyVisible(load, 60_000)
   }, [])
   if (!tasks) return null
   if (!tasks.length) return <section className="card tasks-empty"><b>✓ Todo al día</b><span className="muted">No hay pendientes por ahora. El sistema te avisa aquí cuando haya algo que hacer.</span></section>
@@ -244,7 +244,7 @@ function Pendientes() {
 /** Reloj con fecha (hora de México, 12 horas). */
 function Clock() {
   const [n, setN] = useState(new Date())
-  useEffect(() => { const t = setInterval(() => setN(new Date()), 15_000); return () => clearInterval(t) }, [])
+  useEffect(() => { return everyVisible(() => setN(new Date()), 15_000) }, [])
   return <span className="clock">{n.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/Mexico_City' })} · {n.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</span>
 }
 
@@ -312,7 +312,7 @@ function AgendaHoy({ me }: { me: Me }) {
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
     const load = () => api<any>('GET', '/agenda').then(setD).catch(() => setD(null))
-    void load(); const t = setInterval(() => { void load(); setNow(Date.now()) }, 60_000); return () => clearInterval(t)
+    void load(); return everyVisible(() => { void load(); setNow(Date.now()) }, 60_000)
   }, [])
   if (!d) return null
   const list = (d.appointments as any[]).filter((a) => !['cancelada'].includes(a.status))
