@@ -21,11 +21,15 @@ Mide el texto realmente dibujado: contraste (4.5:1; 3:1 en texto grande), letra 
 | Guía visual | 14 productos × 2 modos × 3 tamaños (1366×900, 768×1024, 390×844) = 84 | **0 hallazgos** (tras corregir contraste en modo claro de Barber/Taquería y modo oscuro de Uñas, y el botón principal de Uñas) |
 | Inicio | 84 | 26 hallazgos, todos de un solo tipo (`<small>` de 16.7 px en celular) → corregido; repetición en celular (14 × 2): **0 hallazgos** |
 
-Otras comprobaciones: `npm run typecheck` (servidor y web), prueba de navegador de la caja (`npm run e2e`: OK). Las 293 pruebas del servidor no se repitieron (no se tocó servidor). Capturas: `scripts/verificacion/fundamentos-visuales.ts <carpeta>`.
+Otras comprobaciones (todas ejecutadas):
+* **293 de 293 pruebas** del servidor (vitest), `npm run typecheck` (servidor y web) y la prueba de navegador de la caja (`npm run e2e`): OK.
+* **Interruptor de tema** (`scripts/verificacion/tema-interruptor.ts`, 4 productos × computadora y celular = 40 comprobaciones): arranca en claro sin preferencia guardada; un toque cambia a oscuro y cambia fondo y color de la barra del navegador; la preferencia se guarda por equipo y sobrevive a recargar, a cerrar sesión y a la pantalla de acceso; volver a claro deja todo igual que al inicio; la identidad del producto no cambia. **Error encontrado y corregido:** en los productos oscuros el color de la barra del navegador no volvía a su valor propio al pasar de claro a oscuro. Capturas: `scripts/verificacion/fundamentos-visuales.ts <carpeta>`.
 
 ## Qué cambia para los negocios actuales (cuando se publique)
 * Quien abre NEXORA ve **modo claro** por defecto. Para Barber (barbería Fénix) y los otros 4 productos oscuros eso es un cambio visible; un toque en «Modo oscuro» devuelve el aspecto de siempre y se recuerda en ese equipo.
 * Abarrotes y estudio de uñas (productos claros) se ven como hoy; solo se oscurecen colores de texto que no cumplían contraste y se suben los textos pequeños en celular.
+
+## Estado: FASE 1 TERMINADA Y VERIFICADA
 
 ## Pendiente (siguientes fases)
 Fase 2 menú con color por módulo y **buscador global**; 3 dashboards; 4 caja; 5 inventario; 6 clientes; 7 pantallas por giro; 8 administración; 9 cierre con revisión de los 14 productos en las pantallas reales.

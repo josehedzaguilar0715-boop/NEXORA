@@ -17,6 +17,7 @@ export function modoGuardado(): Modo {
 /** Pone los atributos del tema en <html> y el color de la barra del navegador. `colorNativo` es el de la paleta propia del producto. */
 export function aplicarTema(productId: string, colorNativo: string, modo: Modo = modoGuardado()) {
   const raiz = document.documentElement
+  raiz.dataset.nativeColor = colorNativo
   const info = MODOS[productId]
   raiz.dataset.mode = modo === 'claro' ? 'light' : 'dark'
   raiz.dataset.native = info?.native ?? 'dark'
@@ -27,7 +28,7 @@ export function aplicarTema(productId: string, colorNativo: string, modo: Modo =
 export function cambiarModo(modo: Modo) {
   try { localStorage.setItem(KEY, modo) } catch { /* sin almacenamiento */ }
   const raiz = document.documentElement
-  aplicarTema(raiz.dataset.product ?? 'nexora', document.querySelector('meta[name="theme-color"]')?.getAttribute('content') ?? '#ffffff', modo)
+  aplicarTema(raiz.dataset.product ?? 'nexora', raiz.dataset.nativeColor ?? '#ffffff', modo)
   escuchas.forEach((f) => f())
 }
 
