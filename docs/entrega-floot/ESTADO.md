@@ -7,7 +7,7 @@ Para leer esta tabla: **Terminado** significa implementado y con prueba que pasa
 | Entorno | Versión | Contenido |
 |---|---|---|
 | **Este ZIP** | rama `modernizacion` (commit exacto en `VERSION.txt`) | Todo lo de abajo |
-| Staging (Cloudflare `nexora-staging`) | `a04435ff` | Igual que el ZIP, salvo la documentación de entrega |
+| Staging (Cloudflare `nexora-staging`) | ver `docs/modernizacion/15-informe-cierre-definitivo.md` §6 | Versión de cierre definitivo |
 | **Producción** (Cloudflare `nexora`, 3 negocios reales) | `2c16921e` = commit `efb75ff` | **No incluye** el trabajo de modernización. Publicarlo requiere autorización del propietario. |
 
 Todas las demás ramas (`main`, `staging`, `claude/new-session-pqpyhl`) ya están contenidas en `modernizacion`: ninguna tiene commits que falten.
@@ -51,6 +51,9 @@ Todas las demás ramas (`main`, `staging`, `claude/new-session-pqpyhl`) ya está
 * 13 demos en el motor de Cloudflare: todo OK.
 
 ## 3. Pendiente
+
+**Actualización del 24 nov:** ver `docs/modernizacion/15-informe-cierre-definitivo.md` §4. Ya se resolvieron el correo del aviso de privacidad (ahora configurable), el procedimiento de cifrado y restauración, y el rendimiento de la base compartida.
+
 
 | Pendiente | Requiere |
 |---|---|

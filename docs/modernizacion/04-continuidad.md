@@ -162,3 +162,14 @@ Publicar el commit anterior que se quiera conservar (`git checkout <commit> && n
   3. separar la base por negocio;
   4. cobro automático y facturación;
   5. dominio y nombres definitivos.
+
+## 14. Cierre definitivo (24 nov)
+
+* **Informe único: `15-informe-cierre-definitivo.md`.** Detalle en:
+  * `12-respaldos-y-recuperacion.md`;
+  * `13-dispositivos-y-proveedores.md`;
+  * `14-estrategia-de-crecimiento.md`.
+* Producción confirmada = commit `efb75ff` exacto (versión `2c16921e-6ccb-41c8-8399-1069ca9a8ca3`).
+* Migraciones hasta la **40**: la 40 solo agrega índices.
+* Scripts de verificación nuevos en `scripts/verificacion/`: `impresion.cjs`, `productos14.cjs`, `carga.cjs` y `bench-panel.ts`.
+* **Antes de cualquier prueba de carga contra staging**: staging y producción comparten la cuota diaria del plan gratis.
