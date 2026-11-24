@@ -1,0 +1,27 @@
+# 24 · Investigación comparativa (etapa «NEXORA inteligente, simple y profesional»)
+
+Fecha: 2026-11-24 · Rama `diseno-v0` · Sin cambios de código en este documento.
+
+**Honestidad de las fuentes.** Casi todo lo investigado viene de páginas de los propios fabricantes, centros de ayuda y sitios de reseñas (Capterra, Software Advice, GetApp). Eso prueba *qué dicen ofrecer*, no *qué tan bien funciona*. Columna «Estado»: **V** = descrito en la documentación/página oficial del fabricante; **R** = solo en reseñas o blogs de terceros; **P** = propuesta propia de NEXORA (no copiada de nadie). No se probó ninguna de estas apps con cuenta real.
+
+| # | App estudiada | Función analizada | Lo que hace bien | Lo que es complicado | Qué adaptar a NEXORA | Qué mejorar | Estado |
+|---|---|---|---|---|---|---|---|
+| 1 | Square (POS/Appointments) | Cobro + citas en un mismo sistema | Una cita se convierte en venta sin recapturar; recordatorios automáticos | Muchos módulos y planes; el reporte financiero está separado del cobro | Cita completada → «pendiente de cobro» → Caja | Mostrar el efecto en Finanzas en la misma pantalla del cobro | V (marketing) |
+| 2 | QuickBooks | Flujo de efectivo, categorías, conciliación | Categorías claras; reportes estándar | Lenguaje contable (cuentas por cobrar/pagar, asientos), pensado para contador | Mantener Estado de resultados/Flujo/Balance **solo como reportes secundarios** | Lenguaje llano: «dinero que entró», «dinero disponible» | V |
+| 3 | Toast | Reportes por turno, costo de platillo, mano de obra | Indicadores del restaurante (ventas por hora, % de mano de obra) | Hardware propio y planes caros | Costo de platillo y % de personal en el panel del restaurante | Hacerlo sin hardware propietario | V/R |
+| 4 | Fresha | Agenda en línea, comisiones, sin costo mensual | Reserva pública simple, historial del cliente, comisiones por empleado | Cobra comisión en pagos/marketplace | Página pública con identidad del negocio (logo, servicios, horario) | Sin marketplace; sin exponer nombres completos del personal | V/R |
+| 5 | Booksy Biz | Comisiones/propinas al cobrar, horarios por silla, protección de no-show | Comisión calculada al cobrar; políticas de cancelación y depósito | Gran parte depende de planes y de pagos integrados | Comisión automática al cobrar la cita; política de cancelación editable | Sin depósitos obligatorios por defecto | R (el «−25 % de no-shows» es dato de la propia marca) |
+| 6 | Vagaro | Comisiones, inventario de productos, re-agendar | Cliente puede re-agendar; notas de alergias/preferencias | Inventario es secundario; reseñas dicen que hay curva de aprendizaje | Notas del cliente y botón «volver a agendar» | Inventario de insumos ligado a servicios (uñas) | V/R |
+| 7 | Lightspeed Retail | Punto de reorden, nivel deseado, reporte de reabastecimiento, ventas promedio diarias | «Pedir cuando baje de X hasta Y»; sugerencia basada en ventas diarias recientes | Reorden y analítica avanzada solo en ciertos planes; reporte de producto sin movimiento no confirmado | Mínimo/máximo por producto → lista de compra sugerida | Incluirlo en todos los planes; explicar el porqué de cada sugerencia | V (parte «baja rotación»: no confirmada) |
+| 8 | Loyverse | POS gratuito para abarrotes/cafés | Muy simple; inventario y reportes básicos | Funciones avanzadas por complemento de pago | Mantener la sencillez de pantalla de venta | Finanzas reales (no solo ventas) | V/R |
+| 9 | Treinta (MX/LatAm) | Ventas + gastos + «utilidad» para micronegocio | Lenguaje cotidiano, muy visual, pensado en celular | Utilidad simple (ventas − gastos) que puede confundirse con efectivo | Lenguaje llano y celular primero | Separar ganancia de dinero disponible | R |
+| 10 | Profit First (método, no app) | Repartir cada ingreso en cuentas con % propios | Idea de «apartar primero» (impuestos, dueño, ganancia) | Porcentajes sugeridos son una convención, no ley | Reparto **configurable por el dueño**, sin porcentajes impuestos | No obligar 50/30/20; permitir varias configuraciones guardadas | V (libro/sitio del autor) |
+| 11 | SAT (tickets vs CFDI) | Comprobante comercial vs factura | Un ticket de caja no es CFDI; la factura requiere datos fiscales del receptor | Reglas cambian; hay que validarlas con el SAT/contador | Ticket marcado «comprobante de venta, no es factura» salvo CFDI emitido | — | V parcial: **verificar en sat.gob.mx antes de redactar leyendas finales** |
+| 12 | Impresoras térmicas | Anchos de papel 58 mm / 80 mm | Estándar de facto del mercado | Caracteres por línea varían por impresora (≈32 / ≈48) | Plantillas de 58 y 80 mm con ancho de columnas calculado | Vista previa antes de imprimir | R/P |
+
+## Conclusiones de la investigación
+
+1. Lo que más repiten las apps buenas: **un solo flujo cita → cobro → reporte**, **comisión calculada al cobrar**, **reorden basado en ventas reales** y **lenguaje llano**.
+2. Lo que ninguna fuente verificó para México: cómo reparte un dueño pequeño su dinero. Por eso el reparto de NEXORA debe ser **del dueño**, con sugerencias justificadas y opcionales (propuesta propia, P).
+3. Riesgo común detectado: confundir **ventas ≠ ganancia ≠ efectivo disponible**. NEXORA ya calcula `utilidad` y `efectivo en cajas` por separado; falta mostrarlos juntos y nombrarlos claro.
+4. Pendiente de verificación externa antes de implementar: leyendas fiscales del ticket (SAT) y anchos reales de columnas de impresoras 58/80 mm con hardware real.
