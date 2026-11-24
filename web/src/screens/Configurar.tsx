@@ -1,4 +1,5 @@
 import { TimeSelect } from '../TimeSelect'
+import { DatosNegocio } from './DatosNegocio'
 import { ProfitLine } from './Productos'
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
@@ -28,6 +29,7 @@ export function Configurar({ me }: { me: Me }) {
     { key: 'limpieza', label: 'Tareas de limpieza', show: owner && hasGiro(me, 'banos'), C: Limpieza },
     { key: 'comisiones', label: 'Comisiones', show: owner && hasGiro(me, 'barberia', 'unas', 'perfumeria'), C: Comisiones },
     { key: 'categorias', label: 'Categorías de productos', show: true, C: Categorias },
+    { key: 'datos', label: 'Respaldo y exportación de datos', show: owner, C: DatosNegocio },
   ].filter((t) => t.show)
   const [tab, setTab] = useState(tabs[0]!.key)
   const Cur = (tabs.find((t) => t.key === tab) ?? tabs[0]!).C

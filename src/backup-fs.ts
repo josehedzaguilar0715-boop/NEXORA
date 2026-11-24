@@ -8,7 +8,7 @@ export function fsBackupStore(dir: string): BackupStore {
   const safe = (n: string) => join(dir, n.replace(/[^\w.-]/g, ''))
   return {
     async put(name, bytes) { writeFileSync(safe(name), bytes) },
-    async list() { return readdirSync(dir).filter((n) => n.endsWith('.json.gz')).map((name) => ({ name, size: statSync(join(dir, name)).size })) },
+    async list() { return readdirSync(dir).filter((n) => n.endsWith('.json.gz') || n.endsWith('.json.gz.enc')).map((name) => ({ name, size: statSync(join(dir, name)).size })) },
     async get(name) { try { return new Uint8Array(readFileSync(safe(name))) } catch { return null } },
     async remove(name) { rmSync(safe(name), { force: true }) },
   }

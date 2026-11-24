@@ -37,6 +37,8 @@ import { users } from './users.js'
 import { AppError } from './util.js'
 import { rateLimiter } from './ratelimit.js'
 import { scopeGuard } from './scope.js'
+import { datos } from './datos.js'
+import { recordError } from './monitor.js'
 
 export function createApp(deps: Deps) {
   const app = new Hono<Env>()
@@ -44,7 +46,10 @@ export function createApp(deps: Deps) {
     c.set('deps', deps)
     await next()
   })
-  app.get('/health', (c) => c.json({ ok: true }))
+  app.get('/health', (c) => {
+    // Solo dice si la base responde y en qué versión de esquema está (sin cifras del negocio).
+    try { return c.json({ ok: true, schema: (deps.db.prepare('SELECT MAX(version) v FROM _migrations').get() as { v: number }).v }) } catch { return c.json({ ok: false }, 503) }
+  })
   app.use('*', rateLimiter(deps.now))
   app.route('/', publicAuth)
   app.route('/', publicCommon)
@@ -90,11 +95,15 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', dashboard)
   protectedApp.route('/', notifications)
   protectedApp.route('/', publicLinks)
+  protectedApp.route('/', datos)
   app.route('/', protectedApp)
 
   app.onError((err, c) => {
     if (err instanceof AppError) return c.json({ error: { code: err.code, message: err.message } }, err.status as 400)
     console.error(err)
+    let biz: string | null = null
+    try { biz = c.get('session')?.user.business_id ?? null } catch { /* sin sesión */ }
+    recordError(deps, { source: 'api', route: `${c.req.method} ${c.req.path}`, status: 500, message: err instanceof Error ? `${err.name}: ${err.message}` : 'error', businessId: biz })
     return c.json({ error: { code: 'error_interno', message: 'Ocurrió un error. Inténtalo de nuevo.' } }, 500)
   })
   app.notFound((c) => c.json({ error: { code: 'no_encontrado', message: 'Ruta no encontrada.' } }, 404))

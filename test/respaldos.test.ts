@@ -29,7 +29,8 @@ describe('respaldos automáticos', () => {
     // Uno viejo (de hace 40 días) se borra solo.
     await store.put('nexora-2026-10-08T09-17.json.gz', new Uint8Array([1]))
     await runBackup({ ...deps, now: () => new Date('2026-11-18T09:17:00Z') }, store)
-    expect([...store.files.keys()].sort()).toEqual(['nexora-2026-11-17T09-17.json.gz', 'nexora-2026-11-18T09-17.json.gz'])
+    expect([...store.files.keys()].filter((k) => k.startsWith('nexora-')).sort()).toEqual(['nexora-2026-11-17T09-17.json.gz', 'nexora-2026-11-18T09-17.json.gz'])
+    expect([...store.files.keys()].filter((k) => k.startsWith('negocio-'))).toHaveLength(2) // además, un archivo por negocio y por día
 
     // Se puede restaurar: la base reconstruida tiene los mismos datos.
     const dir = mkdtempSync(join(tmpdir(), 'nx-'))

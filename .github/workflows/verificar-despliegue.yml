@@ -1,0 +1,26 @@
+# Verificación de SOLO LECTURA de staging y producción desde internet (el entorno de desarrollo no llega a estos dominios).
+# Se ejecuta a mano (Actions → Verificar despliegue) o al cambiar este archivo, y todos los días a las 15:00 UTC si está en la rama principal.
+name: Verificar despliegue
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 15 * * *'
+  push:
+    branches: [modernizacion]
+    paths: ['.github/workflows/verificar-despliegue.yml', 'scripts/verificar-despliegue.sh']
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sitio: [staging, produccion]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Verificar ${{ matrix.sitio }}
+        run: |
+          if [ "${{ matrix.sitio }}" = produccion ]; then U=https://nexora.josehedzaguilar0715.workers.dev; else U=https://nexora-staging.josehedzaguilar0715.workers.dev; fi
+          bash scripts/verificar-despliegue.sh "$U"

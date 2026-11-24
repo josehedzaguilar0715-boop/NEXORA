@@ -28,7 +28,7 @@ function kvStore(kv: KV): BackupStore {
       const out: { name: string; size: number }[] = []
       let cursor: string | undefined
       do {
-        const r = await kv.list({ prefix: 'nexora-', cursor })
+        const r = await kv.list({ cursor })
         for (const k of r.keys) out.push({ name: k.name, size: Number((k.metadata as { size?: number } | undefined)?.size ?? 0) })
         cursor = r.list_complete ? undefined : r.cursor
       } while (cursor)

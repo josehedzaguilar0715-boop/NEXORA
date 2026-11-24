@@ -7,7 +7,7 @@ import type { Db } from './db.js'
  * La prueba test/particion.test.ts exige que toda tabla esté clasificada aquí.
  * Los renglones con business_id vacío (bitácora del super panel, respaldos) son de la plataforma, no de un negocio.
  */
-export const GLOBAL_TABLES = ['_migrations', 'admins', 'admin_sessions', 'admin_challenges', 'settings', 'app_keys'] as const
+export const GLOBAL_TABLES = ['_migrations', 'admins', 'admin_sessions', 'admin_challenges', 'settings', 'app_keys', 'feature_flags'] as const
 
 /** Tabla → [columna, tabla de la que depende]. La tabla de la que depende ya es de un negocio. */
 export const OWNER: Record<string, [string, string]> = {

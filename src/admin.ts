@@ -8,6 +8,7 @@ import { consumeChallenge, createChallenge, extraOf, forgetDevices } from './aut
 import { resetDemoData } from './reset.js'
 import { demoAccess, demoApp, DEMOS, seedDemo } from './demo.js'
 import { ticketView } from './support.js'
+import { healthReport, KNOWN_FLAGS } from './monitor.js'
 import { exportAll, importAll, keyFingerprint, readBackup, runBackup } from './backup.js'
 import {
   bad, businessCode, checkPassword, conflict, hashSecret, iso, locked, newId, newToken, normalizePhone, notFound, numericCode, sha256, unauthorized, verifySecret, localDate } from './util.js'
@@ -437,11 +438,26 @@ admin.get('/admin/storage', (c) => {
   return c.json({ bytes, limit, pct, sales30, perMonth, monthsLeft, level: pct >= 85 ? 'critico' : pct >= 70 ? 'aviso' : 'ok' })
 })
 
+/** Salud del sistema: respaldos, errores, migraciones, ventas y sincronización, en un solo lugar. */
+admin.get('/admin/salud', (c) => c.json(healthReport(c.get('deps'))))
+
+/** Interruptores de funciones: apagar o limitar una función sin publicar de nuevo. */
+admin.get('/admin/flags', (c) => c.json({ flags: c.get('deps').db.prepare('SELECT key, enabled, business_ids AS businessIds, note, updated_at AS updatedAt FROM feature_flags ORDER BY key').all(), known: KNOWN_FLAGS }))
+admin.put('/admin/flags/:key', async (c) => {
+  const { db, now } = c.get('deps')
+  const key = c.req.param('key')
+  if (!KNOWN_FLAGS.some((f) => f.key === key)) throw notFound('Esa función no tiene interruptor.')
+  const d = parse(z.object({ enabled: z.boolean(), businessIds: z.array(z.string()).optional(), note: z.string().max(200).optional() }), await body(c))
+  db.prepare('INSERT INTO feature_flags (key, enabled, business_ids, note, updated_at) VALUES (?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET enabled = excluded.enabled, business_ids = excluded.business_ids, note = excluded.note, updated_at = excluded.updated_at').run(key, d.enabled ? 1 : 0, d.businessIds?.length ? JSON.stringify(d.businessIds) : null, d.note ?? null, iso(now()))
+  audit(db, now, { businessId: null, userId: c.get('admin').id, action: 'admin.interruptor', newValue: { key, ...d } })
+  return c.json({ ok: true })
+})
+
 /** Respaldos automáticos guardados (30 días). */
 admin.get('/admin/backups', async (c) => {
   const store = c.get('deps').backups
   if (!store) return c.json({ backups: [], enabled: false })
-  const list = (await store.list()).sort((x, y) => (x.name < y.name ? 1 : -1))
+  const list = (await store.list()).filter((b) => b.name.startsWith('nexora-')).sort((x, y) => (x.name < y.name ? 1 : -1))
   const key = c.get('deps').backupKey
   // Si están cifrados, la huella dice QUÉ llave se usa (la llave nunca se muestra).
   return c.json({ backups: list, enabled: true, encrypted: !!key, keyFingerprint: key ? await keyFingerprint(key) : null })

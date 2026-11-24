@@ -76,7 +76,8 @@ export const GIROS = ['abarrotes', 'ferreteria', 'papeleria', 'barberia', 'unas'
 
 export const BLOCKED_CODE = 'cuenta_vencida'
 /** Lo que un negocio vencido o suspendido aún puede usar: entrar, ver su estado y escribir al buzón. */
-const ALLOWED_WHEN_BLOCKED = [/^\/auth\//, /^\/support\//]
+// Aunque la cuenta esté vencida o suspendida, el dueño siempre puede llevarse sus datos (nunca restaurar).
+const ALLOWED_WHEN_BLOCKED = [/^\/auth\//, /^\/support\//, /^\/data\/(info|export)$/]
 
 export const businessGate = createMiddleware<Env>(async (c, next) => {
   const { db, now } = c.get('deps')

@@ -290,12 +290,32 @@ function AjustesAdmin() {
       <CorreoPrivacidad />
       <h2 style={{ marginTop: 16 }}>Cambiar mi contraseña</h2>
       <CambiarClave />
+      <h2 style={{ marginTop: 16 }}>Salud del sistema</h2>
+      <Salud />
       <h2 style={{ marginTop: 16 }}>Espacio de la base</h2>
       <Espacio />
       <h2 style={{ marginTop: 16 }}>Respaldos</h2>
       <Respaldos />
       <p className="muted">Precios de planes: {mxn(50000)} / {mxn(70000)} / {mxn(90000)}; sucursal extra {mxn(30000)}; paquete de 5 usuarios {mxn(toCents('200'))}.</p>
     </div>
+  )
+}
+
+function Salud() {
+  const [h, setH] = useState<any>(null)
+  const [msg, setMsg] = useState('')
+  const load = () => adm('GET', '/admin/salud').then(setH).catch((e) => setMsg(e.message))
+  useEffect(() => { void load() }, [])
+  if (!h) return <p className="muted">{msg || 'Revisando…'}</p>
+  const ico = h.status === 'ok' ? '🟢' : h.status === 'atencion' ? '🟡' : '🔴'
+  return (
+    <>
+      <p><b>{ico} {h.status === 'ok' ? 'Todo en orden' : h.status === 'atencion' ? 'Atención' : 'Problema crítico'}</b> <small className="muted">· revisado {new Date(h.checkedAt).toLocaleTimeString('es-MX')}</small> <button className="mini" onClick={load}>Actualizar</button></p>
+      {h.issues.map((x: string, i: number) => <p key={i} className="error">{x}</p>)}
+      {h.warnings.map((x: string, i: number) => <p key={i} className="muted">⚠ {x}</p>)}
+      <p className="muted small">Esquema {h.schema.database}/{h.schema.code} · ventas 24 h: {h.sales.last24h} · respaldos de negocio: {h.backups.businessesOk} bien, {h.backups.businessesFailed} fallidos · último completo: {h.backups.lastFull ? `${new Date(h.backups.lastFull.created_at).toLocaleString('es-MX')} (${h.backups.lastFull.status})` : 'nunca'}</p>
+      {h.errors24h.length > 0 && <div className="table-wrap"><table className="list"><tbody>{h.errors24h.map((e: any, i: number) => <tr key={i}><td>{e.route ?? e.source}<br /><small className="muted">{e.message}</small></td><td className="num">×{e.count}</td></tr>)}</tbody></table></div>}
+    </>
   )
 }
 

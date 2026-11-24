@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { createApp } from '../src/app.js'
 import { openDb } from '../src/db-node.js'
 
-describe('migración 41 (users.position): compatible con una base que ya tiene datos', () => {
+describe('migraciones 41 y 42 (users.position; respaldos, errores e interruptores): compatible con una base que ya tiene datos', () => {
   it('sobre una base en la versión 40 con negocio, personal y ventas: agrega la columna y no cambia ningún dato ni comportamiento', async () => {
     const file = join(mkdtempSync(join(tmpdir(), 'nx-mig-')), 'v40.db')
     // Base «de producción»: negocio con dueño, empleado y una venta, y esquema detenido en la versión 40.
@@ -25,12 +25,13 @@ describe('migración 41 (users.position): compatible con una base que ya tiene d
     const antes = db.prepare('SELECT id, role, name, permissions, branch_id FROM users ORDER BY id').all()
     const ventasAntes = db.prepare('SELECT COUNT(*) n FROM sales').get()
     // Regresa la base a la versión 40: sin columna ni registro de la migración 41.
-    db.exec('DELETE FROM _migrations WHERE version = 41; ALTER TABLE users DROP COLUMN position;')
+    db.exec('DELETE FROM _migrations WHERE version IN (41, 42); ALTER TABLE users DROP COLUMN position; DROP TABLE backup_log; DROP TABLE error_log; DROP TABLE feature_flags;')
     expect((db.prepare("SELECT COUNT(*) n FROM pragma_table_info('users') WHERE name = 'position'").get() as any).n).toBe(0)
     ;(db as any).close?.()
-    // Arranque con el código nuevo: aplica solo la 41.
+    // Arranque con el código nuevo: aplica la 41 (columna) y la 42 (tablas de respaldos, errores e interruptores).
     db = openDb(file)
-    expect((db.prepare('SELECT MAX(version) v FROM _migrations').get() as any).v).toBe(41)
+    expect((db.prepare('SELECT MAX(version) v FROM _migrations').get() as any).v).toBe(42)
+    expect((db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name IN ('backup_log','error_log','feature_flags')").get() as any).n).toBe(3)
     expect((db.prepare("SELECT COUNT(*) n FROM pragma_table_info('users') WHERE name = 'position'").get() as any).n).toBe(1)
     expect(db.prepare('SELECT id, role, name, permissions, branch_id FROM users ORDER BY id').all()).toEqual(antes)
     expect(db.prepare('SELECT COUNT(*) n FROM sales').get()).toEqual(ventasAntes)

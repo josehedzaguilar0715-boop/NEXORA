@@ -1502,7 +1502,21 @@ const MIGRATIONS: Migration[] = [
   // Puestos: dueño (rol «owner»), encargado y empleado. NULL = se deduce de los permisos como antes
   // (con «cancelar o descontar» es encargado). Solo agrega una columna: no cambia ningún dato existente.
   `ALTER TABLE users ADD COLUMN position TEXT CHECK (position IS NULL OR position IN ('encargado','empleado'));`,
+  // Operación y protección: bitácora de respaldos, registro de errores sin datos privados e interruptores de funciones. Solo tablas nuevas.
+  `CREATE TABLE backup_log (
+    id TEXT PRIMARY KEY, business_id TEXT, kind TEXT NOT NULL, name TEXT, bytes INTEGER, sha256 TEXT,
+    status TEXT NOT NULL CHECK (status IN ('ok','error')), error TEXT, encrypted INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+  );
+  CREATE INDEX backup_log_business ON backup_log(business_id, created_at);
+  CREATE TABLE error_log (
+    id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL UNIQUE, source TEXT NOT NULL, route TEXT, status INTEGER, message TEXT,
+    business_id TEXT, count INTEGER NOT NULL DEFAULT 1, first_at TEXT NOT NULL, last_at TEXT NOT NULL, alerted_at TEXT
+  );
+  CREATE TABLE feature_flags (
+    key TEXT PRIMARY KEY, enabled INTEGER NOT NULL, business_ids TEXT, note TEXT, updated_at TEXT NOT NULL
+  );`,
 ]
+export const SCHEMA_VERSION = MIGRATIONS.length
 
 /** Aplica las migraciones pendientes (en orden, cada una en su transacción). */
 export function migrate(db: Db): Db {

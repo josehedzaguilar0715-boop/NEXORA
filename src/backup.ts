@@ -1,7 +1,9 @@
 import type { Deps } from './context.js'
 import type { Db } from './db.js'
 import { audit } from './audit.js'
-import { iso } from './util.js'
+import { iso, newId } from './util.js'
+import { backupAllBusinesses } from './datos.js'
+import { recordError } from './monitor.js'
 
 /**
  * Respaldos automáticos: toda la base, comprimida, una vez al día. Se guardan 30 días
@@ -64,14 +66,20 @@ export async function keyFingerprint(keyB64: string): Promise<string> {
 
 type BackupData = { version: number; tables: Record<string, Record<string, unknown>[]> }
 
-/** Abre un respaldo (cifrado o no, comprimido o no) y devuelve su contenido. */
-export async function readBackup(bytes: Uint8Array, keyB64?: string): Promise<BackupData> {
+/** Quita el cifrado y la compresión de un respaldo y devuelve sus bytes. */
+export async function unpackBytes(bytes: Uint8Array, keyB64?: string): Promise<Uint8Array> {
   let b = bytes
   if (isEncrypted(b)) {
     if (!keyB64) throw new Error('Este respaldo está cifrado y no hay llave (BACKUP_KEY).')
     b = await decryptBackup(b, keyB64)
   }
   if (b[0] === 0x1f && b[1] === 0x8b) b = new Uint8Array(await new Response(new Blob([new Uint8Array(b)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
+  return b
+}
+
+/** Abre un respaldo (cifrado o no, comprimido o no) y devuelve su contenido. */
+export async function readBackup(bytes: Uint8Array, keyB64?: string): Promise<BackupData> {
+  const b = await unpackBytes(bytes, keyB64)
   const data = JSON.parse(new TextDecoder().decode(b)) as BackupData
   if (typeof data.version !== 'number' || !data.tables || typeof data.tables !== 'object') throw new Error('El archivo no es un respaldo de NEXORA.')
   return data
@@ -118,6 +126,21 @@ const toBase64 = (bytes: Uint8Array) => {
 export async function runBackup(deps: Deps, store: BackupStore, reason = 'automático') {
   const { db, now } = deps
   const t = now()
+  try {
+    const r = await runWholeBackup(deps, store, reason, t)
+    db.prepare("INSERT INTO backup_log (id, business_id, kind, name, bytes, status, encrypted, created_at) VALUES (?,?,?,?,?,'ok',?,?)").run(newId(), null, 'completo', r.name, r.bytes, deps.backupKey ? 1 : 0, iso(t))
+    // Además, un archivo propio por negocio (sirve para exportar y restaurar a UN negocio sin tocar a los demás).
+    const perBusiness = await backupAllBusinesses(deps, store)
+    return { ...r, perBusiness }
+  } catch (e) {
+    db.prepare("INSERT INTO backup_log (id, business_id, kind, status, error, created_at) VALUES (?,?,?,'error',?,?)").run(newId(), null, 'completo', (e as Error).message.slice(0, 200), iso(t))
+    recordError(deps, { source: 'respaldo', message: `Respaldo completo falló: ${(e as Error).message}` })
+    throw e
+  }
+}
+
+async function runWholeBackup(deps: Deps, store: BackupStore, reason: string, t: Date) {
+  const { db, now } = deps
   const data = exportAll(db, t)
   const packed = await gzip(JSON.stringify(data))
   const bytes = deps.backupKey ? await encryptBackup(packed, deps.backupKey) : packed
@@ -125,7 +148,7 @@ export async function runBackup(deps: Deps, store: BackupStore, reason = 'autom�
   await store.put(name, bytes)
   // Se quitan los de más de 30 días.
   const cutoff = iso(new Date(t.getTime() - KEEP_DAYS * 86_400_000)).slice(0, 10)
-  for (const b of await store.list()) if (b.name.slice(7, 17) < cutoff) await store.remove(b.name)
+  for (const b of await store.list()) if (b.name.startsWith('nexora-') && b.name.slice(7, 17) < cutoff) await store.remove(b.name)
   // Copia fuera del servidor: al correo del super panel (si hay proveedor de correo).
   let emailed = 0
   if (deps.notifier.sendEmail) {
