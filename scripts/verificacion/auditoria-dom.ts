@@ -46,16 +46,18 @@ export const auditoria = () => {
     if (r.bottom < 0 || r.top > innerHeight * 6) continue
     // Contenido que queda recortado dentro de una zona con desplazamiento (no se ve) no cuenta.
     let recortado = false
+    const zonas: DOMRect[] = []
     for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
-      const o = getComputedStyle(p).overflow
-      if (o === 'visible') continue
-      const pr = p.getBoundingClientRect()
+      if (getComputedStyle(p).overflow === 'visible') continue
+      const pr = p.getBoundingClientRect(); zonas.push(pr)
       if (r.top >= pr.bottom - 1 || r.bottom <= pr.top + 1 || r.left >= pr.right - 1 || r.right <= pr.left + 1) { recortado = true; break }
     }
     if (recortado) continue
+    // Lo que se ve de cada renglón: su recuadro recortado por las zonas con desplazamiento que lo contienen.
+    const visibles = [...el.getClientRects()].map((q) => { let l = q.left, tp = q.top, rr = q.right, bt = q.bottom; for (const z of zonas) { l = Math.max(l, z.left); tp = Math.max(tp, z.top); rr = Math.min(rr, z.right); bt = Math.min(bt, z.bottom) } return new DOMRect(l, tp, Math.max(0, rr - l), Math.max(0, bt - tp)) }).filter((q) => q.width > 3 && q.height > 3)
     // Solo el texto propio del elemento (sin contar a sus hijos).
     const propio = [...el.childNodes].filter((n) => n.nodeType === 3 && n.textContent?.trim()).map((n) => n.textContent!.trim()).join(' ')
-    if (propio) hojas.push({ el, r, rs: [...el.getClientRects()].filter((q) => q.width > 3 && q.height > 3), txt: propio.slice(0, 18) })
+    if (propio) hojas.push({ el, r, rs: visibles, txt: propio.slice(0, 18) })
   }
   const encimados: string[] = []
   for (let i = 0; i < hojas.length && encimados.length < 5; i++) for (let j = i + 1; j < hojas.length; j++) {
