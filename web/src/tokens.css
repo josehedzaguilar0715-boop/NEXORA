@@ -74,3 +74,6 @@
 .guia .muestra { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); font-weight: 600; }
 .guia .escala > div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .guia .escala small { color: var(--muted); font-size: max(var(--fs-min), 0.8rem); }
+
+/* El texto <small> del navegador (≈16,7 px) se sube al piso de legibilidad: 18 px en celular. */
+small { font-size: max(var(--fs-min), 0.85rem); }
