@@ -45,7 +45,7 @@ for (const [vpName, vp] of Object.entries(VP)) {
     const primero = await page.locator('.buscador-lista li[role=option]').first().getAttribute('id')
     ok(primero?.endsWith('-' + esperado), `[${vpName}/${giro}] «${texto}» → primer resultado ${esperado}`)
     const colores = await page.evaluate(() => [...document.querySelectorAll('.buscador-lista .mod-ico')].map((e) => getComputedStyle(e).color))
-    ok(colores.length > 0 && colores.every((c) => c !== 'rgb(0, 0, 0)'), `[${vpName}/${giro}] los resultados llevan el color de su módulo`)
+    ok(colores.length > 0 && colores.every((c: string) => c !== 'rgb(0, 0, 0)'), `[${vpName}/${giro}] los resultados llevan el color de su módulo`)
     await page.screenshot({ path: `${shots}/${vpName}-${giro}-buscando.png` })
     await page.keyboard.press('Enter'); await page.waitForTimeout(500)
     ok(new URL(page.url()).hash === `#/${esperado}`, `[${vpName}/${giro}] Enter abre «${esperado}»`)
