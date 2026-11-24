@@ -43,8 +43,8 @@ En la columna Tipo: **automática** = base de prueba en memoria; **navegador** =
 |---|---|---|
 | `npm run check`: tipos, **254 pruebas en 52 archivos**, compilación y prueba de punta a punta (31 pasos) | automática + navegador | ✅ todo pasa |
 | Los 14 productos: identidad al entrar, páginas públicas (reservas, boletos, tarjeta) y la base en acceso y super panel | navegador | ✅ **TODO OK** (`productos14.cjs`) |
-| Recorrido profundo: 13 giros × dueño y empleado × celular y computadora | navegador | RESULTADO_DEEPWALK |
-| Flujos completos de 6 giros (`giros6.cjs`) | navegador | RESULTADO_GIROS6 |
+| Recorrido profundo: 13 giros × dueño y empleado × celular y computadora | navegador | ✅ **Sin hallazgos**: sin errores de JS ni de servidor, ni desbordes |
+| Flujos completos de 6 giros (`giros6.cjs`) | navegador | ✅ **43/43 en computadora, 43/43 en celular** |
 | Impresión: ticket y corte X en 58 y 80 mm, boletos con QR | navegador (impresora simulada en PDF) | ✅ 1 hoja cada uno, renglones completos, QR presentes |
 | Carga, una sola base, 1 conexión | workerd | venta p50 12 ms; panel 24 ms; 0 errores |
 | Carga, 30 conexiones simultáneas, 4 negocios | workerd | **~98 peticiones/s**, p95 403 ms, **0 errores, todas las ventas cuadran** |
@@ -53,10 +53,10 @@ En la columna Tipo: **automática** = base de prueba en memoria; **navegador** =
 | Restaurar sobre una base con negocios | workerd + automática | ✅ se rechaza sin tocar nada |
 | **Actualización**: base creada con el código de producción (8 negocios con datos) → versión nueva | servidor local | ✅ migraciones 35 a 40 aplicadas, **0 diferencias** en ventas, renglones, pagos, inventario, fiado y lotes |
 | **Reversión**: esa base ya migrada, abierta con el código de producción | servidor local | ✅ entra, vende, abona, registra gasto, reporta y hace corte Z con diferencia 0 |
-| 13 demos en el motor de Cloudflare | workerd | RESULTADO_WORKERD |
+| 13 demos en el motor de Cloudflare | workerd | ✅ **TODO OK** (las 13, con todas sus pantallas) |
 | Separar por negocio: 13 giros, suma exacta y cada negocio solo da el mismo resumen | automática | ✅ |
 | Versión de producción contra el commit `efb75ff` | solo lectura | ✅ 35 de 35 archivos idénticos |
-| Staging con esta versión | staging | RESULTADO_STAGING |
+| Staging con esta versión | staging | ✅ versión `f9c3271f` desplegada en **staging** (no en producción). Comprobaciones de dinero 7/7. Carga pequeña (2 negocios, 200 peticiones): mediana 112 ms medida desde aquí, **0 errores**, todas las ventas cuadran. |
 
 ## 4. Lo que sigue pendiente (depende de equipos, credenciales o decisiones tuyas)
 
@@ -85,9 +85,9 @@ En la columna Tipo: **automática** = base de prueba en memoria; **navegador** =
 
 ## 6. Versión exacta lista para publicar
 
-* **Rama `modernizacion`, commit COMMIT_FINAL.**
+* **Rama `modernizacion`, commit el último de la rama (el código final es `f8ec8bf`; encima solo hay documentación).**
 * Migraciones de base: **hasta la 40**. Todas solo agregan. La 40 crea índices: en una base del tamaño actual (~1 MB) tarda menos de un segundo.
-* Staging tiene esta misma versión: STAGING_VERSION.
+* Staging tiene esta misma versión: `f9c3271f-0bc9-4679-88a7-253911d22e17`, desplegada el 24 nov.
 
 **Para publicar** (solo con tu autorización expresa):
 
