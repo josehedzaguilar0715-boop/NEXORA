@@ -25,6 +25,7 @@ type Filter = 'todos' | 'surtir' | 'caducar' | 'eliminados'
 
 /** Inventario: lista con filtros y editor por secciones (datos, existencia, presentaciones, receta…). */
 export function Productos({ me }: { me: Me }) {
+  const costs = !!me.access?.costs // costos y márgenes: permiso aparte
   const [list, setList] = useState<P[]>([])
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('todos')
@@ -72,7 +73,7 @@ export function Productos({ me }: { me: Me }) {
       <section className="card">
         <div className="table-wrap" style={{ border: 0, margin: 0 }}>
           <table className="list products">
-            <thead><tr><th>Producto</th><th className="num">Precio</th><th className="num">Existencia</th><th className="num hide-sm">Costo</th><th /></tr></thead>
+            <thead><tr><th>Producto</th><th className="num">Precio</th><th className="num">Existencia</th>{costs && <th className="num hide-sm">Costo</th>}<th /></tr></thead>
             <tbody>
               {shown.map((p) => {
                 const low = lowIds.has(p.id)
@@ -81,7 +82,7 @@ export function Productos({ me }: { me: Me }) {
                     <td><b>{p.name}</b><br /><small className="muted">{[catName(p.categoryId), p.barcode ?? 'sin código', UNIT[p.unit] ?? p.unit].filter(Boolean).join(' · ')}{p.sellable === false ? ' · uso interno' : ''}</small></td>
                     <td className="num">{mxn(p.price)}{p.tiers?.length ? <><br /><small className="muted">mayoreo {mxn(p.tiers[0]!.price)} desde {p.tiers[0]!.minQuantity}</small></> : null}</td>
                     <td className="num">{p.trackStock === false ? <span className="muted">receta</span> : <span className={low ? 'pill bad' : 'pill'}>{p.stock ?? 0}</span>}{inPacks(p.stock ?? 0, (p as P).pack) && <><br /><small className="muted">{inPacks(p.stock ?? 0, (p as P).pack)}</small></>}{(p as P & { reserved?: number }).reserved ? <><br /><small className="muted">{(p as P & { reserved?: number }).reserved} apartados</small></> : null}{expIds.has(p.id) && <><br /><small className="neg">por caducar</small></>}</td>
-                    <td className="num hide-sm">{p.lastCost ? mxn(Math.round(p.lastCost)) : '—'}</td>
+                    {costs && <td className="num hide-sm">{p.lastCost ? mxn(Math.round(p.lastCost)) : '—'}</td>}
                     <td className="num row-actions">
                       {canStock && p.active !== false && p.trackStock !== false && <button className="mini" onClick={(e) => { e.stopPropagation(); setEdit({ p, tab: 'existencia' }) }}>+ Agregar</button>}
                       {canEdit && p.active !== false && <button className="mini icon-btn" aria-label={`Eliminar ${p.name}`} title="Eliminar" onClick={async (e) => { e.stopPropagation(); if (!(await confirmAsk(`¿Eliminar «${p.name}»?`, 'Ya no aparecerá en la caja ni en la lista. Sus ventas se conservan y puedes restaurarlo desde «Eliminados».', true))) return; try { await api('PATCH', `/products/${p.id}`, { active: false, baseVersion: p.version, updatedAt: new Date().toISOString() }); await load() } catch (er) { setErr((er as Error).message) } }}><Trash2 size={16} aria-hidden /></button>}
@@ -133,6 +134,7 @@ function Editor({ me, p, tab: initialTab, categories, onClose, onSaved }: { me: 
 }
 
 function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories: { id: string; name: string }[]; onSaved: (close?: boolean) => void }) {
+  const costs = !!me.access?.costs
   const perfume = hasGiro(me, 'perfumeria')
   const food = hasGiro(me, ...FOOD)
   const canEdit = can(me, 'configure_catalog')
@@ -211,7 +213,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
             <label>Costo por {UNIT[f.unit] ?? 'unidad'}<input inputMode="decimal" value={f.cost} onChange={set('cost')} placeholder="$0.00" disabled={!canEdit} /></label>
             <label>% de ganancia que quieres<input inputMode="decimal" value={f.margin} onChange={set('margin')} placeholder="Ej. 30" disabled={!canEdit} /></label>
           </div>
-          <ProfitLine price={toCents(f.price)} cost={toCents(f.cost)} margin={Number(f.margin)} onUse={canEdit ? (v) => setF({ ...f, price: String(v / 100) }) : undefined} />
+          {costs && <ProfitLine price={toCents(f.price)} cost={toCents(f.cost)} margin={Number(f.margin)} onUse={canEdit ? (v) => setF({ ...f, price: String(v / 100) }) : undefined} />}
         </div>
       ) : <p className="muted small">El costo de este platillo sale de su receta (pestaña «Receta»).</p>}
       {f.trackStock && f.unit === 'pieza' && (
@@ -519,7 +521,7 @@ function Pedido({ me, onClose }: { me: Me; onClose: () => void }) {
         {items === null && <p className="muted">Calculando…</p>}
         {items?.length === 0 && <p className="okmsg">No hay nada por surtir. ✓</p>}
         {[...groups.values()].map((g) => {
-          const cost = g.items.reduce((a, i) => a + Math.round((Number(qty[i.productId]) || 0) * i.lastCost), 0)
+          const cost = g.items.reduce((a, i) => a + Math.round((Number(qty[i.productId]) || 0) * (i.lastCost ?? 0)), 0)
           return (
             <div key={g.supplier?.id ?? 'sin'} className="danger-zone">
               <div className="card-head"><h3>{g.supplier ? g.supplier.name : 'Sin proveedor registrado'}</h3>{cost > 0 && <span className="muted small">aprox. {mxn(cost)}</span>}</div>

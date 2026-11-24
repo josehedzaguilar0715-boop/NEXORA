@@ -166,7 +166,11 @@ export const inventory = new Hono<Env>()
 
 // ---------- Categorías ----------
 
-inventory.get('/categories', (c) => c.json({ categories: c.get('deps').db.prepare('SELECT id, name, margin_bp AS marginBp FROM categories WHERE business_id = ? ORDER BY name').all(c.get('session').user.business_id) }))
+inventory.get('/categories', (c) => {
+  const rows = c.get('deps').db.prepare('SELECT id, name, margin_bp AS marginBp FROM categories WHERE business_id = ? ORDER BY name').all(c.get('session').user.business_id) as { marginBp: number | null }[]
+  // El margen es información de costos: solo con su permiso.
+  return c.json({ categories: seeCosts(c) ? rows : rows.map(({ marginBp: _m, ...r }) => r) })
+})
 
 inventory.post('/categories', requirePerm('configure_catalog'), async (c) => {
   const { db, now } = c.get('deps')
@@ -372,7 +376,8 @@ inventory.get('/products/:id/lots', requirePerm('view_inventory'), (c) => {
   const { db } = c.get('deps')
   const p = getProduct(db, c.get('session').user.business_id, c.req.param('id'))
   const rows = db.prepare('SELECT id, qty_initial_milli, qty_remaining_milli, unit_cost AS unitCost, price, expires_at AS expiresAt, received_at AS receivedAt FROM lots WHERE product_id = ? AND branch_id = ? ORDER BY received_at').all(p.id, branchOf(c)) as { qty_initial_milli: number; qty_remaining_milli: number }[]
-  return c.json({ lots: rows.map(({ qty_initial_milli, qty_remaining_milli, ...r }) => ({ ...r, initial: fromMilli(qty_initial_milli), remaining: fromMilli(qty_remaining_milli) })) })
+  const costs = seeCosts(c)
+  return c.json({ lots: rows.map(({ qty_initial_milli, qty_remaining_milli, ...r }) => { const { unitCost: _u, ...safe } = r as typeof r & { unitCost?: number }; return { ...(costs ? r : safe), initial: fromMilli(qty_initial_milli), remaining: fromMilli(qty_remaining_milli) } }) })
 })
 
 inventory.get('/products/:id/movements', requirePerm('view_inventory'), (c) => {
@@ -391,7 +396,7 @@ inventory.get('/inventory/low-stock', requirePerm('view_inventory'), (c) => {
   const rows = (db.prepare('SELECT * FROM products WHERE business_id = ? AND active = 1 AND min_stock_milli > 0').all(u.business_id) as ProductRow[])
     .map((p) => ({ p, stock: stockOf(db, branchId, p.id) }))
     .filter((x) => x.stock < x.p.min_stock_milli)
-    .map(({ p, stock }) => ({ id: p.id, name: p.name, stock: fromMilli(stock), minStock: fromMilli(p.min_stock_milli), missing: fromMilli(p.min_stock_milli - stock), restockCost: Math.round(((p.min_stock_milli - stock) * p.last_cost) / 1000) }))
+    .map(({ p, stock }) => ({ id: p.id, name: p.name, stock: fromMilli(stock), minStock: fromMilli(p.min_stock_milli), missing: fromMilli(p.min_stock_milli - stock), ...(seeCosts(c) ? { restockCost: Math.round(((p.min_stock_milli - stock) * p.last_cost) / 1000) } : {}) }))
   return c.json({ products: rows })
 })
 
@@ -425,6 +430,8 @@ inventory.get('/inventory/replenishment', requirePerm('edit_inventory'), (c) => 
   }
   toBuy.sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999))
   slow.sort((a, b) => b.tiedUp - a.tiedUp)
+  // Los importes salen del costo: sin el permiso de costos solo se muestran cantidades.
+  if (!seeCosts(c)) return c.json({ days, cover, slowDays, toBuy: toBuy.map(({ estCost: _e, ...x }) => x), slow: slow.map(({ tiedUp: _t, ...x }) => x) })
   return c.json({ days, cover, slowDays, toBuy, toBuyCost: toBuy.reduce((a, x) => a + x.estCost, 0), slow, tiedUp: slow.reduce((a, x) => a + x.tiedUp, 0) })
 })
 
@@ -676,7 +683,7 @@ inventory.get('/purchases', requirePerm('edit_inventory'), (c) => {
   const { db } = c.get('deps')
   const br = scopeBranch(c) // dueño: todas; los demás: las compras de su sucursal
   const rows = db.prepare(`SELECT p.id, p.ticket_ref AS ticketRef, p.payment, p.created_at AS createdAt, s.name AS supplier FROM purchases p LEFT JOIN suppliers s ON s.id = p.supplier_id WHERE p.business_id = ? ${br ? 'AND p.branch_id = ?' : ''} ORDER BY p.created_at DESC LIMIT 50`).all(c.get('session').user.business_id, ...(br ? [br] : [])) as { id: string }[]
-  return c.json({ purchases: rows.map((r) => ({ ...r, ...purchaseBalance(db, r.id), items: db.prepare('SELECT pi.id, pr.name, pr.unit, pi.qty_milli / 1000.0 AS quantity, l.qty_remaining_milli / 1000.0 AS remaining, pi.unit_cost AS unitCost FROM purchase_items pi JOIN products pr ON pr.id = pi.product_id JOIN lots l ON l.id = pi.lot_id WHERE pi.purchase_id = ?').all(r.id) })) })
+  return c.json({ purchases: rows.map((r) => ({ ...r, ...purchaseBalance(db, r.id), items: db.prepare('SELECT pi.id, pr.name, pr.unit, pi.qty_milli / 1000.0 AS quantity, l.qty_remaining_milli / 1000.0 AS remaining, pi.unit_cost AS unitCost FROM purchase_items pi JOIN products pr ON pr.id = pi.product_id JOIN lots l ON l.id = pi.lot_id WHERE pi.purchase_id = ?').all(r.id).map((i) => (seeCosts(c) ? i : { ...(i as object), unitCost: undefined })) })) })
 })
 
 // Cuentas por pagar.

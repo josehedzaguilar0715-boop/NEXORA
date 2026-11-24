@@ -13,16 +13,17 @@ export const PERMISSIONS = {
   attendance: 'Asistencia',
   give_stamps: 'Dar sellos o puntos a mano',
   kitchen: 'Cocina: ver comandas y pedidos y marcarlos listos',
-  // Solo para el Administrador autorizado (los marca el dueño; a nadie más le sirven).
+  // Las tres primeras solo sirven al Administrador autorizado (las marca el dueño).
   view_dashboard: 'Ver el resumen general del negocio',
   view_finance: 'Ver las finanzas: ganancias, gastos y dinero disponible',
   manage_finance: 'Registrar retiros, gastos y el reparto del dinero',
+  // Independiente: el dueño lo da a quien él quiera (encargado, administrador o empleado que compra).
   view_costs: 'Ver costos y márgenes de los productos',
 } as const
 
 export type Permission = keyof typeof PERMISSIONS
 /** Funciones financieras: solo las puede tener un Administrador autorizado. */
-export const FINANCE_PERMS: Permission[] = ['view_dashboard', 'view_finance', 'manage_finance', 'view_costs']
+export const FINANCE_PERMS: Permission[] = ['view_dashboard', 'view_finance', 'manage_finance']
 export const PERMISSION_KEYS = Object.keys(PERMISSIONS) as [Permission, ...Permission[]]
 
 /** Plantillas editables: solo son un punto de partida al crear un usuario. */

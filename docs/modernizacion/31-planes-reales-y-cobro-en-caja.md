@@ -21,3 +21,8 @@ Rama `diseno-v0`. Lectura del código (`src/billing.ts`, `src/admin.ts`, `src/co
 - **Servidor:** cobrar una cita sin terminarla responde 409 `terminar_primero`; cobrarla dos veces, 409 `ya_cobrada`. La venta, comisiones, sellos, Finanzas y reportes se leen de la venta real, así que se actualizan solos.
 - Tras cobrar, Caja muestra el ticket (58/80 mm).
 - Pruebas: A `agenda-cobro-publica.test.ts`; N `scripts/verificacion/agenda-caja.ts` y el e2e de punta a punta (Terminar → Ver en Caja → Cobrar → el cliente ve «Atendida»). Los tests de barbería y uñas se actualizaron para terminar el servicio antes de cobrar.
+
+## Costos y márgenes: permiso independiente (`view_costs`)
+- El dueño lo marca **por persona** (encargado, administrador o empleado que compra) en Personal → «Qué puede hacer». Sin él, el servidor **quita** de las respuestas: costo, margen y precio sugerido de productos; margen de categorías; costo de lotes; costos de compras recientes; costo estimado de reposición y de «Conviene comprar»/«Casi no se vende». En pantalla desaparecen la columna Costo, la línea de ganancia y los importes derivados.
+- **Efecto sobre usuarios actuales:** no se modificó ningún permiso guardado, pero encargados y empleados que antes veían costos por tener permisos de inventario **dejan de verlos hasta que el dueño les marque «Ver costos y márgenes»**. Pueden seguir capturando costos al comprar.
+- Pruebas: A (7 en `administrador-y-finanzas-acceso.test.ts`: sin permiso no hay costos; con permiso sí, sin abrir finanzas; otro encargado no; se puede quitar); N (`mi-dinero.ts`: columna Costo ausente/presente). 

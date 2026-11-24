@@ -4,7 +4,7 @@ import { api } from '../api'
 import { ask } from '../Dialog'
 import { hasGiro, type Me } from '../App'
 
-const FIN_PERMS = ['view_dashboard', 'view_finance', 'manage_finance', 'view_costs']
+const FIN_PERMS = ['view_dashboard', 'view_finance', 'manage_finance']
 const TEMPLATE_LABEL: Record<string, string> = { administrador: 'Administrador autorizado', cajero: 'Cajero', encargado: 'Encargado', barbero: 'Barbero', empleado_piso: 'Empleado de piso' }
 /** El puesto «que atiende» se llama según el giro; en tiendas sin agenda ni comisiones no aparece. */
 function templateLabel(me: Me, key: string): string | null {

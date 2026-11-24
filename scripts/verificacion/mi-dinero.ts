@@ -97,6 +97,18 @@ for (const [dev, vp] of [['escritorio', { width: 1366, height: 900 }], ['celular
   ok(!/Vendiste|Dinero disponible|Puedes retirar/.test(await page.locator('body').innerText()), `[encargado/${dev}] entrar a #/finanzas por la dirección no muestra cifras`)
   await ctx.close()
 }
+// Costos y márgenes: permiso aparte (el encargado no los ve hasta que el dueño se los da).
+{
+  const { ctx, page } = await abrir(enc.token, { width: 1366, height: 900 }, '/#/productos')
+  ok(!(await page.locator('th', { hasText: 'Costo' }).count()), '[encargado sin permiso de costos] Productos no muestra la columna Costo')
+  await ctx.close()
+  const perms = (await s.call('GET', '/auth/me', { token: enc.token })).json.permissions as string[]
+  await s.call('PATCH', `/users/${enc.id}`, { token: T, body: { permissions: [...perms, 'view_costs'] } })
+  const o2 = await abrir(enc.token, { width: 1366, height: 900 }, '/#/productos')
+  ok((await o2.page.locator('th', { hasText: 'Costo' }).count()) > 0, '[encargado con permiso de costos] Productos muestra la columna Costo')
+  await o2.ctx.close()
+  await s.call('PATCH', `/users/${enc.id}`, { token: T, body: { permissions: perms } })
+}
 // Auditoría visual de cada pestaña (contraste AA, letra mínima en celular, desborde, textos encimados) en claro y oscuro.
 for (const modo of ['claro', 'oscuro']) for (const [dev, vp] of [['escritorio', { width: 1366, height: 900 }], ['celular', { width: 390, height: 844 }]] as const) {
   const ctx = await browser.newContext({ viewport: vp })

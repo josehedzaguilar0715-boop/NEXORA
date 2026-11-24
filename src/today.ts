@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { businessGiros } from './billing.js'
 import { moduleOn } from './common.js'
-import { hasPerm, requirePerm, type Env, type UserRow } from './context.js'
+import { canFinance, hasPerm, requirePerm, type Env, type UserRow } from './context.js'
 import type { Db } from './db.js'
 import { fromMilli, stockOf } from './inventory.js'
 import { iso, localDate } from './util.js'
@@ -151,5 +151,7 @@ today.get('/inventory/reorder', requirePerm('view_inventory'), (c) => {
   const { db } = c.get('deps')
   const u = c.get('session').user
   const branch = mainBranch(db, u)
-  return c.json({ items: branch ? reorderList(db, u.business_id, branch) : [] })
+  const items = branch ? reorderList(db, u.business_id, branch) : []
+  // El costo del producto es información de costos: solo con su permiso.
+  return c.json({ items: canFinance(u, 'costs') ? items : items.map(({ lastCost: _c, ...i }) => i) })
 })

@@ -31,7 +31,7 @@ describe('acceso a finanzas por puesto', () => {
     expect(u.user.position).toBe('encargado')
     expect(u.permissions).toContain('view_reports')
     expect(u.permissions).toContain('cancel_discount')
-    expect(u.access).toEqual({ dashboard: false, finance: false, manage: false, costs: true })
+    expect(u.access).toEqual({ dashboard: false, finance: false, manage: false, costs: false }) // costos: permiso aparte, que el dueño da
     // Y los demás sí: dueño (todo) y administrador autorizado (lo marcado).
     for (const p of FINANZAS) expect(await get(f, f.T, p), `dueño ${p}`).toBe(200)
   })
@@ -75,5 +75,31 @@ describe('acceso a finanzas por puesto', () => {
     expect(emp).not.toHaveProperty('suggestedPrice')
     expect((await f.s.call('GET', '/receivables', { token: f.T })).json).toHaveProperty('total')
     expect((await f.s.call('GET', '/receivables', { token: f.e1a.token })).json).not.toHaveProperty('total')
+  })
+
+  it('costos y márgenes: permiso independiente que el dueño da a cada encargado (o a quien quiera), sin abrir finanzas', async () => {
+    const f = await dosSucursales()
+    const prod = async (tok: string) => (await f.s.call('GET', '/products', { token: tok })).json.products[0]
+    const cats = async (tok: string) => (await f.s.call('GET', '/categories', { token: tok })).json.categories
+    // Sin el permiso: el encargado vende e inventaría, pero no ve costos ni márgenes.
+    expect(await prod(f.enc1.token)).not.toHaveProperty('lastCost')
+    expect(await prod(f.enc1.token)).not.toHaveProperty('marginBp')
+    // El dueño se lo da a ESTE encargado.
+    const perms = (await f.s.call('GET', '/auth/me', { token: f.enc1.token })).json.permissions as string[]
+    expect((await f.s.call('PATCH', `/users/${f.enc1.id}`, { token: f.T, body: { permissions: [...perms, 'view_costs'] } })).status).toBe(200)
+    expect(await prod(f.enc1.token)).toHaveProperty('lastCost')
+    expect((await f.s.call('GET', '/auth/me', { token: f.enc1.token })).json.access).toEqual({ dashboard: false, finance: false, manage: false, costs: true })
+    // Sigue sin finanzas ni cambio de puesto.
+    expect(await get(f, f.enc1.token, '/dashboard/panel')).toBe(403)
+    expect(await get(f, f.enc1.token, '/finanzas/resumen')).toBe(403)
+    expect((await f.s.call('GET', '/auth/me', { token: f.enc1.token })).json.user.position).toBe('encargado')
+    // Otro encargado (sin el permiso) no lo ve.
+    expect(await prod(f.enc2.token)).not.toHaveProperty('lastCost')
+    // El permiso también puede darse a un empleado que compra, y se quita igual.
+    expect((await f.s.call('PATCH', `/users/${f.e1a.id}`, { token: f.T, body: { permissions: ['sell', 'view_inventory', 'view_costs'] } })).status).toBe(200)
+    expect(await prod(f.e1a.token)).toHaveProperty('lastCost')
+    await f.s.call('PATCH', `/users/${f.enc1.id}`, { token: f.T, body: { permissions: perms } })
+    expect(await prod(f.enc1.token)).not.toHaveProperty('lastCost')
+    void cats
   })
 })

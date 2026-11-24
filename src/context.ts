@@ -107,14 +107,14 @@ export type FinanceKind = 'dashboard' | 'finance' | 'manage' | 'costs'
 /**
  * Quién ve el panel general y lo financiero. Decisión del propietario (24 nov 2026, opción B): exclusivo del dueño y de
  * administradores expresamente autorizados. Ni el encargado ni el empleado, aunque tengan «ver reportes» guardado
- * (ese permiso solo sirve para ver las ventas de sus compañeros). Los costos de productos los ve quien compra y edita inventario.
+ * (ese permiso solo sirve para ver las ventas de sus compañeros). Los costos y márgenes de productos son un permiso aparte (`view_costs`).
  */
 export function canFinance(u: UserRow, kind: FinanceKind): boolean {
   const p = puestoOf(u)
   if (p === 'dueno') return true
-  if (p === 'administrador') return hasPerm(u, ({ dashboard: 'view_dashboard', finance: 'view_finance', manage: 'manage_finance', costs: 'view_costs' } as const)[kind])
-  // Encargado y empleado: nada de finanzas; costos solo si compran/editan inventario (el encargado conserva lo que ya tenía en inventario).
-  if (kind === 'costs') return p === 'encargado' ? hasPerm(u, 'view_inventory') || hasPerm(u, 'edit_inventory') : hasPerm(u, 'edit_inventory')
+  // Costos y márgenes: permiso independiente que el dueño da a quien quiera (encargado, administrador o empleado), uno por uno.
+  if (kind === 'costs') return hasPerm(u, 'view_costs')
+  if (p === 'administrador') return hasPerm(u, ({ dashboard: 'view_dashboard', finance: 'view_finance', manage: 'manage_finance' } as const)[kind])
   return false
 }
 
