@@ -127,6 +127,7 @@ export function Agenda({ me }: { me: Me }) {
           )
         })}
       </div>
+      <Recordatorios />
       {me.modules?.includes('recordatorios') && <Retoques />}
       {staff.length === 0 && <p className="card">Nadie está en la agenda todavía. En <a href="#/usuarios">Personal</a> abre a cada persona → «Horario de agenda» y marca «Atiende citas». Los servicios se dan de alta en <a href="#/configurar">Configurar negocio</a>.</p>}
       {form && <NuevaCita walkIn={form.walkIn} preset={form.staffId ? { staffId: form.staffId, time: form.time } : undefined} date={date} staff={staff} services={services} onClose={() => setForm(null)} onSaved={() => { setForm(null); setMsg({ ok: 'Cita guardada.' }); void load() }} />}
@@ -198,6 +199,30 @@ function Retoques() {
       <div className="table-wrap"><table className="list"><tbody>{list.map((r, i) => (
         <tr key={i}><td>{r.customerName}<br /><small className="muted">{r.service} · última vez {new Date(r.lastVisit).toLocaleDateString('es-MX')}</small></td><td>{r.whatsapp ? <a href={r.whatsapp} target="_blank" rel="noreferrer">Preparar WhatsApp</a> : <span className="muted">sin teléfono</span>}</td></tr>
       ))}</tbody></table></div>
+    </section>
+  )
+}
+
+/** Citas de mañana: el mensaje ya viene escrito; al abrir WhatsApp la cita queda marcada como «avisada». */
+function Recordatorios() {
+  const [list, setList] = useState<any[] | null>(null)
+  const load = () => api<{ reminders: any[] }>('GET', '/agenda/reminders').then((r) => setList(r.reminders)).catch(() => setList(null))
+  useEffect(() => { void load() }, [])
+  if (!list || list.length === 0) return null
+  const pendientes = list.filter((r) => !r.reminded).length
+  return (
+    <section className="card">
+      <h2>Recordatorios para mañana <span className="muted small">· {pendientes === 0 ? 'todos avisados' : `${pendientes} por avisar`}</span></h2>
+      <div className="table-wrap cards-sm"><table className="list"><tbody>
+        {list.map((r) => (
+          <tr key={r.id}>
+            <td data-label="Cita"><b>{r.customerName}</b><br /><small className="muted">{hm(r.startsAt)} · {r.services.join(' + ')}</small></td>
+            <td>{r.reminded ? <span className="estado ok">Avisado</span> : r.whatsapp
+              ? <a className="button primary" href={r.whatsapp} target="_blank" rel="noreferrer" onClick={() => { void api('POST', `/appointments/${r.id}/reminded`).then(load) }}>Recordarle</a>
+              : <small className="muted">sin teléfono</small>}</td>
+          </tr>
+        ))}
+      </tbody></table></div>
     </section>
   )
 }

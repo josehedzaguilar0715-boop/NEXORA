@@ -186,3 +186,14 @@ small { font-size: max(var(--fs-min), 0.85rem); }
   .reparto-row { grid-template-columns: 1fr 1fr; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
   .reparto-row > input:first-child { grid-column: 1 / -1; }
 }
+
+/* Tablas que en celular se vuelven tarjetas (cada celda con su etiqueta). */
+@media (max-width: 640px) {
+  .cards-sm table, .cards-sm tbody, .cards-sm tr, .cards-sm td { display: block; width: 100%; }
+  .cards-sm thead { display: none; }
+  .cards-sm tr { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; background: var(--card); }
+  .cards-sm td { border: 0; padding: 4px 0; text-align: left !important; display: flex; justify-content: space-between; gap: 12px; }
+  .cards-sm td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: var(--fs-sm, 0.9rem); }
+  .cards-sm td:first-child { display: block; }
+  .cards-sm td:first-child::before { display: none; }
+}

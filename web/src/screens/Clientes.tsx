@@ -31,6 +31,7 @@ export function Clientes({ me }: { me: Me }) {
         <button className="primary" onClick={() => setAdding(true)}>+ Nuevo cliente</button>
       </div>
       {fiado && <div className="kpis mini">{rec.total !== undefined && <div><span className="muted">Te deben en total</span><b>{mxn(rec.total)}</b></div>}<div><span className="muted">Clientes con saldo</span><b>{rec.customers.length}</b></div></div>}
+      {hasGiro(me, 'barberia', 'unas') && <Seguimiento />}
       {msg && <p className="error">{msg}</p>}
       <div>
         <section className="card">
@@ -307,5 +308,28 @@ function Compras({ c }: { c: any }) {
       {sales.map((s) => <tr key={s.id}><td>Ticket #{s.folio}<br /><small className="muted">{new Date(s.createdAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' })} · {METHOD[s.paymentMethod] ?? s.paymentMethod}{s.status === 'cancelada' ? ' · cancelada' : ''}</small></td><td className="num">{mxn(s.total)}</td></tr>)}
       {sales.length === 0 && <tr><td className="muted">Sin compras registradas a su nombre.</td></tr>}
     </tbody></table></div>
+  )
+}
+
+/** Clientes que dejaron de venir o vinieron una sola vez: el mensaje ya viene escrito, un clic abre WhatsApp. */
+function Seguimiento() {
+  const [d, setD] = useState<any>(null)
+  useEffect(() => { api<any>('GET', '/auto/clientes').then(setD).catch(() => setD(null)) }, [])
+  if (!d) return null
+  const lista = (titulo: string, rows: any[], nota: string) => rows.length > 0 && (
+    <section className="card">
+      <h2>{titulo} <span className="muted small">· {rows.length}</span></h2>
+      <p className="muted small">{nota}</p>
+      <div className="table-wrap cards-sm"><table className="list"><tbody>
+        {rows.slice(0, 10).map((c) => <tr key={c.id}><td data-label="Cliente"><b>{c.name}</b><br /><small className="muted">{c.visits} {c.visits === 1 ? 'visita' : 'visitas'} · hace {c.daysAgo} días</small></td><td>{c.whatsapp ? <a className="button" href={c.whatsapp} target="_blank" rel="noreferrer">Escribirle</a> : <small className="muted">sin teléfono</small>}</td></tr>)}
+      </tbody></table></div>
+    </section>
+  )
+  return (
+    <div className="stack">
+      {d.falta?.map((f: string) => <p key={f} className="notice">{f}</p>)}
+      {lista('Dejaron de venir', d.lapsed, `Ya habían venido 2 o más veces y llevan más de ${d.days} días sin regresar.`)}
+      {lista('Vinieron una vez y no regresaron', d.once, 'Un mensaje amable ayuda a que vuelvan.')}
+    </div>
   )
 }
