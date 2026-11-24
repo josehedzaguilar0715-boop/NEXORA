@@ -1,4 +1,4 @@
-import { printText } from '../print'
+import { guardarPapel, papel, printText, type Papel } from '../print'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ScanButton } from '../Scanner'
 import { api, ApiError, cache, flush, mxn, outbox, toCents } from '../api'
@@ -47,7 +47,7 @@ export function loyaltyText(l: Loyalty): string {
   return parts.join(' · ')
 }
 
-type Modal_ = null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product; qty?: number } | { kind: 'libre' } | { kind: 'cobro' } | { kind: 'fiado' } | { kind: 'ticket'; text: string; change?: number | null; provisional: boolean; loyalty?: Loyalty | null } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' } | { kind: 'espera' } | { kind: 'cliente' } | { kind: 'cancelar' }
+type Modal_ = null | { kind: 'servicio'; sv: Service } | { kind: 'contador' } | { kind: 'granel'; p: Product; qty?: number } | { kind: 'libre' } | { kind: 'cobro' } | { kind: 'fiado' } | { kind: 'ticket'; saleId?: string; text: string; change?: number | null; provisional: boolean; loyalty?: Loyalty | null } | { kind: 'mov' } | { kind: 'corte' } | { kind: 'ventas' } | { kind: 'descuento' } | { kind: 'espera' } | { kind: 'cliente' } | { kind: 'cancelar' }
 
 /** Atajos de teclado de la caja (se muestran en cada botón). */
 const KEYS = { buscar: 'F2', cliente: 'F3', descuento: 'F4', espera: 'F6', mov: 'F7', libre: 'F8', ventas: 'F9', cobrar: 'F10' } as const
@@ -226,14 +226,14 @@ export function Caja({ me }: { me: Me }) {
       outbox.enqueue('POST', '/sales', body, `Venta ${mxn(total)}`, id)
     }
     let text = ''
-    if (sale) text = (await api<{ text: string }>('GET', `/sales/${sale.id}/ticket`).catch(() => ({ text: '' }))).text
+    if (sale) text = (await api<{ text: string }>('GET', `/sales/${sale.id}/ticket?paper=${papel()}`).catch(() => ({ text: '' }))).text
     if (!text) {
       text = [me.business.name, me.business.phone ? `Tel. ${me.business.phone}` : '', 'Folio provisional (sin internet)', new Date().toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short', hour12: true, timeZone: 'America/Mexico_City' }), '-'.repeat(32),
         ...cart.map((l) => `${l.quantity} ${l.name}`.slice(0, 22).padEnd(22) + mxn(lineTotal(l)).padStart(10)), '-'.repeat(32),
         `TOTAL ${mxn(total)}`, `Pago: ${method}`, `Atendió: ${me.user.name}`].filter(Boolean).join('\n')
     }
     const cashPart = total - (extra.otherPayments ?? []).reduce((a, p) => a + p.amount, 0)
-    setModal({ kind: 'ticket', text, change: extra.cashReceived !== undefined ? (sale?.change ?? extra.cashReceived - cashPart) : null, provisional: !sale, loyalty })
+    setModal({ kind: 'ticket', saleId: sale?.id, text, change: extra.cashReceived !== undefined ? (sale?.change ?? extra.cashReceived - cashPart) : null, provisional: !sale, loyalty })
     reset()
   }
 
@@ -402,6 +402,10 @@ export function Caja({ me }: { me: Me }) {
           {modal.loyalty && <p className="okmsg">{loyaltyText(modal.loyalty)}</p>}
           <pre style={{ fontSize: 14, background: 'var(--bg)', padding: 10, borderRadius: 8, overflowX: 'auto' }}>{modal.text}</pre>
           <div className="ticket">{modal.text}</div>
+          <div className="row chips" role="group" aria-label="Ancho del papel">
+            <span className="muted">Papel:</span>
+            {(['58', '80'] as Papel[]).map((p) => <button key={p} className={papel() === p ? 'on' : ''} aria-pressed={papel() === p} onClick={async () => { guardarPapel(p); if (modal.saleId) { const r = await api<{ text: string }>('GET', `/sales/${modal.saleId}/ticket?paper=${p}`).catch(() => null); if (r) setModal({ ...modal, text: r.text }) } else setModal({ ...modal }) }}>{p} mm</button>)}
+          </div>
           <div className="row">
             <button className="big" onClick={() => printText(modal.text)}>Imprimir ticket</button>
             <button className="primary big" autoFocus onClick={() => { setModal(null); focusSearch() }}>Nueva venta</button>
@@ -677,7 +681,7 @@ function VentasTurno({ shift, me, onClose }: { shift: Shift; me: Me; onClose: ()
             <tr key={s.id}>
               <td>#{s.folio}<br /><small className="muted">{new Date(s.createdAt).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })} · {s.paymentMethod}</small></td>
               <td className="num">{s.status === 'cancelada' ? <s>{mxn(s.total)}</s> : mxn(s.total)}</td>
-              <td>{s.status === 'completada' && can(me, 'cancel_discount') ? <button onClick={() => cancel(s.id)}>Cancelar</button> : <small className="muted">{s.status}</small>}</td>
+              <td className="row chips"><button onClick={async () => { try { printText((await api<{ text: string }>('GET', `/sales/${s.id}/ticket?paper=${papel()}&reprint=1`)).text) } catch (e) { setErr((e as Error).message) } }}>Reimprimir</button>{s.status === 'completada' && can(me, 'cancel_discount') ? <button onClick={() => cancel(s.id)}>Cancelar</button> : <small className="muted">{s.status}</small>}</td>
             </tr>
           ))}
         </tbody></table></div>

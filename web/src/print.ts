@@ -28,3 +28,8 @@ export function printElement(el: Element | null) {
   if (!el) return
   run((root) => { const copy = el.cloneNode(true) as HTMLElement; copy.classList.add('print-block'); root.appendChild(copy) })
 }
+
+/** Ancho del rollo de la impresora de tickets: 58 mm (32 columnas) u 80 mm (48 columnas). Se recuerda en este equipo. */
+export type Papel = '58' | '80'
+export const papel = (): Papel => { try { return localStorage.getItem('nx_papel') === '80' ? '80' : '58' } catch { return '58' } }
+export const guardarPapel = (p: Papel) => { try { localStorage.setItem('nx_papel', p) } catch { /* sin almacenamiento: queda en 58 mm */ } }

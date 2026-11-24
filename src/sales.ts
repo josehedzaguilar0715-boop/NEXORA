@@ -365,39 +365,56 @@ sales.post('/sales/:id/cancel', requirePerm('cancel_discount'), async (c) => {
   return c.json({ sale: saleView(deps, db.prepare('SELECT * FROM sales WHERE id = ?').get(s.id) as SaleRow) })
 })
 
-// Ticket: logo, teléfono, folio, fecha, productos, cantidades, total, forma de pago y cajero.
+// Ticket (comprobante de venta): negocio, sucursal, folio consecutivo, fecha y hora, responsable, renglones, descuentos, total, pagos y cambio.
+// ?paper=58|80 elige el ancho (32 u 48 columnas); ?reprint=1 lo marca como reimpresión. NO es una factura (CFDI): el texto lo dice.
 sales.get('/sales/:id/ticket', (c) => {
   const deps = c.get('deps')
   const { db } = deps
   const s = loadSale(c)
   ensureCanSee(c, s)
   const biz = db.prepare('SELECT name, phone, logo_url FROM businesses WHERE id = ?').get(s.business_id) as { name: string; phone: string | null; logo_url: string | null }
+  const branch = db.prepare('SELECT name FROM branches WHERE id = ?').get(s.branch_id) as { name: string } | undefined
+  const multi = (db.prepare('SELECT COUNT(*) n FROM branches WHERE business_id = ?').get(s.business_id) as { n: number }).n > 1
   const cashier = db.prepare('SELECT name FROM users WHERE id = ?').get(s.cashier_id) as { name: string }
   const v = saleView(deps, s)
+  const paper = c.req.query('paper') === '80' ? 80 : 58
   const ticket = {
-    business: biz.name, logoUrl: biz.logo_url, phone: biz.phone, folio: String(s.folio).padStart(6, '0'), date: s.created_at,
+    business: biz.name, branch: multi ? branch?.name ?? null : null, logoUrl: biz.logo_url, phone: biz.phone, folio: String(s.folio).padStart(6, '0'), date: s.created_at,
     items: v.items, subtotal: s.subtotal, discount: s.discount + s.promo_discount, total: s.total, paymentMethod: v.paymentMethod, payments: v.payments, cashReceived: s.cash_received, change: v.change, cashier: cashier.name,
-    cancelled: s.status === 'cancelada',
+    cancelled: s.status === 'cancelada', reprint: c.req.query('reprint') === '1', paper,
   }
-  return c.json({ ticket, text: ticketText(ticket) })
+  return c.json({ ticket, text: ticketText(ticket, paper === 80 ? 48 : 32) })
 })
 
 const mxn = (cents: number) => `$${(cents / 100).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const METHOD: Record<string, string> = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta', fiado: 'Fiado', anticipo: 'Pagado en apartado' }
 
-function ticketText(t: { business: string; phone: string | null; folio: string; date: string; items: { description: string; quantity: number; total: number }[]; subtotal: number; discount: number; total: number; paymentMethod: string; payments: { method: string; amount: number }[]; cashReceived: number | null; change: number | null; cashier: string; cancelled: boolean }) {
-  const W = 32
-  const row = (l: string, r: string) => l.slice(0, W - r.length - 1).padEnd(W - r.length) + r
+type TicketData = { business: string; branch?: string | null; phone: string | null; folio: string; date: string; items: { description: string; quantity: number; total: number }[]; subtotal: number; discount: number; total: number; paymentMethod: string; payments: { method: string; amount: number }[]; cashReceived: number | null; change: number | null; cashier: string; cancelled: boolean; reprint?: boolean }
+
+/** Ticket en texto de ancho fijo (32 columnas = rollo de 58 mm, 48 = rollo de 80 mm). Los nombres largos pasan a una segunda línea, no se cortan. */
+export function ticketText(t: TicketData, W = 32) {
+  const row = (l: string, r: string) => l.slice(0, Math.max(1, W - r.length - 1)).padEnd(W - r.length) + r
+  const center = (x: string) => x.length >= W ? x : ' '.repeat(Math.floor((W - x.length) / 2)) + x
+  const wrap = (x: string) => { const out: string[] = []; let rest = x; while (rest.length > W) { let cut = rest.lastIndexOf(' ', W); if (cut < W / 2) cut = W; out.push(rest.slice(0, cut).trimEnd()); rest = rest.slice(cut).trimStart() } out.push(rest); return out }
+  const item = (i: { description: string; quantity: number; total: number }) => {
+    const amount = mxn(i.total)
+    const label = `${i.quantity} ${i.description}`
+    if (label.length <= W - amount.length - 1) return [row(label, amount)]
+    const lines = wrap(label)
+    const last = lines.pop()!
+    return [...lines, row(last, amount)]
+  }
   const fecha = new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', dateStyle: 'short', timeStyle: 'short', hour12: true }).format(new Date(t.date))
   return [
-    t.business, t.phone ? `Tel. ${t.phone}` : '', `Folio ${t.folio}`, fecha, t.cancelled ? '*** CANCELADO ***' : '', '-'.repeat(W),
-    ...t.items.map((i) => row(`${i.quantity} ${i.description}`, mxn(i.total))),
+    ...wrap(t.business).map(center), t.branch ? center(`Sucursal ${t.branch}`.slice(0, W)) : '', t.phone ? center(`Tel. ${t.phone}`) : '',
+    `Folio ${t.folio}`, fecha, t.cancelled ? center('*** CANCELADO ***') : '', t.reprint ? center('*** REIMPRESIÓN ***') : '', '-'.repeat(W),
+    ...t.items.flatMap(item),
     '-'.repeat(W),
     ...(t.discount ? [row('Subtotal', mxn(t.subtotal)), row('Descuento', `-${mxn(t.discount)}`)] : []),
     row('TOTAL', mxn(t.total)),
     ...(t.payments.length > 1 ? t.payments.map((p) => row(METHOD[p.method] ?? p.method, mxn(p.amount))) : [`Pago: ${METHOD[t.paymentMethod] ?? t.paymentMethod}`]),
     ...(t.cashReceived != null ? [row('Recibido', mxn(t.cashReceived)), row('Cambio', mxn(t.change ?? 0))] : []),
-    `Atendió: ${t.cashier}`, '', '¡Gracias por su compra!',
+    `Atendió: ${t.cashier}`, '', center('¡Gracias por su compra!'), ...wrap('Comprobante de venta. No es una factura (CFDI).').map(center),
   ].filter((l) => l !== '').join('\n')
 }
