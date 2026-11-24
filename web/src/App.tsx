@@ -7,9 +7,11 @@ import { Intro, Logo } from './Brand'
 import { Login } from './screens/Login'
 import { GuiaVisual } from './screens/GuiaVisual'
 import { cambiarModo, modoActual, suscribirModo } from './tema'
+import { Buscador } from './Buscador'
+import { MODULOS, moduloDe } from './modulos'
 import {
   Archive, Armchair, Boxes, CalendarDays, ChevronRight, ChartColumn, ChefHat, ClipboardCheck, Clock, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
-  LifeBuoy, LogOut, Menu, Moon, Sun, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
+  LifeBuoy, LogOut, Menu, Moon, Search, Sun, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
 } from 'lucide-react'
 
 /**
@@ -94,7 +96,7 @@ const PORTALS: { group: string; label: string; icon: Icon }[] = [
 ]
 /** Cada portal con su color de ícono, para ubicarse de un vistazo (lo demás es neutro). */
 // Los colores reales viven en CSS (--tone-*), así cada producto tiene los suyos.
-export const TONE: Record<string, string> = { '': 'var(--tone-main)', Operación: 'var(--tone-op)', Inventario: 'var(--tone-inv)', Clientes: 'var(--tone-cli)', Finanzas: 'var(--tone-fin)', Administración: 'var(--tone-adm)' }
+export const TONE: Record<string, string> = { '': 'var(--cyan)', Operación: 'var(--m-ventas)', Inventario: 'var(--m-inventario)', Clientes: 'var(--m-clientes)', Finanzas: 'var(--m-dinero)', Administración: 'var(--m-admin)' }
 export const toneStyle = (group: string) => ({ '--tone': TONE[group] ?? TONE[''] }) as CSSProperties
 export const portalOf = (group: string) => PORTALS.find((p) => p.group === group)?.label ?? group
 
@@ -266,6 +268,7 @@ function Privada() {
   const [checking, setChecking] = useState(!!auth.token)
   const hash = useHash()
   const [menu, setMenu] = useState(false)
+  const [senalBuscar, setSenalBuscar] = useState(0)
   const [portal, setPortal] = useState<{ group: string; top: number } | null>(null)
   // Cuántos pendientes hay hoy (se ve junto a «Inicio» desde cualquier pantalla).
   const [pending, setPending] = useState(0)
@@ -334,12 +337,14 @@ function Privada() {
         <button className="menu-btn" aria-label="Abrir menú" onClick={() => setMenu(true)}><Menu size={22} aria-hidden /></button>
         <Logo size={26} />
         <span style={{ flex: 1 }} />
+        <button className="menu-btn" aria-label="Buscar" onClick={() => { setMenu(true); setSenalBuscar((v) => v + 1) }}><Search size={22} aria-hidden /></button>
         <BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} />
         <PendingBadge />
       </header>
       <aside className={`side ${menu ? 'open' : ''}`} onClick={() => setMenu(false)}>
         <div className="brand"><Logo size={36} /><span className="word-wrap"><span className="word">NEXORA</span>{product.short && <span className="product-name">{product.short}</span>}</span><span style={{ flex: 1 }} /><BellButton unread={notices.data?.unread ?? 0} onClick={() => setAvisos(true)} /></div>
         <div className="biz">{me.business.name}</div>
+        <div onClick={(e) => e.stopPropagation()}><Buscador pantallas={allowed} rapidas={product.quick} senal={senalBuscar} onIr={(k) => { location.hash = `#/${k}`; setMenu(false) }} /></div>
         {/* Un permiso no marcado no aparece en pantalla. */}
         <nav>
           {allowed.filter((s) => s.group === '').map((s) => (
@@ -396,11 +401,11 @@ function Privada() {
           if (sib.length < 2) return null
           return (
             <nav className="portal-tabs" aria-label={portalOf(current.group)} style={toneStyle(current.group)}>
-              {sib.map((s) => <a key={s.key} href={`#/${s.key}`} className={s.key === current.key ? 'on' : ''} aria-current={s.key === current.key ? 'page' : undefined}><s.icon size={16} strokeWidth={2} aria-hidden />{s.label}</a>)}
+              {sib.map((s) => <a key={s.key} href={`#/${s.key}`} className={s.key === current.key ? 'on' : ''} style={{ '--tone': `var(--m-${moduloDe(s.key)})` } as CSSProperties} aria-current={s.key === current.key ? 'page' : undefined}><s.icon size={16} strokeWidth={2} aria-hidden />{s.label}</a>)}
             </nav>
           )
         })()}
-        {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <p className="muted">{portalOf(current.group)}</p>}</div></header>}
+        {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <span className={`screen-chip mod-${moduloDe(current.key)}`}><current.icon size={16} aria-hidden />{MODULOS[moduloDe(current.key)].nombre}</span>}</div></header>}
         <Suspense fallback={<ScreenLoading />}>{hash === 'guia-visual' ? <div className="screen-in"><GuiaVisual /></div> : current ? <div key={current.key} className="screen-in"><current.C me={me} /></div> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}</Suspense>
       </main>
     </div>
@@ -410,7 +415,7 @@ function Privada() {
 /** Opción dentro de un portal: ícono, nombre y qué hace. */
 function PortalItem({ s, on }: { s: Screen; on: boolean }) {
   return (
-    <a href={`#/${s.key}`} className={`portal-item ${on ? 'on' : ''}`} role="menuitem" aria-current={on ? 'page' : undefined}>
+    <a href={`#/${s.key}`} className={`portal-item ${on ? 'on' : ''}`} role="menuitem" aria-current={on ? 'page' : undefined} style={{ '--tone': `var(--m-${moduloDe(s.key)})` } as CSSProperties}>
       <s.icon size={20} strokeWidth={1.9} aria-hidden />
       <span><b>{s.label}</b>{s.desc && <small>{s.desc}</small>}</span>
     </a>
