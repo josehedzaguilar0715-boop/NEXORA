@@ -8,6 +8,7 @@ import { common, publicCommon } from './common.js'
 import { finance } from './finance.js'
 import { accounting } from './accounting.js'
 import { finanzas } from './finanzas.js'
+import { auto } from './automatizaciones.js'
 import { importer } from './importer.js'
 import { layaways } from './layaways.js'
 import { reset } from './reset.js'
@@ -89,6 +90,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', finance)
   protectedApp.route('/', accounting)
   protectedApp.route('/', finanzas)
+  protectedApp.route('/', auto)
   protectedApp.route('/', importer)
   protectedApp.route('/', layaways)
   protectedApp.route('/', reset)

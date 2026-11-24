@@ -24,7 +24,7 @@ const SLOT_MIN = 15
 interface Svc { serviceId: string; name: string; price: number; duration: number }
 interface ApptRow {
   id: string; business_id: string; branch_id: string; staff_id: string | null; customer_id: string | null; customer_name: string; phone: string | null; services: string
-  starts_at: string; ends_at: string; status: string; source: string; public_token: string | null; at_home: number; address: string | null; travel_min: number; notes: string | null; sale_id: string | null; completed_at: string | null
+  starts_at: string; ends_at: string; status: string; source: string; public_token: string | null; at_home: number; address: string | null; travel_min: number; notes: string | null; sale_id: string | null; completed_at: string | null; reminded_at: string | null
 }
 
 /** Duración que ocupa un servicio en la agenda: su tiempo más lo que bloquea (p. ej. secado). Un combo sin duración propia suma la de sus servicios. */
@@ -278,6 +278,38 @@ agenda.get('/agenda/to-charge', requirePerm('sell'), (c) => {
   const br = scopeBranch(c)
   const rows = db.prepare(`SELECT * FROM appointments WHERE business_id = ? AND completed_at IS NOT NULL AND sale_id IS NULL AND status IN ${ACTIVE} ${br ? 'AND branch_id = ?' : ''} ORDER BY completed_at`).all(...(br ? [u.business_id, br] : [u.business_id])) as ApptRow[]
   return c.json({ appointments: rows.map((a) => { const v = apptView(db, a); return { ...v, total: v.services.reduce((x, sv) => x + sv.price, 0) } }) })
+})
+
+/**
+ * Recordatorios de citas (de mañana, o del día que se pida): prepara el mensaje de WhatsApp de cada cliente con teléfono y recuerda
+ * a cuáles ya se avisó. No se envía nada solo: no hay proveedor de mensajes contratado (sería un costo); un clic abre WhatsApp.
+ */
+agenda.get('/agenda/reminders', requirePerm('sell'), (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const date = c.req.query('date') ?? localDate(new Date(now().getTime() + 86_400_000))
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw bad('Fecha no válida.')
+  const br = scopeBranch(c)
+  const start = localToIso(date, '00:00')
+  const rows = db.prepare(`SELECT * FROM appointments WHERE business_id = ? AND status IN ('pendiente','confirmada') AND starts_at >= ? AND starts_at < ? ${br ? 'AND branch_id = ?' : ''} ORDER BY starts_at`).all(...(br ? [u.business_id, start, addMin(start, 1440), br] : [u.business_id, start, addMin(start, 1440)])) as ApptRow[]
+  const biz = (db.prepare('SELECT name FROM businesses WHERE id = ?').get(u.business_id) as { name: string }).name
+  const hour = (iso: string) => new Intl.DateTimeFormat('es-MX', { timeZone: 'America/Mexico_City', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(iso))
+  return c.json({
+    date,
+    reminders: rows.map((a) => {
+      const msg = `Hola ${a.customer_name.split(' ')[0]}, te recordamos tu cita en ${biz} ${date === localDate(now()) ? 'hoy' : 'el ' + new Date(`${date}T12:00:00-06:00`).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' })} a las ${hour(a.starts_at)}. Si no puedes venir, avísanos para reagendar.`
+      return { id: a.id, customerName: a.customer_name, startsAt: a.starts_at, services: (JSON.parse(a.services) as Svc[]).map((x) => x.name), phone: a.phone, reminded: !!a.reminded_at, message: msg, whatsapp: a.phone ? `https://wa.me/52${a.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(msg)}` : null }
+    }),
+  })
+})
+
+agenda.post('/appointments/:id/reminded', requirePerm('sell'), (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const a = loadAppt(c)
+  db.prepare('UPDATE appointments SET reminded_at = COALESCE(reminded_at, ?) WHERE id = ?').run(iso(now()), a.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'cita.recordatorio', entity: 'appointment', entityId: a.id })
+  return c.json({ ok: true })
 })
 
 agenda.post('/appointments/:id/no-show', (c) => transition(c, ['pendiente', 'confirmada'], 'no_asistio', 'cita.no_asistio'))

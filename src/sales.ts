@@ -276,6 +276,8 @@ export function createSale(deps: Deps, u: UserRow, d: SaleInput, opts: { trusted
       if (l.serviceId) l.cost += consumeRecipe(ctx, l.serviceId, l.quantity, d.id) + Math.round(l.quantity * ((db.prepare('SELECT cost FROM services WHERE id = ?').get(l.serviceId) as { cost: number } | undefined)?.cost ?? 0))
       ins.run(l.itemId, d.id, l.description, l.quantity, l.unitPrice, l.total, l.ref, l.category, l.productId, l.presentationId, l.qtyMilli, l.cost)
       if (l.serviceId) db.prepare('UPDATE sale_items SET service_id = ? WHERE id = ?').run(l.serviceId, l.itemId)
+      // Quién atendió (para rentabilidad por persona); las propinas y cargos sin comisión no cuentan.
+      { const who = (l.input as { staffId?: string; noCommission?: boolean }); const st = who.noCommission ? null : who.staffId ?? (d as { staffId?: string }).staffId; if (st) db.prepare('UPDATE sale_items SET staff_id = ? WHERE id = ?').run(st, l.itemId) }
       if (l.priceChanged) audit(db, now, { businessId: u.business_id, userId: u.id, action: 'venta.cambio_precio', entity: 'sale', entityId: d.id, newValue: { description: l.description, unitPrice: l.unitPrice }, authorizedBy: priceAuth })
     }
     for (const p of payments) db.prepare('INSERT INTO sale_payments (id, sale_id, method, amount) VALUES (?,?,?,?)').run(newId(), d.id, p.method, p.amount)

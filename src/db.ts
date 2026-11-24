@@ -1561,6 +1561,10 @@ const MIGRATIONS: Migration[] = [
   // Agenda → Caja: la cita terminada queda «por cobrar» (completed_at) hasta que Caja la cobra. Solo agrega una columna nula.
   `ALTER TABLE appointments ADD COLUMN completed_at TEXT;
   CREATE INDEX appointments_to_charge ON appointments(business_id, completed_at);`,
+  // Automatizaciones por giro: quién atendió cada renglón (rentabilidad por persona, aunque no gane comisión) y si ya se avisó de la cita.
+  // Solo columnas nulas: las ventas y citas anteriores quedan «sin responsable registrado» y nada existente cambia.
+  `ALTER TABLE sale_items ADD COLUMN staff_id TEXT;
+  ALTER TABLE appointments ADD COLUMN reminded_at TEXT;`,
 ]
 export const SCHEMA_VERSION = MIGRATIONS.length
 
