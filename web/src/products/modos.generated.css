@@ -1,0 +1,827 @@
+/* GENERADO por web/scripts/generar-modos.mjs — no editar a mano. Modo contrario de cada producto (misma identidad). */
+
+:root[data-product='nexora'][data-mode='dark'] {
+  --muted-2: #7f8696;
+  --primary: #08647b;
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, #08647b 84%, #fff 16%) 0%, #08647b 55%, color-mix(in srgb, #08647b 88%, #000 12%) 100%);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+}
+
+:root[data-product='nexora'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='nexora'][data-mode='light'] button.primary { text-shadow: none; }
+:root[data-product='nexora'][data-mode='light'] {
+  color-scheme: light;
+  --bg: #e9f1f5;
+  --card: #ffffff;
+  --input: #f3fafb;
+  --ink: #13232c;
+  --muted: #505a6b;
+  --muted-2: #5f6a7b;
+  --line: #c8dbe3;
+  --line-strong: #a2c3d0;
+  --selected: #e1f2f6;
+  --selected-line: #b5dee8;
+  --hi: #000000;
+  --glass: rgba(255, 255, 255, 0.86);
+  --ok: #11673a;
+  --danger: #a62016;
+  --cyan: #116d79;
+  --violet: #8b5cf6;
+  --accent: #826212;
+  --tone-main: #1997aa;
+  --tone-op: #28a478;
+  --tone-inv: #b4891a;
+  --tone-cli: #1997aa;
+  --tone-fin: #9a80e6;
+  --tone-adm: #8896a9;
+  --chart-in: #2c93c1;
+  --chart-out: #e46868;
+  --chart-profit: #28a478;
+  --chart-bar-1: #1997aa;
+  --chart-bar-2: #0891b2;
+  --chart-grid: #c8dbe3;
+  --brand-text: linear-gradient(135deg, #13232c, #137684);
+  --body-glow: none;
+  --glow: 0 10px 26px -16px rgba(20, 30, 50, 0.28);
+  --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.1);
+  --shadow-md: 0 8px 24px -12px rgba(20, 30, 50, 0.22);
+  --shadow-lg: 0 24px 60px -20px rgba(20, 30, 50, 0.3);
+  --surface: var(--card);
+  --surface-sunken: var(--input);
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(20, 30, 50, 0.07), 0 8px 20px -14px rgba(20, 30, 50, 0.2);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 2px 5px rgba(20, 30, 50, 0.07), 0 18px 40px -24px rgba(20, 30, 50, 0.3);
+  --elev-3: 0 1px 0 #fff inset, 0 8px 16px rgba(20, 30, 50, 0.09), 0 30px 60px -28px rgba(20, 30, 50, 0.38);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+  --on-primary: #14171d;
+}
+
+:root[data-product='barber'][data-mode='dark'] {
+  --muted-2: #918678;
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+}
+
+:root[data-product='barber'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='barber'][data-mode='light'] button.primary { text-shadow: none; }
+:root[data-product='barber'][data-mode='light'] {
+  color-scheme: light;
+  --bg: #f2f1ee;
+  --card: #ffffff;
+  --input: #fcf9f5;
+  --ink: #25231f;
+  --muted: #505a6b;
+  --muted-2: #5f6a7b;
+  --line: #dddad4;
+  --line-strong: #c6c1b7;
+  --selected: #f7f1e7;
+  --selected-line: #eadcc2;
+  --hi: #000000;
+  --glass: rgba(255, 255, 255, 0.86);
+  --ok: #11673a;
+  --danger: #a62016;
+  --cyan: #755e2f;
+  --violet: #8f6c33;
+  --accent: #755d2e;
+  --chart-in: #b18f47;
+  --chart-out: #ce6f57;
+  --chart-profit: #68965f;
+  --chart-bar-1: #a38b57;
+  --chart-bar-2: #8f6c33;
+  --tone-main: #b18f47;
+  --tone-op: #b18f47;
+  --tone-inv: #b47f53;
+  --tone-cli: #a38b57;
+  --tone-fin: #a58e62;
+  --tone-adm: #8c8170;
+  --chart-grid: #dddad4;
+  --brand-text: linear-gradient(135deg, #25231f, #7f6633);
+  --body-glow: none;
+  --glow: 0 10px 26px -16px rgba(20, 30, 50, 0.28);
+  --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.1);
+  --shadow-md: 0 8px 24px -12px rgba(20, 30, 50, 0.22);
+  --shadow-lg: 0 24px 60px -20px rgba(20, 30, 50, 0.3);
+  --surface: var(--card);
+  --surface-sunken: var(--input);
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(20, 30, 50, 0.07), 0 8px 20px -14px rgba(20, 30, 50, 0.2);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 2px 5px rgba(20, 30, 50, 0.07), 0 18px 40px -24px rgba(20, 30, 50, 0.3);
+  --elev-3: 0 1px 0 #fff inset, 0 8px 16px rgba(20, 30, 50, 0.09), 0 30px 60px -28px rgba(20, 30, 50, 0.38);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+  --on-primary: #14171d;
+}
+
+:root[data-product='nails'][data-mode='light'] {
+  --muted-2: #79686f;
+  --cyan: #a23e65;
+  --accent: #805711;
+  --ok: #226c51;
+  --danger: #a63434;
+  --primary: #9e3860;
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, #9e3860 84%, #fff 16%) 0%, #9e3860 55%, color-mix(in srgb, #9e3860 88%, #000 12%) 100%);
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+}
+
+:root[data-product='nails'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='nails'][data-mode='dark'] button.primary { text-shadow: none; }
+:root[data-product='nails'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #1c141c;
+  --card: #271e29;
+  --input: #2f2432;
+  --ink: #eef1f5;
+  --muted: #a9b2c0;
+  --muted-2: #8f9aab;
+  --line: #3d2f3f;
+  --line-strong: #58405a;
+  --selected: #42293c;
+  --selected-line: #5e3853;
+  --hi: #ffffff;
+  --glass: rgba(16, 20, 27, 0.8);
+  --ok: #4cd08f;
+  --danger: #f98080;
+  --cyan: #cb84a0;
+  --violet: #d98fac;
+  --accent: #c78f2c;
+  --chart-in: #b6527a;
+  --chart-out: #d26a5f;
+  --chart-profit: #2c8a68;
+  --chart-bar-1: #eaa5c0;
+  --chart-bar-2: #b6527a;
+  --tone-main: #b6527a;
+  --tone-op: #b6527a;
+  --tone-inv: #b97a2a;
+  --tone-cli: #c25b86;
+  --tone-fin: #8667ad;
+  --tone-adm: #8a7a80;
+  --chart-grid: #3d2f3f;
+  --brand-text: linear-gradient(135deg, #eef1f5, #c16d8f);
+  --body-glow: none;
+  --glow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%) 0%, var(--card) 40%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+  --on-primary: #ffffff;
+}
+
+:root[data-product='market'][data-mode='light'] {
+  --muted-2: #5f6a62;
+  --cyan: #116b3a;
+  --accent: #845700;
+  --ok: #116b3a;
+  --danger: #b62525;
+  --primary: #106637;
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, #106637 84%, #fff 16%) 0%, #106637 55%, color-mix(in srgb, #106637 88%, #000 12%) 100%);
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+}
+
+:root[data-product='market'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='market'][data-mode='dark'] button.primary { text-shadow: none; }
+:root[data-product='market'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #0d1918;
+  --card: #152525;
+  --input: #1a2c2c;
+  --ink: #eef1f5;
+  --muted: #a9b2c0;
+  --muted-2: #8f9aab;
+  --line: #223938;
+  --line-strong: #2e504f;
+  --selected: #183831;
+  --selected-line: #224e43;
+  --hi: #ffffff;
+  --glass: rgba(16, 20, 27, 0.8);
+  --ok: #4cd08f;
+  --danger: #f98080;
+  --cyan: #63a380;
+  --violet: #e0a300;
+  --accent: #cd8f14;
+  --chart-in: #257f4e;
+  --chart-out: #cb3939;
+  --chart-profit: #0f8a4c;
+  --chart-bar-1: #f6c33b;
+  --chart-bar-2: #d99a00;
+  --tone-main: #257f4e;
+  --tone-op: #257f4e;
+  --tone-inv: #b67a00;
+  --tone-cli: #1d6fb8;
+  --tone-fin: #765db6;
+  --tone-adm: #69786e;
+  --chart-grid: #223938;
+  --brand-text: linear-gradient(135deg, #eef1f5, #469269);
+  --body-glow: none;
+  --glow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%) 0%, var(--card) 40%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+  --on-primary: #ffffff;
+}
+
+:root[data-product='tools'][data-mode='dark'] {
+  --muted-2: #868d96;
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+}
+
+:root[data-product='tools'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='tools'][data-mode='light'] button.primary { text-shadow: none; }
+:root[data-product='tools'][data-mode='light'] {
+  color-scheme: light;
+  --bg: #f5f1ee;
+  --card: #ffffff;
+  --input: #fef9f4;
+  --ink: #2a231e;
+  --muted: #505a6b;
+  --muted-2: #5f6a7b;
+  --line: #e4dad3;
+  --line-strong: #d1c2b5;
+  --selected: #fdf1e5;
+  --selected-line: #fbddbf;
+  --hi: #000000;
+  --glass: rgba(255, 255, 255, 0.86);
+  --ok: #11673a;
+  --danger: #b42318;
+  --cyan: #885622;
+  --violet: #757b84;
+  --accent: #7d660d;
+  --chart-in: #cf8333;
+  --chart-out: #df6d57;
+  --chart-profit: #54995f;
+  --chart-bar-1: #af8e11;
+  --chart-bar-2: #cd7722;
+  --tone-main: #cf8333;
+  --tone-op: #cf8333;
+  --tone-inv: #af8e11;
+  --tone-cli: #6c98c3;
+  --tone-fin: #9884b9;
+  --tone-adm: #8a929c;
+  --chart-grid: #e4dad3;
+  --brand-text: linear-gradient(135deg, #2a231e, #945e25);
+  --body-glow: none;
+  --glow: 0 10px 26px -16px rgba(20, 30, 50, 0.28);
+  --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.1);
+  --shadow-md: 0 8px 24px -12px rgba(20, 30, 50, 0.22);
+  --shadow-lg: 0 24px 60px -20px rgba(20, 30, 50, 0.3);
+  --surface: var(--card);
+  --surface-sunken: var(--input);
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(20, 30, 50, 0.07), 0 8px 20px -14px rgba(20, 30, 50, 0.2);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 2px 5px rgba(20, 30, 50, 0.07), 0 18px 40px -24px rgba(20, 30, 50, 0.3);
+  --elev-3: 0 1px 0 #fff inset, 0 8px 16px rgba(20, 30, 50, 0.09), 0 30px 60px -28px rgba(20, 30, 50, 0.38);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+  --on-primary: #14171d;
+}
+
+:root[data-product='paper'][data-mode='light'] {
+  --muted-2: #6c6f7f;
+  --accent: #745b00;
+  --ok: #1b6741;
+  --danger: #a62b2b;
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+}
+
+:root[data-product='paper'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='paper'][data-mode='dark'] button.primary { text-shadow: none; }
+:root[data-product='paper'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #101324;
+  --card: #191d33;
+  --input: #1f233d;
+  --ink: #eef1f5;
+  --muted: #a9b2c0;
+  --muted-2: #8f9aab;
+  --line: #292e4e;
+  --line-strong: #383f71;
+  --selected: #222752;
+  --selected-line: #2f3674;
+  --hi: #ffffff;
+  --glass: rgba(16, 20, 27, 0.8);
+  --ok: #4cd08f;
+  --danger: #f98080;
+  --cyan: #8586d4;
+  --violet: #6b6fe0;
+  --accent: #b69314;
+  --chart-in: #6164c8;
+  --chart-out: #c43333;
+  --chart-profit: #1f7a4d;
+  --chart-bar-1: #f5d90a;
+  --chart-bar-2: #6164c8;
+  --tone-main: #6164c8;
+  --tone-op: #6164c8;
+  --tone-inv: #9a7400;
+  --tone-cli: #1f7a8c;
+  --tone-fin: #8f5cbc;
+  --tone-adm: #6a6f80;
+  --chart-grid: #292e4e;
+  --brand-text: linear-gradient(135deg, #eef1f5, #7a7bd0);
+  --body-glow: none;
+  --glow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%) 0%, var(--card) 40%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+  --on-primary: #ffffff;
+}
+
+:root[data-product='scent'][data-mode='dark'] {
+  --muted-2: #938591;
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+}
+
+:root[data-product='scent'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='scent'][data-mode='light'] button.primary { text-shadow: none; }
+:root[data-product='scent'][data-mode='light'] {
+  color-scheme: light;
+  --bg: #f4f2f3;
+  --card: #ffffff;
+  --input: #fdfaf9;
+  --ink: #282528;
+  --muted: #505a6b;
+  --muted-2: #5f6a7b;
+  --line: #e1dddf;
+  --line-strong: #ccc6c9;
+  --selected: #faf4f1;
+  --selected-line: #f4e3dd;
+  --hi: #000000;
+  --glass: rgba(255, 255, 255, 0.86);
+  --ok: #11673a;
+  --danger: #b42318;
+  --cyan: #775c54;
+  --violet: #9976a6;
+  --accent: #78643f;
+  --chart-in: #b38c7f;
+  --chart-out: #ca7567;
+  --chart-profit: #6f9e79;
+  --chart-bar-1: #9f847a;
+  --chart-bar-2: #a8687a;
+  --tone-main: #b38c7f;
+  --tone-op: #b38c7f;
+  --tone-inv: #a68b57;
+  --tone-cli: #b68499;
+  --tone-fin: #a680b4;
+  --tone-adm: #8a7a87;
+  --chart-grid: #e1dddf;
+  --brand-text: linear-gradient(135deg, #282528, #81645b);
+  --body-glow: none;
+  --glow: 0 10px 26px -16px rgba(20, 30, 50, 0.28);
+  --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.1);
+  --shadow-md: 0 8px 24px -12px rgba(20, 30, 50, 0.22);
+  --shadow-lg: 0 24px 60px -20px rgba(20, 30, 50, 0.3);
+  --surface: var(--card);
+  --surface-sunken: var(--input);
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(20, 30, 50, 0.07), 0 8px 20px -14px rgba(20, 30, 50, 0.2);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 2px 5px rgba(20, 30, 50, 0.07), 0 18px 40px -24px rgba(20, 30, 50, 0.3);
+  --elev-3: 0 1px 0 #fff inset, 0 8px 16px rgba(20, 30, 50, 0.09), 0 30px 60px -28px rgba(20, 30, 50, 0.38);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+  --on-primary: #14171d;
+}
+
+:root[data-product='access'][data-mode='light'] {
+  --muted-2: #606a79;
+  --accent: #7e5700;
+  --ok: #196748;
+  --danger: #a62d2d;
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+}
+
+:root[data-product='access'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='access'][data-mode='dark'] button.primary { text-shadow: none; }
+:root[data-product='access'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #0e1723;
+  --card: #162231;
+  --input: #1b293b;
+  --ink: #eef1f5;
+  --muted: #a9b2c0;
+  --muted-2: #8f9aab;
+  --line: #24354b;
+  --line-strong: #314a6c;
+  --selected: #1c324e;
+  --selected-line: #26466d;
+  --hi: #ffffff;
+  --glass: rgba(16, 20, 27, 0.8);
+  --ok: #4cd08f;
+  --danger: #f98080;
+  --cyan: #6a96c5;
+  --violet: #4f9fd8;
+  --accent: #bc8f27;
+  --chart-in: #4078b5;
+  --chart-out: #c94545;
+  --chart-profit: #1d7a55;
+  --chart-bar-1: #7cc4f0;
+  --chart-bar-2: #4078b5;
+  --tone-main: #4078b5;
+  --tone-op: #4078b5;
+  --tone-inv: #9a6a00;
+  --tone-cli: #157a8a;
+  --tone-fin: #765db6;
+  --tone-adm: #647085;
+  --chart-grid: #24354b;
+  --brand-text: linear-gradient(135deg, #eef1f5, #4f83bb);
+  --body-glow: none;
+  --glow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%) 0%, var(--card) 40%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+  --on-primary: #ffffff;
+}
+
+:root[data-product='tour'][data-mode='light'] {
+  --muted-2: #636c66;
+  --accent: #8f5300;
+  --ok: #1b6741;
+  --danger: #a43228;
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+}
+
+:root[data-product='tour'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='tour'][data-mode='dark'] button.primary { text-shadow: none; }
+:root[data-product='tour'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #0c181b;
+  --card: #142427;
+  --input: #192b2f;
+  --ink: #eef1f5;
+  --muted: #a9b2c0;
+  --muted-2: #8f9aab;
+  --line: #22373d;
+  --line-strong: #2d4d56;
+  --selected: #183637;
+  --selected-line: #204b4d;
+  --hi: #ffffff;
+  --glass: rgba(16, 20, 27, 0.8);
+  --ok: #4cd08f;
+  --danger: #f98080;
+  --cyan: #619d90;
+  --violet: #d9692a;
+  --accent: #c88b38;
+  --chart-in: #348270;
+  --chart-out: #c23b2f;
+  --chart-profit: #1f7a4d;
+  --chart-bar-1: #f0a04b;
+  --chart-bar-2: #348270;
+  --tone-main: #348270;
+  --tone-op: #348270;
+  --tone-inv: #a85d00;
+  --tone-cli: #3c76af;
+  --tone-fin: #855db6;
+  --tone-adm: #68736d;
+  --chart-grid: #22373d;
+  --brand-text: linear-gradient(135deg, #eef1f5, #448c7b);
+  --body-glow: none;
+  --glow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%) 0%, var(--card) 40%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+  --on-primary: #ffffff;
+}
+
+:root[data-product='beach'][data-mode='light'] {
+  --muted-2: #5f6f73;
+  --cyan: #09667b;
+  --accent: #8d5800;
+  --ok: #1d7047;
+  --danger: #a63125;
+  --primary: #086276;
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, #086276 84%, #fff 16%) 0%, #086276 55%, color-mix(in srgb, #086276 88%, #000 12%) 100%);
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+}
+
+:root[data-product='beach'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='beach'][data-mode='dark'] button.primary { text-shadow: none; }
+:root[data-product='beach'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #0c191f;
+  --card: #14242d;
+  --input: #192b36;
+  --ink: #eef1f5;
+  --muted: #a9b2c0;
+  --muted-2: #8f9aab;
+  --line: #213845;
+  --line-strong: #2c4f63;
+  --selected: #163744;
+  --selected-line: #1e4c60;
+  --hi: #ffffff;
+  --glass: rgba(16, 20, 27, 0.8);
+  --ok: #4cd08f;
+  --danger: #f98080;
+  --cyan: #5ea1b0;
+  --violet: #e8735a;
+  --accent: #c59038;
+  --chart-in: #1e7b90;
+  --chart-out: #c43a2c;
+  --chart-profit: #31855b;
+  --chart-bar-1: #6fd0dc;
+  --chart-bar-2: #1e7b90;
+  --tone-main: #1e7b90;
+  --tone-op: #1e7b90;
+  --tone-inv: #a86200;
+  --tone-cli: #c2533c;
+  --tone-fin: #765db6;
+  --tone-adm: #62767b;
+  --chart-grid: #213845;
+  --brand-text: linear-gradient(135deg, #eef1f5, #4190a1);
+  --body-glow: none;
+  --glow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%) 0%, var(--card) 40%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+  --on-primary: #ffffff;
+}
+
+:root[data-product='dining'][data-mode='light'] {
+  --muted-2: #726667;
+  --accent: #845700;
+  --ok: #287045;
+  --danger: #b13428;
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+}
+
+:root[data-product='dining'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='dining'][data-mode='dark'] button.primary { text-shadow: none; }
+:root[data-product='dining'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #191218;
+  --card: #241c24;
+  --input: #2b222b;
+  --ink: #eef1f5;
+  --muted: #a9b2c0;
+  --muted-2: #8f9aab;
+  --line: #392c38;
+  --line-strong: #513c4d;
+  --selected: #3b242f;
+  --selected-line: #533141;
+  --hi: #ffffff;
+  --glass: rgba(16, 20, 27, 0.8);
+  --ok: #4cd08f;
+  --danger: #f98080;
+  --cyan: #ba7e86;
+  --violet: #c9895a;
+  --accent: #bb9038;
+  --chart-in: #a75a65;
+  --chart-out: #c0392b;
+  --chart-profit: #2c7a4b;
+  --chart-bar-1: #e3b07a;
+  --chart-bar-2: #a75a65;
+  --tone-main: #a75a65;
+  --tone-op: #a75a65;
+  --tone-inv: #a06400;
+  --tone-cli: #3c7693;
+  --tone-fin: #765db6;
+  --tone-adm: #7a6a6c;
+  --chart-grid: #392c38;
+  --brand-text: linear-gradient(135deg, #eef1f5, #b4737c);
+  --body-glow: none;
+  --glow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%) 0%, var(--card) 40%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+  --on-primary: #ffffff;
+}
+
+:root[data-product='fonda'][data-mode='light'] {
+  --muted-2: #726667;
+  --accent: #845700;
+  --ok: #287045;
+  --danger: #b13428;
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+}
+
+:root[data-product='fonda'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='fonda'][data-mode='dark'] button.primary { text-shadow: none; }
+:root[data-product='fonda'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #191218;
+  --card: #241c24;
+  --input: #2b222b;
+  --ink: #eef1f5;
+  --muted: #a9b2c0;
+  --muted-2: #8f9aab;
+  --line: #392c38;
+  --line-strong: #513c4d;
+  --selected: #3b242f;
+  --selected-line: #533141;
+  --hi: #ffffff;
+  --glass: rgba(16, 20, 27, 0.8);
+  --ok: #4cd08f;
+  --danger: #f98080;
+  --cyan: #ba7e86;
+  --violet: #c9895a;
+  --accent: #bb9038;
+  --chart-in: #a75a65;
+  --chart-out: #c0392b;
+  --chart-profit: #2c7a4b;
+  --chart-bar-1: #e3b07a;
+  --chart-bar-2: #a75a65;
+  --tone-main: #a75a65;
+  --tone-op: #a75a65;
+  --tone-inv: #a06400;
+  --tone-cli: #3c7693;
+  --tone-fin: #765db6;
+  --tone-adm: #7a6a6c;
+  --chart-grid: #392c38;
+  --brand-text: linear-gradient(135deg, #eef1f5, #b4737c);
+  --body-glow: none;
+  --glow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%) 0%, var(--card) 40%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+  --on-primary: #ffffff;
+}
+
+:root[data-product='taco'][data-mode='dark'] {
+  --muted-2: #91857d;
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+}
+
+:root[data-product='taco'][data-mode='light'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='taco'][data-mode='light'] button.primary { text-shadow: none; }
+:root[data-product='taco'][data-mode='light'] {
+  color-scheme: light;
+  --bg: #f6efef;
+  --card: #ffffff;
+  --input: #fff8f6;
+  --ink: #2c1f21;
+  --muted: #505a6b;
+  --muted-2: #5f6a7b;
+  --line: #e5d6d6;
+  --line-strong: #d4bbbb;
+  --selected: #ffede9;
+  --selected-line: #ffd2c7;
+  --hi: #000000;
+  --glass: rgba(255, 255, 255, 0.86);
+  --ok: #11673a;
+  --danger: #a62016;
+  --cyan: #9b4a35;
+  --violet: #6f8a31;
+  --accent: #7c6428;
+  --chart-in: #eb7052;
+  --chart-out: #eb6253;
+  --chart-profit: #799635;
+  --chart-bar-1: #ae8b38;
+  --chart-bar-2: #e2402a;
+  --tone-main: #eb7052;
+  --tone-op: #eb7052;
+  --tone-inv: #ae8b38;
+  --tone-cli: #799635;
+  --tone-fin: #aa87ba;
+  --tone-adm: #877a72;
+  --chart-grid: #e5d6d6;
+  --brand-text: linear-gradient(135deg, #2c1f21, #a8503a);
+  --body-glow: none;
+  --glow: 0 10px 26px -16px rgba(20, 30, 50, 0.28);
+  --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.1);
+  --shadow-md: 0 8px 24px -12px rgba(20, 30, 50, 0.22);
+  --shadow-lg: 0 24px 60px -20px rgba(20, 30, 50, 0.3);
+  --surface: var(--card);
+  --surface-sunken: var(--input);
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(20, 30, 50, 0.07), 0 8px 20px -14px rgba(20, 30, 50, 0.2);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 2px 5px rgba(20, 30, 50, 0.07), 0 18px 40px -24px rgba(20, 30, 50, 0.3);
+  --elev-3: 0 1px 0 #fff inset, 0 8px 16px rgba(20, 30, 50, 0.09), 0 30px 60px -28px rgba(20, 30, 50, 0.38);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+  --on-primary: #14171d;
+}
+
+:root[data-product='greens'][data-mode='light'] {
+  --muted-2: #646c5b;
+  --cyan: #9a3f0a;
+  --accent: #3e6c22;
+  --ok: #286a1b;
+  --danger: #b32f27;
+  --primary: #963e09;
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, #963e09 84%, #fff 16%) 0%, #963e09 55%, color-mix(in srgb, #963e09 88%, #000 12%) 100%);
+  --on-danger: #ffffff;
+  --on-accent: #ffffff;
+}
+
+:root[data-product='greens'][data-mode='dark'] .card { box-shadow: var(--elev-2); border-color: var(--line); }
+:root[data-product='greens'][data-mode='dark'] button.primary { text-shadow: none; }
+:root[data-product='greens'][data-mode='dark'] {
+  color-scheme: dark;
+  --bg: #1d1513;
+  --card: #28201e;
+  --input: #312625;
+  --ink: #eef1f5;
+  --muted: #a9b2c0;
+  --muted-2: #8f9aab;
+  --line: #40312f;
+  --line-strong: #5c4441;
+  --selected: #462c22;
+  --selected-line: #633d2f;
+  --hi: #ffffff;
+  --glass: rgba(16, 20, 27, 0.8);
+  --ok: #4cd08f;
+  --danger: #f98080;
+  --cyan: #ce865e;
+  --violet: #4f8a2b;
+  --accent: #76a45a;
+  --chart-in: #2f7d1f;
+  --chart-out: #c8433b;
+  --chart-profit: #2f7d1f;
+  --chart-bar-1: #8cc152;
+  --chart-bar-2: #e06a1b;
+  --tone-main: #b54a0c;
+  --tone-op: #b54a0c;
+  --tone-inv: #2f7d1f;
+  --tone-cli: #1d6fb8;
+  --tone-fin: #765db6;
+  --tone-adm: #6a7160;
+  --chart-grid: #40312f;
+  --brand-text: linear-gradient(135deg, #eef1f5, #c57141);
+  --body-glow: none;
+  --glow: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --surface: linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, #fff 6%) 0%, var(--card) 40%);
+  --surface-sunken: linear-gradient(180deg, color-mix(in srgb, var(--input) 92%, #000 8%), var(--input));
+  --elev-1: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --elev-2: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 2px 4px rgba(0, 0, 0, 0.25), 0 18px 40px -22px rgba(0, 0, 0, 0.75);
+  --elev-3: 0 1px 0 rgba(255, 255, 255, 0.09) inset, 0 6px 12px rgba(0, 0, 0, 0.3), 0 32px 64px -28px rgba(0, 0, 0, 0.8);
+  --btn-primary: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, #fff 16%) 0%, var(--primary) 55%, color-mix(in srgb, var(--primary) 88%, #000 12%) 100%);
+  --btn-primary-glow: 0 8px 20px -12px color-mix(in srgb, var(--primary) 80%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 38%, transparent);
+  --on-danger: #14171d;
+  --on-accent: #14171d;
+  --on-primary: #ffffff;
+}

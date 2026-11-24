@@ -5,9 +5,11 @@ import { Caja } from './screens/Caja'
 import { Inicio } from './screens/Inicio'
 import { Intro, Logo } from './Brand'
 import { Login } from './screens/Login'
+import { GuiaVisual } from './screens/GuiaVisual'
+import { cambiarModo, modoActual, suscribirModo } from './tema'
 import {
   Archive, Armchair, Boxes, CalendarDays, ChevronRight, ChartColumn, ChefHat, ClipboardCheck, Clock, ClipboardList, DoorOpen, FileText, Flame, Gift, Landmark, LayoutDashboard,
-  LifeBuoy, LogOut, Menu, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
+  LifeBuoy, LogOut, Menu, Moon, Sun, Package, Percent, QrCode, ScanLine, Settings, ShoppingCart, SlidersHorizontal, Tag, Ticket, Truck, Undo2, Upload, UserCog, Users, UtensilsCrossed,
 } from 'lucide-react'
 
 /**
@@ -157,6 +159,17 @@ const SCREENS: Screen[] = [
   { key: 'importar', label: 'Importar datos', perm: 'owner', C: Importar, group: 'Administración', icon: Upload },
   { key: 'ajustes', label: 'Ajustes', perm: 'owner', C: Ajustes, group: 'Administración', icon: Settings },
 ]
+
+/** Claro por defecto; oscuro opcional. Se recuerda en este equipo. */
+function ModoBoton() {
+  const modo = useSyncExternalStore(suscribirModo, modoActual)
+  const oscuro = modo === 'oscuro'
+  return (
+    <button className="logout" onClick={(e) => { e.stopPropagation(); cambiarModo(oscuro ? 'claro' : 'oscuro') }} aria-pressed={oscuro}>
+      {oscuro ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}{oscuro ? 'Modo claro' : 'Modo oscuro'}
+    </button>
+  )
+}
 
 function useHash() {
   const [h, setH] = useState(location.hash.slice(2))
@@ -358,6 +371,7 @@ function Privada() {
         <div className="foot">
           <PendingBadge main />
           <div className="who"><span className="avatar" aria-hidden>{me.user.name.trim().charAt(0).toUpperCase()}</span><span><b>{me.user.name}</b><small className="muted">{me.user.role === 'owner' ? 'Dueño' : me.user.position === 'encargado' ? 'Encargado' : 'Empleado'}</small></span></div>
+          <ModoBoton />
           <button className="logout" onClick={logout}><LogOut size={18} aria-hidden />Salir</button>
         </div>
       </aside>
@@ -387,7 +401,7 @@ function Privada() {
           )
         })()}
         {current && !current.ownTitle && <header className="page-head"><div><h1>{current.label}</h1>{current.group && <p className="muted">{portalOf(current.group)}</p>}</div></header>}
-        <Suspense fallback={<ScreenLoading />}>{current ? <div key={current.key} className="screen-in"><current.C me={me} /></div> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}</Suspense>
+        <Suspense fallback={<ScreenLoading />}>{hash === 'guia-visual' ? <div className="screen-in"><GuiaVisual /></div> : current ? <div key={current.key} className="screen-in"><current.C me={me} /></div> : <p>No tienes pantallas asignadas. Pide al dueño que te dé permisos.</p>}</Suspense>
       </main>
     </div>
   )

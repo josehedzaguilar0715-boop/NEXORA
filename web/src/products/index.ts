@@ -11,6 +11,7 @@
  * Para agregar un producto: un objeto aquí + su bloque en products.css. Nada más cambia.
  */
 
+import { aplicarTema } from '../tema'
 export type ProductId = 'nexora' | 'barber' | 'nails' | 'market' | 'tools' | 'paper' | 'scent' | 'access' | 'tour' | 'beach' | 'dining' | 'fonda' | 'taco' | 'greens'
 
 export interface Product {
@@ -108,7 +109,7 @@ const KEY = 'nx_product'
 export function applyProduct(p: Product, remember = true) {
   document.documentElement.dataset.product = p.id
   document.documentElement.style.background = ''
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.themeColor)
+  aplicarTema(p.id, p.themeColor)
   if (remember) try { localStorage.setItem(KEY, p.id) } catch { /* sin almacenamiento */ }
 }
 /** Páginas públicas (reservar, boletos, tarjeta): el cliente final ve la identidad del negocio, sin cambiar la que recuerda su equipo. */

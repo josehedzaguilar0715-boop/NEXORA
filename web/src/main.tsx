@@ -6,6 +6,8 @@ import './fonts.css'
 import './styles.css'
 import './premium.css'
 import './products/products.css'
+import './products/modos.generated.css'
+import './tokens.css'
 import { applyProduct, lastProduct } from './products'
 
 // La pantalla de acceso usa la identidad del último producto usado en este equipo.

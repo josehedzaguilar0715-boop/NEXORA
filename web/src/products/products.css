@@ -111,7 +111,7 @@
 :root[data-product='nails'] .bar-fill.cost, :root[data-product='market'] .bar-fill.cost { background: #b8b2ad; }
 
 /* Marca del producto junto a NEXORA en el menú. */
-.brand .product-name { display: block; font-family: var(--font-display); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; color: var(--cyan); margin-top: 2px; }
+.brand .product-name { display: block; font-family: var(--font-display); font-size: max(var(--fs-min), 0.78rem); font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; color: var(--cyan); margin-top: 2px; }
 [data-product='nails'] .brand .product-name { font-style: italic; text-transform: none; letter-spacing: 0.04em; font-size: 1rem; font-weight: 400; }
 
 /* Vidrio: se apaga en equipos que piden menos efectos (y nunca va en la caja). */

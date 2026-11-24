@@ -1,0 +1,76 @@
+/* ============================================================================
+   NEXORA · fundamentos visuales (diseno-v0, fase 1)
+   Lo que NO cambia entre productos: el significado de los colores de estado, el color de cada módulo y la
+   escala de letra. La identidad de cada producto (marca, letra de títulos, formas) vive en products/products.css.
+   ============================================================================ */
+
+:root {
+  /* Escala de letra (rem = 20 px). En celular ningún texto baja de 18 px: ver --fs-min. */
+  --fs-min: 0rem;
+  --fs-title: 1.6rem;   /* 32 px · título de pantalla */
+  --fs-subtitle: 1.25rem; /* 25 px */
+  --fs-body: 1rem;      /* 20 px · texto */
+  --fs-small: 0.9rem;   /* 18 px · etiquetas y ayudas */
+  --fs-data: 1.5rem;    /* 30 px · cifras importantes */
+
+  /* Estados: el color nunca va solo (siempre con ícono y texto, ver .estado). Modo claro. */
+  --st-ok: #146c3a;     --st-ok-bg: #e6f4ec;     --st-ok-line: #b4dcc4;
+  --st-warn: #8a4b08;   --st-warn-bg: #fff2dc;   --st-warn-line: #f0d29a;
+  --st-danger: #b42318; --st-danger-bg: #fdecea; --st-danger-line: #f1bdb7;
+  --st-info: #1d4ed8;   --st-info-bg: #e9f0ff;   --st-info-line: #bccdf7;
+
+  /* Color de cada módulo: el mismo en los 14 productos (mismo color = misma función). */
+  --m-ventas: #1d4ed8;      /* Caja, taquilla, entradas, apartados, cotizaciones, encargos */
+  --m-inventario: #7c3aed;  /* Productos, compras, precios, cierre */
+  --m-clientes: #0f766e;    /* Clientes, fiado, membresías, escanear QR */
+  --m-dinero: #15803d;      /* Finanzas, comisiones */
+  --m-reportes: #c2410c;    /* Ventas y retiro, reportes */
+  --m-mesas: #be185d;       /* Mesas, pedidos */
+  --m-cocina: #a15c07;      /* Cocina, menú del día, carne */
+  --m-agenda: #4338ca;      /* Agenda de citas */
+  --m-admin: #475569;       /* Personal, configuración, ajustes, importar, soporte */
+  --m-bg-mix: 12%;          /* fuerza del fondo suave de cada módulo */
+}
+:root[data-mode='dark'] {
+  --st-ok: #4cd08f;     --st-ok-bg: rgba(76, 208, 143, 0.14);   --st-ok-line: rgba(76, 208, 143, 0.38);
+  --st-warn: #fbbf4a;   --st-warn-bg: rgba(251, 191, 74, 0.14); --st-warn-line: rgba(251, 191, 74, 0.38);
+  --st-danger: #f98080; --st-danger-bg: rgba(249, 128, 128, 0.14); --st-danger-line: rgba(249, 128, 128, 0.4);
+  --st-info: #8fb0ff;   --st-info-bg: rgba(143, 176, 255, 0.14); --st-info-line: rgba(143, 176, 255, 0.4);
+  --m-ventas: #8fb0ff; --m-inventario: #bfa0f8; --m-clientes: #4fd1c5; --m-dinero: #4cd08f; --m-reportes: #fb9a5c;
+  --m-mesas: #f58bbd; --m-cocina: #f5b94a; --m-agenda: #a9b4ff; --m-admin: #a9b6c8;
+  --m-bg-mix: 22%;
+}
+@media (max-width: 600px) {
+  :root { --fs-min: 0.9rem; }  /* 18 px */
+}
+
+/* ---------- Insignia de estado: ícono + texto + color ---------- */
+.estado {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 2px 12px 2px 9px;
+  border-radius: var(--radius-full); border: 1px solid var(--est-line); background: var(--est-bg); color: var(--est-fg);
+  font-size: max(var(--fs-min), 0.85rem); font-weight: 700; line-height: 1.2; white-space: nowrap;
+}
+.estado svg { flex-shrink: 0; }
+.estado.ok { --est-fg: var(--st-ok); --est-bg: var(--st-ok-bg); --est-line: var(--st-ok-line); }
+.estado.warn { --est-fg: var(--st-warn); --est-bg: var(--st-warn-bg); --est-line: var(--st-warn-line); }
+.estado.danger { --est-fg: var(--st-danger); --est-bg: var(--st-danger-bg); --est-line: var(--st-danger-line); }
+.estado.info { --est-fg: var(--st-info); --est-bg: var(--st-info-bg); --est-line: var(--st-info-line); }
+
+/* ---------- Ícono de módulo: cuadro con el color del módulo ---------- */
+.mod-ico {
+  --mc: var(--m-admin);
+  width: 40px; height: 40px; border-radius: var(--radius-sm); flex-shrink: 0; display: inline-grid; place-items: center;
+  color: var(--mc); background: color-mix(in srgb, var(--mc) var(--m-bg-mix), var(--card)); border: 1px solid color-mix(in srgb, var(--mc) 28%, var(--card));
+}
+.mod-ventas { --mc: var(--m-ventas); } .mod-inventario { --mc: var(--m-inventario); } .mod-clientes { --mc: var(--m-clientes); }
+.mod-dinero { --mc: var(--m-dinero); } .mod-reportes { --mc: var(--m-reportes); } .mod-mesas { --mc: var(--m-mesas); }
+.mod-cocina { --mc: var(--m-cocina); } .mod-agenda { --mc: var(--m-agenda); } .mod-admin { --mc: var(--m-admin); }
+
+/* ---------- Guía visual (#/guia-visual) ---------- */
+.guia { display: flex; flex-direction: column; gap: 22px; }
+.guia h2 { margin: 0 0 8px; }
+.guia .fila { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.guia .muestras { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.guia .muestra { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); font-weight: 600; }
+.guia .escala > div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.guia .escala small { color: var(--muted); font-size: max(var(--fs-min), 0.8rem); }
