@@ -26,7 +26,7 @@ npm run build
 NEXORA_DB=data/nexora.db PORT=3000 npm start     # http://localhost:3000
 ```
 
-Pruebas: `npm test` (277 pruebas) o `npm run check` (todo, incluida la prueba en navegador).
+Pruebas: `npm test` (293 pruebas) o `npm run check` (todo, incluida la prueba en navegador).
 
 ## Reglas que este proyecto ha seguido (y conviene mantener)
 

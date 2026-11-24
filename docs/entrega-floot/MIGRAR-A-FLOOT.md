@@ -8,7 +8,7 @@
 
 | NEXORA hoy | Floot | Consecuencia |
 |---|---|---|
-| **SQLite** (Durable Object) con 41 migraciones | **Postgres** (kysely + postgres-js); columnas en `snake_case`; ENUM para estados | Traducir el esquema (`esquema-sqlite.sql`) a Postgres. Las fechas son texto ISO y el dinero son enteros en centavos: conviene mantenerlo así. Los *triggers* «no borrar» se reescriben en Postgres. |
+| **SQLite** (Durable Object) con 42 migraciones | **Postgres** (kysely + postgres-js); columnas en `snake_case`; ENUM para estados | Traducir el esquema (`esquema-sqlite.sql`) a Postgres. Las fechas son texto ISO y el dinero son enteros en centavos: conviene mantenerlo así. Los *triggers* «no borrar» se reescriben en Postgres. |
 | API **Hono**: ~320 rutas con `:id`, y métodos GET, POST, PUT, PATCH y DELETE | Un archivo por ruta y método en `endpoints/`, **solo GET y POST**, **sin parámetros en la ruta** | Cada ruta pasa a ser `endpoints/<ruta>_<GET|POST>.ts` con su `.schema.ts`. El `:id` va en el cuerpo o en la consulta. PUT, PATCH y DELETE pasan a POST. |
 | Base **síncrona** (`db.prepare().get()`) dentro de transacciones | Postgres **asíncrono** | Toda la lógica de `src/*.ts` necesita `await`. Las transacciones de dinero e inventario se vuelven `db.transaction().execute(async (trx) => …)`. **Es el cambio más grande y el más delicado.** |
 | Middleware de Hono: sesión, negocio vigente, idempotencia | `endpoints/_middleware.ts` con `before()` | Se traduce casi 1 a 1. |
@@ -19,7 +19,7 @@
 | Cron diario de Cloudflare (respaldo) | Tareas programadas de Floot y respaldos propios de Postgres | El respaldo propio pasa a ser opcional. |
 | Pantallas React 18 + Vite, ruteo por `#/` | React 19, carpetas `pages/`, `components/`, `helpers/`, React Router, CSS Modules y kit de componentes de Floot | Las 30 pantallas se reutilizan en su lógica. Hay que repartirlas en `pages/` y `components/`, y pasar los estilos globales a `base.css` y a módulos CSS. |
 | Identidad por giro con `data-product` y variables CSS | `base.css` con variables (modo claro y oscuro) | Las 13 paletas de `web/src/products/products.css` se copian como variables. |
-| Pruebas vitest (277) | Floot solo ejecuta pruebas de *helpers* (`.spec.tsx`) | Conservar la lógica de negocio en *helpers* puros y migrar sus pruebas. Las pruebas de este ZIP sirven como **especificación** de qué debe dar cada caso. |
+| Pruebas vitest (293) | Floot solo ejecuta pruebas de *helpers* (`.spec.tsx`) | Conservar la lógica de negocio en *helpers* puros y migrar sus pruebas. Las pruebas de este ZIP sirven como **especificación** de qué debe dar cada caso. |
 
 ## 2. Lo que se reutiliza casi sin cambios
 

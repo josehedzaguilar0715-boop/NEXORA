@@ -46,7 +46,7 @@ Todas las demás ramas (`main`, `staging`, `claude/new-session-pqpyhl`) ya está
 
 **Verificación al empaquetar:**
 
-* `npm run check` sin errores: tipos, 277 pruebas, compilación y prueba de punta a punta.
+* `npm run check` sin errores: tipos, 293 pruebas, compilación y prueba de punta a punta.
 * Recorrido de 13 giros × dueño y empleado × celular y computadora: sin hallazgos.
 * 13 demos en el motor de Cloudflare: todo OK.
 

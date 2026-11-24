@@ -53,7 +53,7 @@ Desarrollo local: src/server.ts (Node + better-sqlite3) corre la MISMA app Hono 
 ## 3. Base de datos
 
 * **SQLite.** En Cloudflare es la SQLite del Durable Object; en local es `better-sqlite3`. El mismo código usa ambas a través de la interfaz `Db` (`src/db.ts`).
-* **Migraciones:** el arreglo `MIGRATIONS` de `src/db.ts` (41 hoy) se aplica en orden al arrancar y queda registrado en `_migrations`.
+* **Migraciones:** el arreglo `MIGRATIONS` de `src/db.ts` (42 hoy) se aplica en orden al arrancar y queda registrado en `_migrations`.
   * **Regla: solo agregar al final**; nunca editar una ya publicada.
   * El esquema resultante está en `docs/entrega-floot/esquema-sqlite.sql`.
 * **Multi-negocio lógico:** casi todas las tablas tienen `business_id`, y cada ruta filtra por el negocio de la sesión. Probado en ~90 rutas (`test/aislamiento-negocios.test.ts`).
@@ -99,7 +99,7 @@ Desarrollo local: src/server.ts (Node + better-sqlite3) corre la MISMA app Hono 
 
 ## 8. Pruebas
 
-* `test/*.test.ts` (55 archivos, 277 pruebas) con vitest sobre SQLite en memoria. Cubren:
+* `test/*.test.ts` (56 archivos, 293 pruebas) con vitest sobre SQLite en memoria. Cubren:
   * un archivo por giro;
   * días completos (`dia-completo.test.ts`);
   * permisos (`permisos-barrido.test.ts`), los tres puestos por sucursal (`puestos-sucursales.test.ts`) y aislamiento;

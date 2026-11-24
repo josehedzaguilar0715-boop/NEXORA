@@ -17,5 +17,10 @@ y las demos creadas (`POST /api/admin/demos/{giro}` con el token de soporte, o `
 | `carga.cjs` | Prueba de carga: varios negocios vendiendo a la vez; peticiones/s, latencias y cuadre de ventas | `B=<url> NEG=5 CONC=20 TOTAL=2000 node scripts/verificacion/carga.cjs` |
 | `bench-panel.ts` | Tiempo de las pantallas más consultadas con una base grande (40 negocios, meses de ventas) | `NEG=40 VENTAS=1500 npx tsx scripts/verificacion/bench-panel.ts <archivo.db>` |
 | `puestos.ts` | Los tres puestos con dos sucursales, escritorio y celular: alcance, `branchId` e ids manipulados, «Mi día» | `npm run build && npx tsx scripts/verificacion/puestos.ts <carpeta de capturas>` (todo en memoria) |
+| `datos.ts` | «Respaldo y exportación de datos» en escritorio y celular: descargar, simular, restaurar, rechazo de archivos ajenos | `npm run build && npx tsx scripts/verificacion/datos.ts <carpeta>` (en memoria) |
+| `productos-datos.ts` | Los 13 giros + base: identidad visual y la sección de datos, sin errores ni desbordes | `npm run build && npx tsx scripts/verificacion/productos-datos.ts` (en memoria) |
+| `staging-datos.ts` | Prueba funcional contra un servidor real de **staging** (crea 2 negocios de prueba) | `NODE_USE_ENV_PROXY=1 npx tsx scripts/verificacion/staging-datos.ts <url de staging>` |
+| `ensayo-respaldo.ts` | Restaura un respaldo real en carpeta aislada, migra en el sitio y compara cada negocio renglón por renglón | `npx tsx scripts/verificacion/ensayo-respaldo.ts <respaldo> <carpeta-nueva>` |
+| `comparar-respaldos.ts` | Compara un respaldo anterior y uno posterior: nada perdido ni alterado | `npx tsx scripts/verificacion/comparar-respaldos.ts <antes> <después>` |
 | `pixdiff.cjs` | Compara píxel a píxel una pantalla con un CSS anterior | ver comentario del archivo |
 | `perf.cjs` | Tiempo de abrir la caja y agregar productos con CPU 4× más lenta, versión anterior contra actual | dos servidores en 3136 (anterior) y 3135 (actual) |

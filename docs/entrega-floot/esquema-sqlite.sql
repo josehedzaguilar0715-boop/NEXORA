@@ -1,6 +1,6 @@
--- Esquema completo de NEXORA (SQLite), generado aplicando las 41 migraciones de src/db.ts a una base vacía.
+-- Esquema completo de NEXORA (SQLite), generado aplicando las 42 migraciones de src/db.ts a una base vacía.
 -- NO contiene datos. Referencia para traducir a Postgres (Floot). La fuente de verdad son las migraciones de src/db.ts.
--- Tablas: 102 · índices: 47 · candados (triggers): 34
+-- Tablas: 105 · índices: 48 · candados (triggers): 34
 
 CREATE TABLE _migrations (version INTEGER PRIMARY KEY);
 
@@ -109,6 +109,11 @@ CREATE TABLE audit_log (
     authorized_by TEXT,
     reason TEXT,
     created_at TEXT NOT NULL
+  );
+
+CREATE TABLE backup_log (
+    id TEXT PRIMARY KEY, business_id TEXT, kind TEXT NOT NULL, name TEXT, bytes INTEGER, sha256 TEXT,
+    status TEXT NOT NULL CHECK (status IN ('ok','error')), error TEXT, encrypted INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
   );
 
 CREATE TABLE branches (
@@ -350,6 +355,11 @@ CREATE TABLE entry_tickets (
     created_at TEXT NOT NULL
   );
 
+CREATE TABLE error_log (
+    id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL UNIQUE, source TEXT NOT NULL, route TEXT, status INTEGER, message TEXT,
+    business_id TEXT, count INTEGER NOT NULL DEFAULT 1, first_at TEXT NOT NULL, last_at TEXT NOT NULL, alerted_at TEXT
+  );
+
 CREATE TABLE expenses (
     id TEXT PRIMARY KEY,
     business_id TEXT NOT NULL,
@@ -363,6 +373,10 @@ CREATE TABLE expenses (
     created_by TEXT NOT NULL,
     created_at TEXT NOT NULL
   , category TEXT NOT NULL DEFAULT 'otros', voided_at TEXT, voided_by TEXT, void_reason TEXT);
+
+CREATE TABLE feature_flags (
+    key TEXT PRIMARY KEY, enabled INTEGER NOT NULL, business_ids TEXT, note TEXT, updated_at TEXT NOT NULL
+  );
 
 CREATE TABLE fixed_expenses (
     id TEXT PRIMARY KEY,
@@ -1190,6 +1204,8 @@ CREATE INDEX accesses_business ON accesses(business_id, at);
 CREATE INDEX appointments_staff ON appointments(staff_id, starts_at);
 
 CREATE INDEX audit_business ON audit_log(business_id, created_at);
+
+CREATE INDEX backup_log_business ON backup_log(business_id, created_at);
 
 CREATE UNIQUE INDEX businesses_public_slug ON businesses(public_slug) WHERE public_slug IS NOT NULL;
 
