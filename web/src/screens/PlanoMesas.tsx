@@ -2,13 +2,16 @@ import { useEffect, useRef, useState, type PointerEvent as RPointerEvent } from 
 import { api, mxn } from '../api'
 
 type Pos = Record<string, { x: number; y: number }>
-const COLOR: Record<string, string> = { libre: '#16a34a', ocupada: '#2563eb', reservada: '#7c3aed', por_cobrar: '#dc2626', limpieza: '#64748b' }
+// Mismos colores que la vista Lista (cumplen contraste en claro y oscuro).
+const COLOR: Record<string, string> = { libre: 'var(--ok)', ocupada: 'var(--accent)', reservada: '#2563eb', por_cobrar: 'var(--danger)', limpieza: 'var(--muted)' }
 const ETIQUETA: Record<string, string> = { libre: 'Libre', ocupada: 'Ocupada', reservada: 'Reservada', por_cobrar: 'Por cobrar', limpieza: 'Limpieza' }
-const tam = (seats: number) => (seats <= 2 ? 84 : seats <= 4 ? 100 : seats <= 6 ? 120 : 140)
+const tam = (seats: number) => (seats <= 2 ? 100 : seats <= 4 ? 108 : seats <= 6 ? 124 : 140)
+const ALTO = 84
+const angosto = () => typeof window !== 'undefined' && window.innerWidth < 600
 
 /** Las posiciones son el centro de la mesa (en % de la zona). Posición automática en cuadrícula para las mesas que todavía no se acomodaron. */
 function auto(i: number, n: number) {
-  const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.6)))
+  const cols = angosto() ? Math.min(2, n) : Math.max(1, Math.ceil(Math.sqrt(n * 1.6)))
   const rows = Math.ceil(n / cols)
   return { x: ((i % cols) + 0.5) * (100 / cols), y: (Math.floor(i / cols) + 0.5) * (100 / rows) }
 }
@@ -50,10 +53,10 @@ export function PlanoMesas({ tables, puedeEditar, onOpen }: { tables: any[]; pue
         return (
           <section key={a} className="card" style={{ marginBottom: 16 }}>
             <h2 style={{ textTransform: 'capitalize' }}>{a}</h2>
-            <div className="plano" data-edit={edit || undefined} role="group" aria-label={`Plano de ${a}`}
+            <div className="plano" data-edit={edit || undefined} role="group" aria-label={`Plano de ${a}`} style={{ minHeight: Math.ceil(ts.length / (angosto() ? 2 : Math.max(1, Math.ceil(Math.sqrt(ts.length * 1.6))))) * (ALTO + 28) + 20 }}
               onPointerMove={mover} onPointerUp={() => { drag.current = null }} onPointerCancel={() => { drag.current = null }}>
               {ts.map((t, i) => {
-                const p = pos(t, i, ts.length); const s = tam(t.seats); const h = Math.round(s * 0.8)
+                const p = pos(t, i, ts.length); const s = tam(t.seats); const h = ALTO
                 return (
                   <button key={t.id} type="button" className={`mesa-plano ${t.seats <= 4 ? 'redonda' : ''}`} aria-label={`Mesa ${t.name}, ${t.seats} lugares, ${ETIQUETA[t.status]}${t.tabId ? `, ${mxn(t.total)}` : ''}`}
                     style={{ left: `clamp(0px, calc(${p.x}% - ${s / 2}px), calc(100% - ${s}px))`, top: `clamp(0px, calc(${p.y}% - ${h / 2}px), calc(100% - ${h}px))`, width: s, height: h, borderColor: COLOR[t.status], touchAction: edit ? 'none' : 'auto', cursor: edit ? 'grab' : 'pointer' }}

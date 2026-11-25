@@ -29,6 +29,15 @@ for (const [giro, ruta] of [['barberia', 'reservar'], ['unas', 'reservar'], ['tu
   const biz = { public_slug: slug, code: slug }
   rutas.push([`${giro}/${ruta}`, `/${ruta}/${biz.public_slug ?? biz.code}`])
 }
+// Menú digital, lista de precios y catálogo (se publican con el escaparate; no necesitan el extra de reservas).
+for (const giro of ['restaurante', 'verduleria', 'perfumeria']) {
+  const r = await s.call('POST', `/admin/demos/${giro}`, { token: at })
+  let own = await s.call('POST', '/auth/owner/login', { body: { phone: r.json.demo.phone, password: 'demo1234' } })
+  if (own.json.challengeId) own = await s.call('POST', '/auth/owner/verify', { body: { challengeId: own.json.challengeId, code: s.codes[r.json.demo.phone] } })
+  const slug = (await s.call('GET', '/business/public-link', { token: own.json.token })).json.slug as string
+  await s.call('PUT', '/escaparate', { token: own.json.token, body: { publicarCarta: true, descripcion: 'Comida casera todos los días', direccion: 'Av. Principal 123', horario: 'Lun a Dom 8:00–18:00', instagram: 'minegocio' } })
+  rutas.push([`${giro}/carta`, `/carta/${slug}`])
+}
 const browser = await chromium.launch(); let fails = 0, n = 0
 const VP = { escritorio: { width: 1366, height: 900 }, tableta: { width: 768, height: 1024 }, celular: { width: 390, height: 844 } }
 for (const [vp, size] of Object.entries(VP)) for (const modo of ['claro', 'oscuro']) for (const [nombre, ruta] of rutas) {
@@ -44,5 +53,5 @@ for (const [vp, size] of Object.entries(VP)) for (const modo of ['claro', 'oscur
   await ctx.close()
 }
 await browser.close(); server.close()
-console.log(`\n${n} páginas públicas (3 negocios × claro/oscuro × 3 tamaños) · con hallazgos: ${fails}`)
+console.log(`\n${n} revisiones de páginas públicas (${rutas.length} páginas × claro/oscuro × 3 tamaños) · con hallazgos: ${fails}`)
 process.exit(fails ? 1 : 0)

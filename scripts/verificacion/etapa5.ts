@@ -22,7 +22,7 @@ const owner = async (giro: string) => {
 }
 const abrir = async (T: string, ruta: string, vp: { width: number; height: number }) => {
   const ctx = await browser.newContext({ viewport: vp })
-  await ctx.addInitScript((tk: string) => { sessionStorage.setItem('nx_intro', '1'); localStorage.setItem('nx_token', tk) }, T)
+  await ctx.addInitScript((tk: string) => { (window as any).__name = (f: unknown) => f; sessionStorage.setItem('nx_intro', '1'); localStorage.setItem('nx_token', tk) }, T)
   const page = await ctx.newPage(); const errs: string[] = []
   page.on('pageerror', (e: Error) => errs.push(e.message))
   await page.goto(base + ruta); await page.waitForTimeout(1000)

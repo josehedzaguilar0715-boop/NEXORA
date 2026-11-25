@@ -6,6 +6,7 @@ import { Hono } from 'hono'
 import { createRequire } from 'node:module'
 import { mkdirSync } from 'node:fs'
 import { setup } from '../../test/helpers.js'
+import { auditoria } from './auditoria-dom.js'
 const { chromium } = createRequire(import.meta.url)('playwright') as { chromium: any }
 const shots = process.argv[2] ?? 'test/e2e/shots-plano'; mkdirSync(shots, { recursive: true })
 const s = setup(); const at = await s.adminToken()
@@ -24,7 +25,7 @@ for (const giro of ['restaurante', 'palapa', 'taqueria', 'comedor']) {
   // Celular primero: después de acomodar en computadora el plano guardado ya no es el automático.
   for (const [vn, vp] of [['cel', { width: 390, height: 844 }], ['pc', { width: 1366, height: 900 }]] as const) {
     const ctx = await browser.newContext({ viewport: vp, hasTouch: vn === 'cel' })
-    await ctx.addInitScript((tk: string) => { sessionStorage.setItem('nx_intro', '1'); localStorage.setItem('nx_token', tk) }, T)
+    await ctx.addInitScript((tk: string) => { (window as any).__name = (f: unknown) => f; sessionStorage.setItem('nx_intro', '1'); localStorage.setItem('nx_token', tk) }, T)
     const page = await ctx.newPage(); const errs: string[] = []
     page.on('pageerror', (e: Error) => errs.push(e.message))
     await page.goto(base + '/#/mesas'); await page.waitForTimeout(900)
@@ -48,6 +49,11 @@ for (const giro of ['restaurante', 'palapa', 'taqueria', 'comedor']) {
       ok(!!antes && Math.abs(antes.x - (b.x + 120)) < 40, `[${giro}/${vn}] la mesa queda donde se acomodó tras recargar`)
       await page.getByRole('button', { name: 'Lista', exact: true }).click(); await page.waitForTimeout(200)
       ok(await page.locator('.mesa-plano').count() === 0 && await page.locator('.results button').count() >= n, `[${giro}/${vn}] la vista Lista sigue disponible`)
+    }
+    for (const modo of ['claro', 'oscuro']) {
+      await page.evaluate((m: string) => { localStorage.setItem('nx_modo', m); document.documentElement.dataset.mode = m === 'claro' ? 'light' : 'dark' }, modo); await page.waitForTimeout(250)
+      const a = await page.evaluate(auditoria)
+      ok(!a.overflow && !a.bad.length && !a.small.length && !a.encimados.length && !a.sinNombre.length && !a.cortados.length, `[${giro}/${vn}/${modo}] auditoría de contraste, letra y nombres del plano ${JSON.stringify([a.bad.slice(0, 2), a.small.slice(0, 2), a.sinNombre.slice(0, 2)])}`)
     }
     ok(errs.length === 0, `[${giro}/${vn}] sin errores de JS ${errs[0] ?? ''}`)
     if (giro === 'restaurante' || giro === 'palapa') { await page.getByRole('button', { name: 'Plano', exact: true }).click().catch(() => {}); await page.waitForTimeout(200); await page.screenshot({ path: `${shots}/${giro}-${vn}.png`, fullPage: true }) }

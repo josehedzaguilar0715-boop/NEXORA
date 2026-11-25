@@ -24,3 +24,8 @@ y las demos creadas (`POST /api/admin/demos/{giro}` con el token de soporte, o `
 | `comparar-respaldos.ts` | Compara un respaldo anterior y uno posterior: nada perdido ni alterado | `npx tsx scripts/verificacion/comparar-respaldos.ts <antes> <después>` |
 | `pixdiff.cjs` | Compara píxel a píxel una pantalla con un CSS anterior | ver comentario del archivo |
 | `perf.cjs` | Tiempo de abrir la caja y agregar productos con CPU 4× más lenta, versión anterior contra actual | dos servidores en 3136 (anterior) y 3135 (actual) |
+| `menu-simplificado.ts` | Etapa 1: menú diario corto + «Otras herramientas» en los 13 giros (escritorio y celular), subtítulos de Acceso y Mercado | `npm run build && npx tsx scripts/verificacion/menu-simplificado.ts <carpeta>` (en memoria) |
+| `escaparates.ts` | Etapas 2 y 4: reservas con portada y servicios con foto, menú digital, lista de precios, catálogo y tienda de boletos; ilustración de respaldo; nada interno | `npm run build && npx tsx scripts/verificacion/escaparates.ts <carpeta>` (en memoria) |
+| `plano-mesas.ts` | Etapa 3: plano gráfico de mesas (sin encimarse, acomodar y conservar, lista disponible) | `npm run build && npx tsx scripts/verificacion/plano-mesas.ts <carpeta>` (en memoria) |
+| `etapa5.ts` | Etapa 5: tablero de encargos, alerta de limpieza y notas olfativas | `npm run build && npx tsx scripts/verificacion/etapa5.ts <carpeta>` (en memoria) |
+| `workerd-evolucion.ts` | Escaparate, carta, plano y primeros pasos en el motor real de Cloudflare (local, no toca producción) | `npx wrangler dev --port 8799 > /tmp/dev.log` y `npx tsx scripts/verificacion/workerd-evolucion.ts http://localhost:8799 /tmp/dev.log` |

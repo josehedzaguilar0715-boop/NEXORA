@@ -20,12 +20,13 @@ const T = own.json.token as string
 const staff = (await s.call('GET', '/agenda/staff', { token: T })).json.staff[0]
 const svc = (await s.call('GET', '/services', { token: T })).json.services[0]
 if (!(await s.call('GET', '/shifts/current', { token: T })).json.shift) await s.call('POST', '/shifts/open', { token: T, body: { openingFloat: 10000 } })
-const hoy = new Date().toISOString().slice(0, 10)
+const mx = (ms: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date(ms)) // el día de México (de noche en UTC ya es otro día)
+const hoy = mx(Date.now())
 // Se agenda para el primer hueco disponible de hoy o de los próximos días.
 let appt: any = null
 let dia = ''
 for (let d = 0; d < 7 && !appt; d++) {
-  const day = new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10)
+  const day = mx(Date.now() + d * 86_400_000)
   const av = (await s.call('GET', `/agenda/availability?date=${day}&serviceIds=${svc.id}&staffId=${staff.id}`, { token: T })).json
   if (av.slots?.length) {
     const t = av.slots[0] as string
