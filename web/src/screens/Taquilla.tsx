@@ -4,6 +4,8 @@ import { printElement } from '../print'
 import { ScanButton } from '../Scanner'
 import { api, h12, mxn, everyVisible } from '../api'
 import type { Me } from '../App'
+import { EncabezadoNegocio } from '../PerfilPublico'
+import { Foto } from '../ilustraciones'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 
@@ -115,13 +117,14 @@ export function TiendaBoletos({ code }: { code: string }) {
   if (!info) return <main className="login">{err ? <p className="error">{err}</p> : <p className="muted">Cargando…</p>}</main>
   const total = info.types.reduce((a: number, t: any) => a + (qty[t.id] ?? 0) * t.price, 0)
   return (
-    <main className="login" style={{ maxWidth: 720 }}>
-      <h1>{info.business.name}</h1>
+    <main className="pub-wrap">
+      <EncabezadoNegocio business={info.business} profile={info.profile} />
+      <h2 style={{ margin: 0 }}>Compra tus boletos</h2>
       <div className="card">
         <label>Día de tu visita<input type="date" min={today()} value={date} onChange={(e) => { setDate(e.target.value); setF({ ...f, start: '' }) }} /></label>
         <div className="results" style={{ marginTop: 8 }}>{info.slots.map((s: any) => <button key={s.start} disabled={!s.available} className={f.start === s.start ? 'primary' : ''} onClick={() => setF({ ...f, start: s.start })}>{h12(s.start)}–{h12(s.end)}<small>{s.available} lugares</small></button>)}</div>
         <div className="table-wrap"><table className="list" style={{ marginTop: 8 }}><tbody>{info.types.map((t: any) => (
-          <tr key={t.id}><td>{t.name} · {mxn(t.price)}</td><td><div className="qty"><button onClick={() => setQty({ ...qty, [t.id]: Math.max(0, (qty[t.id] ?? 0) - 1) })}>−</button><b style={{ minWidth: 40, textAlign: 'center' }}>{qty[t.id] ?? 0}</b><button onClick={() => setQty({ ...qty, [t.id]: (qty[t.id] ?? 0) + 1 })}>+</button></div></td></tr>
+          <tr key={t.id}><td><span style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 64, flex: 'none' }}><Foto url={t.imageUrl} giro={info.business.giro} alto={48} radio={10} /></span><span>{t.name} · {mxn(t.price)}</span></span></td><td><div className="qty"><button onClick={() => setQty({ ...qty, [t.id]: Math.max(0, (qty[t.id] ?? 0) - 1) })}>−</button><b style={{ minWidth: 40, textAlign: 'center' }}>{qty[t.id] ?? 0}</b><button onClick={() => setQty({ ...qty, [t.id]: (qty[t.id] ?? 0) + 1 })}>+</button></div></td></tr>
         ))}</tbody></table></div>
         <div className="total">{mxn(total)}</div>
         <label>Nombre<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>

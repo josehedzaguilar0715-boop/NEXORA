@@ -142,7 +142,7 @@ function Servicios({ me }: { me: Me }) {
 
 function Boletos(_: { me: Me }) {
   const [list, setList] = useState<any[]>([])
-  const [f, setF] = useState({ id: '', name: '', price: '', orig: -1, authCode: '' })
+  const [f, setF] = useState({ id: '', name: '', price: '', orig: -1, authCode: '', imagenUrl: '', attrsPrev: {} as Record<string, any> })
   const { run, view } = useMsg()
   const load = async () => setList((await api<any>('GET', '/services')).services.filter((s: any) => s.category === 'boleto'))
   useEffect(() => { void load() }, [])
@@ -153,7 +153,7 @@ function Boletos(_: { me: Me }) {
           <h2>Tipos de boleto</h2>
           <div className="table-wrap"><table className="list"><tbody>
             {list.map((s) => (
-              <tr key={s.id} className={s.active ? 'clickable' : 'muted'} onClick={() => setF({ id: s.id, name: s.name, price: String(s.price / 100), orig: s.price, authCode: '' })}>
+              <tr key={s.id} className={s.active ? 'clickable' : 'muted'} onClick={() => setF({ id: s.id, name: s.name, price: String(s.price / 100), orig: s.price, authCode: '', imagenUrl: s.attrs?.imagenUrl ?? '', attrsPrev: s.attrs ?? {} })}>
                 <td>{s.name}</td><td className="num">{mxn(s.price)}</td>
                 <td className="num"><button className="mini" onClick={(e) => { e.stopPropagation(); void run(async () => { await api('PATCH', `/services/${s.id}`, { active: !s.active }); await load() }, s.active ? 'Eliminado. Lo puedes reactivar.' : 'Activado de nuevo.')() }}>{s.active ? 'Eliminar' : 'Reactivar'}</button></td>
               </tr>
@@ -167,14 +167,15 @@ function Boletos(_: { me: Me }) {
           <h2>{f.id ? 'Editar boleto' : 'Nuevo tipo de boleto'}</h2>
           <label>Nombre<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="Ej. Adulto" /></label>
           <label>Precio<input inputMode="decimal" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} placeholder="$0.00" /></label>
+          <label>Foto (dirección https de la imagen, opcional)<input value={f.imagenUrl} onChange={(e) => setF({ ...f, imagenUrl: e.target.value })} placeholder="https://…" /></label>
           {f.id && toCents(f.price) !== f.orig && <label>Código de autorización (cambio de precio)<input type="password" value={f.authCode} onChange={(e) => setF({ ...f, authCode: e.target.value })} /></label>}
           {view}
           <p className="row">
-            {f.id && <button onClick={() => setF({ id: '', name: '', price: '', orig: -1, authCode: '' })}>Cancelar</button>}
+            {f.id && <button onClick={() => setF({ id: '', name: '', price: '', orig: -1, authCode: '', imagenUrl: '', attrsPrev: {} as Record<string, any> })}>Cancelar</button>}
             <button className="primary" disabled={!f.name.trim() || f.price.trim() === ''} onClick={run(async () => {
-              const body = { name: f.name, price: toCents(f.price), category: 'boleto', ...(f.id && toCents(f.price) !== f.orig ? { authCode: f.authCode } : {}) }
+              const body = { name: f.name, price: toCents(f.price), category: 'boleto', ...(f.imagenUrl.trim() !== (f.attrsPrev.imagenUrl ?? '') ? { attrs: { ...f.attrsPrev, imagenUrl: f.imagenUrl.trim() || undefined } } : {}), ...(f.id && toCents(f.price) !== f.orig ? { authCode: f.authCode } : {}) }
               if (f.id) await api('PATCH', `/services/${f.id}`, body); else await api('POST', '/services', body)
-              setF({ id: '', name: '', price: '', orig: -1, authCode: '' }); await load()
+              setF({ id: '', name: '', price: '', orig: -1, authCode: '', imagenUrl: '', attrsPrev: {} as Record<string, any> }); await load()
             })}>{f.id ? 'Guardar cambios' : 'Agregar'}</button>
           </p>
         </section>

@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { imagenSegura, perfilPublico } from './escaparate.js'
 import { randomBytes } from 'node:crypto'
 import QRCode from 'qrcode'
 import { z } from 'zod'
@@ -303,9 +304,10 @@ publicTourism.get('/public/tickets-shop/:code', (c) => {
   const { db, now } = c.get('deps')
   const b = publicBiz(c)
   const date = c.req.query('date') ?? localDate(now())
-  const types = db.prepare("SELECT id, name, price FROM services WHERE business_id = ? AND active = 1 AND category = 'boleto' ORDER BY price DESC").all(b.id)
+  const types = (db.prepare("SELECT id, name, price, attrs FROM services WHERE business_id = ? AND active = 1 AND category = 'boleto' ORDER BY price DESC").all(b.id) as { id: string; name: string; price: number; attrs: string }[]).map(({ attrs, ...t }) => ({ ...t, imageUrl: imagenSegura((() => { try { return JSON.parse(attrs).imagenUrl } catch { return null } })()) }))
+  const logo = (db.prepare('SELECT logo_url FROM businesses WHERE id = ?').get(b.id) as { logo_url: string | null }).logo_url
   const slots = slotsFor(db, b.id, date).filter((s) => !s.closed && localToIso(date, s.end) > iso(now())).map(({ start, end, available }) => ({ start, end, available }))
-  return c.json({ business: { name: b.name, phone: b.phone, giro: b.giro }, date, types, slots })
+  return c.json({ business: { name: b.name, phone: b.phone, giro: b.giro, logoUrl: imagenSegura(logo) }, profile: perfilPublico(db, b.id), date, types, slots })
 })
 
 publicTourism.post('/public/tickets-shop/:code', async (c) => {

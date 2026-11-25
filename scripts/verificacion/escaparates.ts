@@ -21,13 +21,13 @@ const owner = async (giro: string) => {
   return own.json.token as string
 }
 const PERFIL = { descripcion: 'Atención con cita, sin esperas.', direccion: 'Av. Principal 123, Centro', horario: 'Lun a Sáb 9:00–20:00', instagram: 'minegocio', portadaUrl: 'https://imagenes-que-no-existe.invalid/portada.jpg' }
-for (const giro of ['barberia', 'unas', 'restaurante', 'taqueria', 'comedor', 'palapa', 'verduleria', 'abarrotes', 'perfumeria', 'ferreteria', 'papeleria']) {
+for (const giro of ['barberia', 'unas', 'restaurante', 'taqueria', 'comedor', 'palapa', 'verduleria', 'turistico', 'abarrotes', 'perfumeria', 'ferreteria', 'papeleria']) {
   const T = await owner(giro)
   const slug = (await s.call('GET', '/business/public-link', { token: T })).json.slug as string
   const agenda = giro === 'barberia' || giro === 'unas'
-  if (agenda) s.db.prepare("UPDATE businesses SET addons = '[\"reservas\"]', modules = '[\"reservas\"]' WHERE public_slug = ?").run(slug)
-  await s.call('PUT', '/escaparate', { token: T, body: { ...PERFIL, publicarCarta: !agenda } })
-  const ruta = agenda ? `/reservar/${slug}` : `/carta/${slug}`
+  if (agenda || giro === 'turistico') s.db.prepare("UPDATE businesses SET addons = '[\"reservas\"]', modules = '[\"reservas\"]' WHERE public_slug = ?").run(slug)
+  await s.call('PUT', '/escaparate', { token: T, body: { ...PERFIL, publicarCarta: !agenda && giro !== 'turistico' } })
+  const ruta = agenda ? `/reservar/${slug}` : giro === 'turistico' ? `/boletos/${slug}` : `/carta/${slug}`
   for (const [vn, vp] of [['pc', { width: 1366, height: 900 }], ['cel', { width: 390, height: 844 }]] as const) {
     const page = await (await browser.newContext({ viewport: vp })).newPage(); const errs: string[] = []
     page.on('pageerror', (e: Error) => errs.push(e.message))
@@ -37,10 +37,11 @@ for (const giro of ['barberia', 'unas', 'restaurante', 'taqueria', 'comedor', 'p
     ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `[${giro}/${vn}] sin desborde horizontal`)
     ok(errs.length === 0, `[${giro}/${vn}] sin errores de JS ${errs[0] ?? ''}`)
     if (agenda) { await page.locator('.pub-item').first().click(); ok(await page.locator('.pub-item.on').count() === 1, `[${giro}/${vn}] se puede elegir un servicio`) }
+    else if (giro === 'turistico') ok(await page.getByText('Compra tus boletos').count() > 0, `[${giro}/${vn}] tienda de boletos con portada y datos`)
     else ok(await page.locator('.pub-item, .pub-fila').count() > 0, `[${giro}/${vn}] muestra artículos`)
     const texto = await page.locator('main').innerText()
     ok(!/costo|existencia|stock/i.test(texto), `[${giro}/${vn}] sin datos internos`)
-    if (['barberia', 'restaurante', 'verduleria'].includes(giro)) await page.screenshot({ path: `${shots}/${giro}-${vn}.png`, fullPage: true })
+    if (['barberia', 'restaurante', 'verduleria', 'turistico'].includes(giro)) await page.screenshot({ path: `${shots}/${giro}-${vn}.png`, fullPage: true })
     await page.context().close()
   }
 }
