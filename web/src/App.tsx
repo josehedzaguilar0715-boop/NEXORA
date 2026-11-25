@@ -136,7 +136,7 @@ const DESC: Record<string, string> = {
 const SCREENS: Screen[] = [
   { key: 'inicio', label: 'Inicio', perm: 'staff', C: Inicio, group: '', icon: LayoutDashboard, ownTitle: true },
   { key: 'caja', label: 'Caja', perm: 'sell', C: Caja, group: 'Operación', icon: ShoppingCart },
-  { key: 'agenda', label: 'Agenda', perm: 'sell', C: Agenda, giros: ['barberia', 'unas'], group: 'Operación', icon: CalendarDays },
+  { key: 'agenda', label: 'Agenda', perm: 'sell', C: Agenda, giros: ['barberia', 'unas'], group: 'Operación', icon: CalendarDays, ownTitle: true },
   { key: 'entradas', label: 'Entradas', perm: 'sell', C: Entradas, giros: ['banos'], group: 'Operación', icon: DoorOpen },
   { key: 'taquilla', label: 'Taquilla', perm: 'sell', C: Taquilla, giros: ['turistico'], group: 'Operación', icon: Ticket },
   { key: 'acceso', label: 'Acceso', perm: 'sell', C: Acceso, giros: ['turistico'], group: 'Operación', icon: ScanLine, ownTitle: true },

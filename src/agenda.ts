@@ -69,6 +69,12 @@ function publicStaffName(db: Db, userId: string, fullName: string) {
   return u?.role === 'owner' ? u.business : publicName(fullName)
 }
 
+/** Fotos de quien atiende (dirección https); se guardan en los ajustes del negocio, sin cambiar el esquema. */
+function fotosPersonal(db: Db, businessId: string): Record<string, string> {
+  const row = db.prepare("SELECT value FROM business_settings WHERE business_id = ? AND key = 'fotosPersonal'").get(businessId) as { value: string } | undefined
+  try { const v = row ? JSON.parse(row.value) : {}; return v && typeof v === 'object' ? v : {} } catch { return {} }
+}
+
 export function agendaStaff(db: Db, businessId: string) {
   return db.prepare("SELECT id, name FROM users WHERE business_id = ? AND active = 1 AND in_agenda = 1 ORDER BY name").all(businessId) as { id: string; name: string }[]
 }
@@ -133,8 +139,24 @@ export const agenda = new Hono<Env>()
 agenda.get('/agenda/staff', (c) => {
   const { db } = c.get('deps')
   const br = scopeBranch(c)
-  const staff = agendaStaff(db, c.get('session').user.business_id).filter((s) => !br || (db.prepare('SELECT branch_id FROM users WHERE id = ?').get(s.id) as { branch_id: string | null }).branch_id === br).map((s) => ({ ...s, schedule: db.prepare('SELECT weekday, start, end FROM staff_schedules WHERE user_id = ? ORDER BY weekday, start').all(s.id) }))
+  const fotos = fotosPersonal(db, c.get('session').user.business_id)
+  const staff = agendaStaff(db, c.get('session').user.business_id).filter((s) => !br || (db.prepare('SELECT branch_id FROM users WHERE id = ?').get(s.id) as { branch_id: string | null }).branch_id === br).map((s) => ({ ...s, photoUrl: imagenSegura(fotos[s.id]), schedule: db.prepare('SELECT weekday, start, end FROM staff_schedules WHERE user_id = ? ORDER BY weekday, start').all(s.id) }))
   return c.json({ staff })
+})
+
+/** Foto de un profesional (dirección https o vacía para quitarla). */
+agenda.put('/staff/:id/photo', ownerOnly, async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const target = db.prepare('SELECT id FROM users WHERE id = ? AND business_id = ?').get(c.req.param('id'), u.business_id) as { id: string } | undefined
+  if (!target) throw notFound()
+  const d = parse(z.object({ url: z.string().trim().max(500).nullable() }), await body(c))
+  if (d.url && !imagenSegura(d.url)) throw bad('La foto debe ser una dirección que empiece con https://')
+  const fotos = fotosPersonal(db, u.business_id)
+  if (d.url) fotos[target.id] = d.url; else delete fotos[target.id]
+  db.prepare("INSERT INTO business_settings (business_id, key, value) VALUES (?, 'fotosPersonal', ?) ON CONFLICT(business_id, key) DO UPDATE SET value = excluded.value").run(u.business_id, JSON.stringify(fotos))
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'agenda.foto', entity: 'user', entityId: target.id, newValue: { foto: !!d.url } })
+  return c.json({ photoUrl: d.url ? imagenSegura(d.url) : null })
 })
 
 /** Horario semanal (un día sin renglones es de descanso). */
@@ -176,15 +198,18 @@ agenda.get('/agenda', requirePerm('sell'), (c) => {
   const u = c.get('session').user
   const date = c.req.query('date') ?? localDate(now())
   const from = localToIso(date, '00:00')
-  const to = addMin(from, 1440)
+  const days = Math.min(7, Math.max(1, Math.floor(Number(c.req.query('days') ?? 1)) || 1))
+  const to = addMin(from, 1440 * days)
   const staffId = c.req.query('staffId')
   const br = scopeBranch(c) // la agenda de la sucursal (dueño: todas)
   const rows = db.prepare(`SELECT * FROM appointments WHERE business_id = ? AND starts_at >= ? AND starts_at < ? ${staffId ? 'AND staff_id = ?' : ''} ${br ? 'AND branch_id = ?' : ''} ORDER BY starts_at`).all(...[u.business_id, from, to, ...(staffId ? [staffId] : []), ...(br ? [br] : [])]) as ApptRow[]
   const blocks = db.prepare(`SELECT b.id, b.user_id AS staffId, b.starts_at AS startsAt, b.ends_at AS endsAt, b.reason FROM agenda_blocks b WHERE b.business_id = ? AND b.starts_at < ? AND b.ends_at > ? ${staffId ? 'AND b.user_id = ?' : ''} ${br ? 'AND b.user_id IN (SELECT id FROM users WHERE branch_id = ?)' : ''}`).all(...[u.business_id, to, from, ...(staffId ? [staffId] : []), ...(br ? [br] : [])])
-  // Horario de cada persona ese día de la semana (para ver sus horas libres).
-  const weekday = new Date(`${date}T12:00:00-06:00`).getUTCDay()
-  const hours = db.prepare(`SELECT s.user_id AS staffId, s.start, s.end FROM staff_schedules s JOIN users u ON u.id = s.user_id WHERE u.business_id = ? AND u.active = 1 AND u.in_agenda = 1 AND s.weekday = ? ${br ? 'AND u.branch_id = ?' : ''} ORDER BY s.start`).all(u.business_id, weekday, ...(br ? [br] : []))
-  return c.json({ date, appointments: rows.map((a) => apptView(db, a)), blocks, hours })
+  // Horario de cada persona por día (para ver sus horas libres y los descansos).
+  const hoursOf = (d: string) => db.prepare(`SELECT s.user_id AS staffId, s.start, s.end FROM staff_schedules s JOIN users u ON u.id = s.user_id WHERE u.business_id = ? AND u.active = 1 AND u.in_agenda = 1 AND s.weekday = ? ${br ? 'AND u.branch_id = ?' : ''} ORDER BY s.start`).all(...[u.business_id, weekdayOf(d), ...(br ? [br] : [])]) as { staffId: string; start: string; end: string }[]
+  const hoursByDay: Record<string, { staffId: string; start: string; end: string }[]> = {}
+  for (let i = 0; i < days; i++) { const d = localDate(new Date(addMin(from, 1440 * i + 720))); hoursByDay[d] = hoursOf(d) }
+  const hours = hoursByDay[date] ?? hoursOf(date)
+  return c.json({ date, days, appointments: rows.map((a) => apptView(db, a)), blocks, hours, hoursByDay })
 })
 
 agenda.get('/agenda/availability', requirePerm('sell'), (c) => {
@@ -317,6 +342,27 @@ agenda.post('/appointments/:id/no-show', (c) => transition(c, ['pendiente', 'con
 agenda.post('/appointments/:id/cancel', async (c) => {
   const d = parse(z.object({ reason: z.string().trim().min(2).max(200) }), await body(c))
   return transition(c, ['pendiente', 'confirmada', 'en_atencion'], 'cancelada', 'cita.cancelada', (a) => void c.get('deps').db.prepare('UPDATE appointments SET cancel_reason = ? WHERE id = ?').run(d.reason, a.id))
+})
+
+/** Editar una cita que sigue abierta: cliente, teléfono, notas y servicios (la duración se recalcula y no puede cruzarse con otra cita). */
+agenda.patch('/appointments/:id', async (c) => {
+  const { db, now } = c.get('deps')
+  const u = c.get('session').user
+  const a = loadAppt(c)
+  if (!canHandle(u, a)) throw forbidden()
+  if (a.sale_id || a.completed_at || !['pendiente', 'confirmada', 'en_atencion'].includes(a.status)) throw conflict('Esta cita ya no se puede editar.', 'estado_invalido')
+  const d = parse(z.object({ customerName: z.string().trim().min(2).max(100).optional(), phone: z.string().trim().max(20).nullable().optional(), notes: z.string().max(1000).nullable().optional(), serviceIds: z.array(z.string()).min(1).max(10).optional() }), await body(c))
+  let services = a.services; let endsAt = a.ends_at
+  if (d.serviceIds) {
+    const { list, duration } = buildServices(db, u.business_id, d.serviceIds)
+    endsAt = addMin(a.starts_at, duration)
+    const f = isFree(db, a.staff_id!, addMin(a.starts_at, -a.travel_min), addMin(endsAt, a.travel_min), a.id)
+    if (!f.ok) throw conflict(`Con esos servicios no cabe: ${f.why}.`, 'horario_ocupado')
+    services = JSON.stringify(list)
+  }
+  db.prepare('UPDATE appointments SET customer_name = ?, phone = ?, notes = ?, services = ?, ends_at = ? WHERE id = ?').run(d.customerName ?? a.customer_name, d.phone === undefined ? a.phone : d.phone ? normalizePhone(d.phone) : null, d.notes === undefined ? a.notes : d.notes, services, endsAt, a.id)
+  audit(db, now, { businessId: u.business_id, userId: u.id, action: 'cita.editada', entity: 'appointment', entityId: a.id, oldValue: { services: a.services, endsAt: a.ends_at }, newValue: { services, endsAt } })
+  return c.json({ appointment: apptView(db, db.prepare('SELECT * FROM appointments WHERE id = ?').get(a.id) as ApptRow) })
 })
 
 agenda.post('/appointments/:id/reschedule', async (c) => {
