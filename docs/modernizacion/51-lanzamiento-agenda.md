@@ -52,3 +52,10 @@ Cloudflare desde las 15:03 UTC (evolución y Agenda): **395 eventos, 0 de nivel 
 ### Revisión de las 16:09 UTC (tarea programada de la Agenda)
 - Cloudflare desde las 15:46 UTC: **36 eventos, 0 de nivel error**; producción sigue sirviendo `9a0ff173…` al 100 %. Sin motivo de reversión.
 - «Verificar despliegue»: **no se pudo repetir** a las 16:09 UTC porque la API de GitHub Actions devolvió error 500 (disparo y repetición de ejecución). La última verificación externa en verde es la de las 15:48 UTC, posterior al despliegue.
+
+## Corrección del 25-nov 16:25 UTC: la cita de FENIX BARBERÍA no aparecía
+- **Causa (confirmada con una copia aislada del respaldo real):** la cita abierta de FENIX (confirmada, reservada por el link público, 25-nov 10:30 a. m.) estaba asignada a un profesional que **ya no está activo** en la agenda; el dueño tampoco está marcado como «atiende citas». La Agenda dibuja una columna por profesional activo, así que esa cita quedaba sin columna (pasaba igual en la lista).
+- **Corrección (solo pantalla; sin tocar datos):** una cita nunca se esconde. Si su profesional ya no atiende, aparece en su propia columna «Nombre (ya no atiende)», en el calendario y en la lista, con todas sus acciones (confirmar, atender, terminar, reprogramar, editar, cancelar).
+- **Prueba con los datos reales (copia):** la cita aparece como bloque en el calendario y en la lista, en escritorio y celular (`scripts/verificacion/fenix-cita.ts`); el resto de pruebas siguen en verde (agenda en navegador, e2e, tipos).
+- **Despliegue:** `585fbef6-17a6-4edd-b7ac-27cc39e8363a` (commit `7ebfa7ffee15d9f811106bf22e6ee21614ab5d7a`), 100 % del tráfico desde las 16:25 UTC; anterior `9a0ff173…`. Sin migraciones ni cambios de datos.
+- **Pendiente de configuración (lo hace el dueño, no el sistema):** para poder agendar nuevas citas, alguien debe estar marcado como «Atiende citas» con su horario en Personal → Horario de agenda.
