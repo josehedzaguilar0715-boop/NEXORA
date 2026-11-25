@@ -82,4 +82,30 @@ describe('pendientes de hoy y pedido sugerido', () => {
     expect((await s.call('POST', `/customers/${cli.id}/credit-charges`, { token: caj.token, body: { amount: 1000, note: 'Faltó' } })).json.error.code).toBe('codigo_requerido')
     expect((await s.call('POST', `/customers/${cli.id}/credit-charges`, { token: caj.token, body: { amount: 1000, note: 'Faltó', authCode: '4321' } })).json.balance).toBe(36000)
   })
+
+  it('fidelidad: avisa a quienes les falta 1 sello para cada premio, con su mensaje de WhatsApp (4 de 5 → facial)', async () => {
+    const { s, T } = await negocioListo()
+    s.setGiro('barberia')
+    await s.call('PUT', '/modules', { token: T, body: { active: ['fidelidad'] } })
+    await s.call('PUT', '/loyalty', { token: T, body: { unit: 'sellos', earnBy: 'venta', earnPoints: 1, scope: 'todos', dailyCap: 3 } })
+    await s.call('POST', '/loyalty/rewards', { token: T, body: { name: 'Facial', cost: 5 } })
+    await s.call('POST', '/loyalty/rewards', { token: T, body: { name: 'Corte gratis', cost: 10 } })
+    const dar = async (name: string, phone: string, n: number) => { const c = (await s.call('POST', '/customers', { token: T, body: { name, phone } })).json.customer; if (n) await s.call('POST', `/customers/${c.id}/stamps/adjust`, { token: T, body: { delta: n, reason: 'Sellos' } }); return c }
+    await dar('Ana López', '5511111111', 4)      // 4 de 5 → falta 1 (Facial)
+    await dar('Beto Ruiz', '5522222222', 9)      // 9 de 10 → falta 1 (Corte gratis)
+    await dar('Carla Soto', '5533333333', 3)     // 3: aún no
+    await dar('Diego Paz', '5544444444', 5)      // 5: ya puede canjear el Facial (otra tarea)
+    const t = (await s.call('GET', '/today', { token: T })).json.tasks.find((x: any) => x.key === 'casi_premio')
+    expect(t.items.map((i: any) => i.label).sort()).toEqual(['Ana López', 'Beto Ruiz'])
+    const ana = t.items.find((i: any) => i.label === 'Ana López')
+    expect(ana.sub).toContain('Facial'); expect(ana.sub).toContain('lleva 4 de 5')
+    expect(ana.message).toContain('te falta solo 1 sello para tu Facial'); expect(ana.phone).toBe('5511111111')
+    expect(t.items.find((i: any) => i.label === 'Beto Ruiz').message).toContain('Corte gratis')
+    // Al dar el sello que faltaba, deja de salir en este aviso (y pasa a «puede canjear»).
+    const c = (await s.call('GET', '/customers?q=Ana', { token: T })).json.customers[0]
+    await s.call('POST', `/customers/${c.id}/stamps/adjust`, { token: T, body: { delta: 1, reason: 'Visita' } })
+    const t2 = (await s.call('GET', '/today', { token: T })).json.tasks.find((x: any) => x.key === 'casi_premio')
+    expect(t2.items.map((i: any) => i.label)).toEqual(['Beto Ruiz'])
+    expect((await s.call('GET', '/today', { token: T })).json.tasks.find((x: any) => x.key === 'premios').items.map((i: any) => i.label).sort()).toEqual(['Ana López', 'Beto Ruiz', 'Diego Paz'])
+  })
 })

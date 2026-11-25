@@ -111,6 +111,19 @@ export function todayTasks(db: Db, u: UserRow, now: Date): Task[] {
         items: ready.slice(0, 8).map((x) => ({ label: x.name, sub: `${x.bal} sellos`, phone: x.phone, message: `Hola ${first(x.name)}, ¡ya juntaste ${x.bal} sellos en ${biz}! Ya puedes canjear tu premio en tu próxima visita.` })) })
     }
   }
+  // Tarjeta de sellos: clientes a UN sello de cada premio (por premio: «a los 4 sellos, al 5.º el facial»). El mensaje queda listo; nada se envía solo.
+  if (moduleOn(db, b, 'fidelidad') && hasPerm(u, 'sell')) {
+    const prog = db.prepare('SELECT unit FROM loyalty_program WHERE business_id = ?').get(b) as { unit: string } | undefined
+    if (prog?.unit === 'sellos') {
+      const rewards = db.prepare('SELECT name, cost FROM loyalty_rewards WHERE business_id = ? AND active = 1 AND cost >= 2 ORDER BY cost').all(b) as { name: string; cost: number }[]
+      const items: TaskItem[] = []
+      for (const r of rewards) {
+        const rows = db.prepare('SELECT c.name, c.phone, SUM(l.delta) AS bal FROM loyalty_ledger l JOIN customers c ON c.id = l.customer_id WHERE l.business_id = ? AND c.active = 1 GROUP BY c.id HAVING bal = ? ORDER BY c.name').all(b, r.cost - 1) as { name: string; phone: string | null; bal: number }[]
+        for (const x of rows) items.push({ label: x.name, sub: `Le falta 1 sello para «${r.name}» (lleva ${x.bal} de ${r.cost})`, phone: x.phone, message: `Hola ${first(x.name)}, ¡te falta solo 1 sello para tu ${r.name} en ${biz}! En tu próxima visita lo completas y recibes tu recompensa.` })
+      }
+      if (items.length) tasks.push({ key: 'casi_premio', tone: 'info', title: `${plural(items.length, 'cliente está', 'clientes están')} a 1 sello de su premio`, detail: 'Avísales para que regresen: con el próximo sello reciben su recompensa.', screen: 'clientes', items: items.slice(0, 20) })
+    }
+  }
   // Primeros pasos (solo el dueño, los primeros 60 días): lo que falta para empezar a vender, según su giro.
   if (u.role === 'owner') {
     const created = (db.prepare('SELECT created_at FROM businesses WHERE id = ?').get(b) as { created_at: string }).created_at
