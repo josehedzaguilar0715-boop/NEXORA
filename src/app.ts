@@ -15,6 +15,7 @@ import { layaways } from './layaways.js'
 import { reset } from './reset.js'
 import { campaigns, publicCampaigns } from './campaigns.js'
 import { today } from './today.js'
+import { plano } from './plano.js'
 import { escaparate, publicEscaparate } from './escaparate.js'
 import { notifications } from './notifications.js'
 import { publicLinks } from './publiclinks.js'
@@ -89,6 +90,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', baths)
   protectedApp.route('/', tourism)
   protectedApp.route('/', dining)
+  protectedApp.route('/', plano)
   protectedApp.route('/', menus)
   protectedApp.route('/', taqueria)
   protectedApp.route('/', inventory)

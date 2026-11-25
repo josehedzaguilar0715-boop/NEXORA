@@ -4,6 +4,7 @@ import { api, mxn, toCents, everyVisible } from '../api'
 import { ask, askCode } from '../Dialog'
 import { can, type Me, hasGiro } from '../App'
 import type { Product } from './Caja'
+import { PlanoMesas } from './PlanoMesas'
 
 const COLORS: Record<string, string> = { libre: 'var(--ok)', ocupada: 'var(--accent)', reservada: '#2563eb', por_cobrar: 'var(--danger)', limpieza: 'var(--muted)' }
 const LABEL: Record<string, string> = { libre: 'Libre', ocupada: 'Ocupada', reservada: 'Reservada', por_cobrar: 'Por cobrar', limpieza: 'En limpieza' }
@@ -16,6 +17,8 @@ export function Mesas({ me }: { me: Me }) {
   const [msg, setMsg] = useState('')
   const [filtro, setFiltro] = useState('todas')
   const [panel, setPanel] = useState<'' | 'reservas' | 'rentas'>('')
+  const [vista, setVista] = useState<'lista' | 'plano'>(() => { try { return localStorage.getItem('nx_mesas_vista') === 'plano' ? 'plano' : 'lista' } catch { return 'lista' } })
+  const cambiarVista = (v: 'lista' | 'plano') => { setVista(v); try { localStorage.setItem('nx_mesas_vista', v) } catch { /* sin almacenamiento */ } }
   const load = async () => setTables((await api<any>('GET', '/tables')).tables)
   useEffect(() => { void load(); return everyVisible(load, 15_000) }, [])
   const openTable = async (t: any) => {
@@ -38,6 +41,7 @@ export function Mesas({ me }: { me: Me }) {
         {([['todas', 'Todas', tables.length], ['libre', 'Libres', cuenta('libre')], ['activas', 'Con cuenta abierta', cuenta('ocupada') + cuenta('por_cobrar')], ['por_cobrar', 'Por cobrar', cuenta('por_cobrar')], ['limpieza', 'Por limpiar', cuenta('limpieza')]] as [string, string, number][]).filter(([k, , n]) => k === 'todas' || n > 0 || filtro === k).map(([k, label, n]) => <button key={k} className={filtro === k ? 'on' : ''} aria-pressed={filtro === k} onClick={() => setFiltro(k)}>{label} <b>{n}</b></button>)}
       </div>
       <div className="toolbar">
+        <div className="row chips" role="group" aria-label="Vista de mesas"><button aria-pressed={vista === 'lista'} className={vista === 'lista' ? 'on' : ''} onClick={() => cambiarVista('lista')}>Lista</button><button aria-pressed={vista === 'plano'} className={vista === 'plano' ? 'on' : ''} onClick={() => cambiarVista('plano')}>Plano</button></div>
         <button onClick={() => setPanel('reservas')}>Reservas de mesa</button>
         {hasGiro(me, 'palapa') && <button onClick={() => setPanel('rentas')}>Rentas fuera</button>}
         <span className="muted small" style={{ flex: 1, textAlign: 'right' }}>Toca una mesa para abrir su cuenta.</span>
@@ -45,7 +49,8 @@ export function Mesas({ me }: { me: Me }) {
       {panel === 'reservas' && <Reservas me={me} tables={tables} onClose={() => { setPanel(''); void load() }} />}
       {panel === 'rentas' && <RentasFuera onClose={() => setPanel('')} />}
       {msg && <p className="error">{msg}</p>}
-      {areas.map((a) => (
+      {vista === 'plano' && visibles.length > 0 && <PlanoMesas tables={visibles} puedeEditar={can(me, 'configure_catalog')} onOpen={openTable} />}
+      {vista === 'lista' && areas.map((a) => (
         <section key={a} className="card" style={{ marginBottom: 16 }}>
           <h2 style={{ textTransform: 'capitalize' }}>{a}</h2>
           <div className="results">{visibles.filter((t) => t.area === a).map((t) => (
