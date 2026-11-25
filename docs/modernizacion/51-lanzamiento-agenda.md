@@ -35,3 +35,13 @@ Autorización expresa del propietario (25-nov-2026) para publicar la mejora de A
 
 ## Reversión (si hiciera falta)
 `CLOUDFLARE_API_TOKEN=dummy NODE_USE_ENV_PROXY=1 npx wrangler rollback 51773d59-c582-40b8-bfbe-a72451fa9de9 --env production --message "reversión"`. Solo código; la única clave nueva en datos es `fotosPersonal` (ajustes), que la versión anterior ignora.
+
+## Resultado de la verificación posterior (25-nov 15:48 UTC)
+| Comprobación | Resultado |
+|---|---|
+| Despliegues de producción | `9a0ff173-b574-420a-97d9-5d31271e446b` al 100 % |
+| GitHub «Verificar despliegue» (repetición de la ejecución 8, intento 2, 15:48 UTC: producción **y** staging) | **En verde**: salud, esquema 48, pantalla principal, aplicación en la página, credenciales falsas rechazadas, rutas con datos exigen sesión, ruta interna de respaldos no alcanzable, salud del sistema con sesión de soporte, encabezados de seguridad |
+| Cloudflare (observabilidad) desde el despliegue | 13 eventos, **0 de nivel error** |
+| Incidencias | Ninguna (el único tropiezo fue un error 500 de GitHub al disparar el flujo directamente; se resolvió repitiendo la ejecución) |
+
+Seguimiento: revisión automática a las 16:08 UTC (con reversión a `51773d59…` si hubiese errores repetidos) y comparación del respaldo de las 09:17 UTC del 26-nov.
