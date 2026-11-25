@@ -140,7 +140,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
   const canEdit = can(me, 'configure_catalog')
   const [f, setF] = useState({
     name: p?.name ?? '', barcode: p?.barcode ?? '', unit: p?.unit ?? 'pieza', price: p ? String(p.price / 100) : '', minStock: String(p?.minStock ?? 0), categoryId: p?.categoryId ?? '',
-    authCode: '', imagenUrl: p?.attrs?.imagenUrl ?? '', brand: p?.attrs?.brand ?? '', fragrance: p?.attrs?.fragrance ?? '', sizeMl: p?.attrs?.sizeMl ? String(p.attrs.sizeMl) : '', presentation: p?.attrs?.presentation ?? 'regular',
+    authCode: '', imagenUrl: p?.attrs?.imagenUrl ?? '', descripcion: p?.attrs?.descripcion ?? '', brand: p?.attrs?.brand ?? '', fragrance: p?.attrs?.fragrance ?? '', sizeMl: p?.attrs?.sizeMl ? String(p.attrs.sizeMl) : '', presentation: p?.attrs?.presentation ?? 'regular',
     trackStock: p ? p.trackStock !== false : true, trackExpiry: !!p?.trackExpiry, stock: '', cost: p?.lastCost ? String(Math.round(p.lastCost) / 100) : '', margin: (p as any)?.marginBp != null ? String((p as any).marginBp / 100) : '',
     packOn: !!p?.pack, packName: p?.pack?.name ?? 'Bolsa', packSize: p?.pack ? String(p.pack.size) : '', packCost: p?.pack && p.lastCost ? String(Math.round(p.lastCost * p.pack.size) / 100) : '',
     wholesale: p?.tiers?.length === 1 ? String(p.tiers[0]!.price / 100) : '', wholesaleMin: p?.tiers?.length === 1 ? String(p.tiers[0]!.minQuantity) : '',
@@ -149,7 +149,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
   const [err, setErr] = useState('')
   const [confirmDel, setConfirmDel] = useState(false)
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
-  const attrs = perfume ? { ...(p?.attrs ?? {}), brand: f.brand || undefined, fragrance: f.fragrance || undefined, sizeMl: Number(f.sizeMl) || undefined, presentation: f.presentation } : undefined
+  const attrs = perfume ? { ...(p?.attrs ?? {}), brand: f.brand || undefined, fragrance: f.fragrance || undefined, descripcion: f.descripcion.trim() || undefined, sizeMl: Number(f.sizeMl) || undefined, presentation: f.presentation } : undefined
   // Foto por dirección (https): se guarda junto a los demás atributos sin borrarlos. Solo se toca si cambió.
   const imagenCambio = f.imagenUrl.trim() !== (p?.attrs?.imagenUrl ?? '')
   const attrsOut = attrs ? { ...attrs, imagenUrl: f.imagenUrl.trim() || undefined } : imagenCambio ? { ...(p?.attrs ?? {}), imagenUrl: f.imagenUrl.trim() || undefined } : undefined
@@ -203,6 +203,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
       <div className="row"><input aria-label="Código de barras" value={f.barcode} onChange={set('barcode')} onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()} placeholder="Escanéalo o escríbelo" disabled={!canEdit} />{canEdit && <ScanButton onCode={(c) => setF((x) => ({ ...x, barcode: c }))} />}</div>
       {perfume && (<>
         <div className="row"><label>Marca<input value={f.brand} onChange={set('brand')} /></label><label>Fragancia<input value={f.fragrance} onChange={set('fragrance')} /></label></div>
+        <label>Notas olfativas (se muestran en tu catálogo)<input value={f.descripcion} maxLength={120} onChange={set('descripcion')} placeholder="Cítrico, madera, ámbar…" /></label>
         <div className="row"><label>Mililitros<input inputMode="numeric" value={f.sizeMl} onChange={set('sizeMl')} /></label>
           <label>Presentación<select value={f.presentation} onChange={set('presentation')}><option value="regular">Regular</option><option value="decant">Decant</option><option value="set">Set</option><option value="tester">Tester (uso interno)</option><option value="muestra">Muestra (uso interno)</option><option value="envase">Envase (uso interno)</option></select></label></div>
       </>)}

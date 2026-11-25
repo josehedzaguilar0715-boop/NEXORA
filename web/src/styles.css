@@ -789,3 +789,8 @@ button.pub-item.on { border-color: var(--accent, #2563eb); box-shadow: 0 0 0 2px
 .mesa-plano b { font-size: 1.05rem; }
 .mesa-plano small { font-size: 0.78rem; font-weight: 700; }
 .plano-leyenda { display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 100%; }
+
+/* Tablero de encargos */
+.enc-card { display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--line, #e3e7ee); border-radius: 14px; margin-bottom: 10px; background: var(--card, #fff); }
+.enc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.enc-acc { display: flex; gap: 6px; flex-wrap: wrap; }

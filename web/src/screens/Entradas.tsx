@@ -70,7 +70,14 @@ export function Entradas(_: { me: Me }) {
         </div>
         <div className="card" style={{ marginTop: 16 }}>
           <h2>Limpieza</h2>
-          <div className="results">{tasks.map((t) => <button key={t.id} onClick={async () => { await api('POST', '/cleaning/log', { taskId: t.id }); void load() }}>✔ {t.name}</button>)}</div>
+          <p className="muted small" style={{ margin: '0 0 8px' }}>Toca una tarea cuando la termines. Se marca en rojo si pasan más de 2 horas o aún no se hace hoy.</p>
+          <div className="results">{tasks.map((t) => {
+            const ultima = log.filter((l) => l.task === t.name).map((l) => Date.parse(l.at)).sort((a, b) => b - a)[0]
+            const min = ultima ? Math.round((Date.now() - ultima) / 60_000) : null
+            const tarde = min === null || min > 120
+            const texto = min === null ? 'Sin limpiar hoy' : min < 60 ? `Hace ${min} min` : `Hace ${Math.floor(min / 60)} h ${min % 60} min`
+            return <button key={t.id} style={tarde ? { borderColor: 'var(--danger)', borderWidth: 3 } : undefined} onClick={async () => { await api('POST', '/cleaning/log', { taskId: t.id }); void load() }}>✔ {t.name}<small style={tarde ? { color: 'var(--danger)', fontWeight: 700 } : undefined}>{tarde ? `Pendiente · ${texto}` : texto}</small></button>
+          })}</div>
           <div className="table-wrap"><table className="list"><tbody>{log.map((l, i) => <tr key={i}><td>{new Date(l.at).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })}</td><td>{l.task}</td><td className="muted">{l.who}</td></tr>)}</tbody></table></div>
         </div>
       </section>
