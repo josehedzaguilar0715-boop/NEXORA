@@ -2,7 +2,7 @@
 
 **Candidato (congelado):** `70c85d7e91e00221c373e8bd96708d7fe85f7450` en `diseno-v0` (los commits posteriores solo agregan documentos y scripts de verificación; la aplicación no cambió).
 **Producción hoy:** versión `34191efa`, esquema 48. **Migraciones a aplicar: ninguna.** No se publicó nada. No se generó ni instaló `BACKUP_KEY`.
-**Estado de este documento:** parte A completa (madrugada, 04:20 UTC). Parte B (comparación del respaldo de las 09:17 UTC, nueva verificación externa y errores) la completa la tarea programada de las 09:35 UTC; el veredicto final está al final.
+**Estado de este documento:** completo (parte A de la madrugada y parte B de las 09:35 UTC). Veredicto al final.
 
 ## A. Validaciones completadas sin intervención de los dueños
 | # | Validación | Resultado |
@@ -39,4 +39,17 @@ Mitigación: el recorrido #9 y los flujos #10 usan **sus datos reales** (copia d
 Sin cambios respecto de los docs 44 §12–13: respaldo fresco ≤ 24 h (existe el de las 03:56 UTC y el de las 09:17) → `npm run deploy:prod` → «Verificar despliegue» + observabilidad 30–60 min → reversión con `wrangler rollback` a `34191efa` si hay errores > 1 %, fallo de inicio de sesión, Caja/Agenda con errores o `schema ≠ 48`. Los datos nuevos del candidato (`perfil`, `planoMesas`, `imagenUrl`) son claves adicionales que la versión anterior ignora.
 
 ## B. Resultados automáticos de las 09:35 UTC y veredicto
-__PENDIENTE_TAREA_PROGRAMADA__
+**Ejecutado automáticamente el 25-nov 09:35–09:45 UTC (solo lectura).**
+| Comprobación | Resultado |
+|---|---|
+| Respaldo automático de las 09:17 UTC (`nexora-2026-11-25T09-17.json.gz`) | Existe, sin cifrar (la llave aún no está instalada), gzip válido, esquema 48 |
+| Comparación contra el respaldo previo al lanzamiento | Esquema 42 → 48; negocios 11 → 11, usuarios 22 → 22, productos 172 → 172, ventas 95 → 99. Única tabla marcada: `push_subscriptions` (un dispositivo del mismo usuario renovó su suscripción: tabla viva, benigno). Ninguna otra pérdida |
+| Comparación contra el respaldo manual de las 03:56 UTC | **Nada se perdió ni se alteró** (solo tablas vivas) |
+| Restauración aislada del respaldo de las 09:17 | Integridad ok, 0 referencias rotas, 11 negocios, 99 ventas, esquema 48, `error_log` con 0 filas |
+| Verificación externa (GitHub «Verificar despliegue», ejecución 7, 09:36 UTC) | **Producción y staging en verde** |
+| Errores en Cloudflare, producción, últimas 12 h | 1,305 eventos, **0 de nivel error** |
+| Recorrido en navegador sobre la copia real, modo oscuro | 466 pantallas; el único hallazgo es el mismo desborde cosmético de Ajustes (§B1) |
+
+### VEREDICTO: **LISTO PARA AUTORIZAR**
+Sin pérdidas críticas, restauración aislada correcta, producción y staging en verde, 0 errores nuevos, 0 migraciones. Condiciones que **no** se pudieron cubrir y se aceptan como limitación documentada: sesiones con credenciales reales de los dueños (§Limitaciones). Único pendiente para el dueño: instalar `BACKUP_KEY` (no bloquea la publicación).
+Candidato a publicar: `70c85d7e91e00221c373e8bd96708d7fe85f7450`.

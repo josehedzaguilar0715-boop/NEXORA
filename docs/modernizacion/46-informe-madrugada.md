@@ -25,3 +25,10 @@ Tarea programada `trig_01JWjjYW1vJGh9bz28m1D69e` a las 09:35 UTC: baja el respal
 - Medio: validación con negocios reales sin hacer (riesgo de que algo propio de sus datos no aparezca en demostraciones).
 - Bajo: si la llave se pega mal, los respaldos fallan (no se guardan sin cifrar); se revisa la huella al instalar y se retira el secreto si falla.
 - Pendiente de seguridad existente: respaldos sin cifrar hasta instalar la llave.
+
+## Resultado de las 09:35 UTC (tarea programada)
+- Respaldo automático de las 09:17 UTC: esquema 48, 11 negocios, 99 ventas; restaurado en base aislada (integridad ok, 0 referencias rotas).
+- Comparado con el previo al lanzamiento y con el manual de las 03:56: nada perdido (solo `push_subscriptions`, tabla viva, por renovación de suscripción de un dispositivo).
+- «Verificar despliegue» (producción y staging): verde. Cloudflare, 12 h: 1,305 eventos, 0 errores.
+- Recorrido sobre la copia real en claro y oscuro: 466 pantallas por modo, único hallazgo cosmético preexistente (Ajustes, celular).
+- **Veredicto: LISTO PARA AUTORIZAR** (detalle en el doc 47). Pendiente solo: `BACKUP_KEY`.
