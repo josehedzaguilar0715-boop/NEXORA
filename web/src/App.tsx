@@ -326,7 +326,7 @@ function Privada() {
       <a className="skip-link" href="#contenido" onClick={(e) => { e.preventDefault(); document.getElementById('contenido')?.focus() }}>Saltar al contenido</a>
       <header className="topbar">
         <div className="topbar-in">
-          <a className="brand2" href="#/inicio" aria-label="Ir al inicio"><Logo size={34} /><span className="brand2-txt"><b>NEXORA{product.short ? ` ${product.short}` : ''}</b><small>{me.business.name}</small></span></a>
+          <a className="brand2" href="#/inicio" aria-label="Ir al inicio"><Logo size={34} /><span className="brand2-txt"><b>NEXORA{product.short ? ` ${product.short}` : ''}</b><small>{product.subtitle && <span className="solo-compu">{product.subtitle} · </span>}{me.business.name}</small></span></a>
           <div className="topbar-search"><Buscador pantallas={allowed} rapidas={product.quick} senal={senalBuscar} onIr={(k) => { location.hash = `#/${k}`; setMasAbierto(false) }} /></div>
           <div className="topbar-actions">
             <button className="icon-btn2 solo-movil" aria-label="Buscar" onClick={() => { setBuscarMovil((v) => !v); setSenalBuscar((v) => v + 1) }}><Search size={22} aria-hidden /></button>
@@ -338,7 +338,7 @@ function Privada() {
         {buscarMovil && <div className="topbar-search-movil solo-movil"><Buscador pantallas={allowed} rapidas={product.quick} senal={senalBuscar} onIr={(k) => { location.hash = `#/${k}`; setBuscarMovil(false) }} /></div>}
       </header>
       <div className="shell2">
-        <aside className="rail" aria-label="Módulos"><NavModulos allowed={allowed} current={current} pending={pending} /></aside>
+        <aside className="rail" aria-label="Módulos"><NavModulos allowed={allowed} current={current} pending={pending} secondary={product.secondary} /></aside>
         <main id="contenido" tabIndex={-1}>
         {blocked && <div className="card error">Tu cuenta está {me.business.status}. Tus datos están intactos; habla con soporte para reactivarla.</div>}
         {me.user.role === 'owner' && !blocked && <RenewNotice b={me.business} />}
@@ -358,7 +358,7 @@ function Privada() {
         </main>
       </div>
       <BarraInferior allowed={allowed} current={current} product={product} pending={pending} onMas={() => setMasAbierto(true)} />
-      {masAbierto && <HojaMas allowed={allowed} current={current} pending={pending} me={me} logout={logout} onClose={() => setMasAbierto(false)} />}
+      {masAbierto && <HojaMas allowed={allowed} current={current} pending={pending} secondary={product.secondary} me={me} logout={logout} onClose={() => setMasAbierto(false)} />}
       {avisos && <AvisosPanel data={notices.data} reload={notices.reload} onClose={() => { setAvisos(false); void notices.reload().catch(() => {}) }} />}
       {notices.toast && !avisos && <NoticeToast n={notices.toast} onClose={notices.closeToast} onOpen={() => { const l = notices.toast?.link; notices.closeToast(); if (l) location.hash = l }} />}
     </div>
@@ -378,12 +378,20 @@ function ItemModulo({ s, on, pending }: { s: Screen; on: boolean; pending: numbe
 }
 
 /** Menú de módulos agrupado (computadora y hoja «Más» del celular): todo a la vista, sin menús escondidos. */
-function NavModulos({ allowed, current, pending }: { allowed: Screen[]; current: Screen | undefined; pending: number }) {
+/** Lo de uso ocasional va recogido en «Otras herramientas»: el menú diario queda corto y claro. */
+const OCASIONALES = ['buzon', 'importar', 'ajustes', 'asistencia']
+function NavModulos({ allowed, current, pending, secondary = [] }: { allowed: Screen[]; current: Screen | undefined; pending: number; secondary?: string[] }) {
+  const rara = (s: Screen) => OCASIONALES.includes(s.key) || secondary.includes(s.key)
+  const raras = allowed.filter(rara)
+  const principales = allowed.filter((s) => !rara(s))
+  // Si no hay mucho, no vale la pena esconder nada.
+  const recoger = allowed.length > 9 && raras.length > 1
+  const lista = recoger ? principales : allowed
   return (
     <nav className="rail-nav">
-      {allowed.filter((s) => s.group === '').map((s) => <ItemModulo key={s.key} s={s} on={current?.key === s.key} pending={pending} />)}
+      {lista.filter((s) => s.group === '').map((s) => <ItemModulo key={s.key} s={s} on={current?.key === s.key} pending={pending} />)}
       {PORTALS.map((p) => {
-        const items = allowed.filter((s) => s.group === p.group)
+        const items = lista.filter((s) => s.group === p.group)
         if (!items.length) return null
         return (
           <div key={p.group} className="rail-grupo">
@@ -392,6 +400,12 @@ function NavModulos({ allowed, current, pending }: { allowed: Screen[]; current:
           </div>
         )
       })}
+      {recoger && (
+        <details className="rail-grupo rail-mas" open={raras.some((s) => s.key === current?.key)}>
+          <summary className="rail-titulo">Otras herramientas</summary>
+          {raras.map((s) => <ItemModulo key={s.key} s={s} on={current?.key === s.key} pending={0} />)}
+        </details>
+      )}
     </nav>
   )
 }
@@ -425,7 +439,7 @@ function BarraInferior({ allowed, current, product, pending, onMas }: { allowed:
 }
 
 /** «Más»: todos los módulos, modo claro/oscuro y salir (celular). */
-function HojaMas({ allowed, current, pending, me, logout, onClose }: { allowed: Screen[]; current: Screen | undefined; pending: number; me: Me; logout: () => void; onClose: () => void }) {
+function HojaMas({ allowed, current, pending, secondary, me, logout, onClose }: { allowed: Screen[]; current: Screen | undefined; pending: number; secondary?: string[]; me: Me; logout: () => void; onClose: () => void }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', esc)
@@ -435,9 +449,9 @@ function HojaMas({ allowed, current, pending, me, logout, onClose }: { allowed: 
     <div className="hoja-fondo" onClick={onClose}>
       <div className="hoja" role="dialog" aria-modal="true" aria-label="Todos los módulos" onClick={(e) => e.stopPropagation()}>
         <div className="hoja-cab"><b>Todos los módulos</b><button type="button" className="icon-btn2" aria-label="Cerrar" onClick={onClose}><X size={22} aria-hidden /></button></div>
-        <div onClick={onClose}><NavModulos allowed={allowed} current={current} pending={pending} /></div>
+        <div onClick={(e) => { if ((e.target as HTMLElement).closest('summary')) return; onClose() }}><NavModulos allowed={allowed} current={current} pending={pending} secondary={secondary} /></div>
         <div className="hoja-pie"><ModoBoton /><button className="logout" onClick={logout}><LogOut size={18} aria-hidden />Salir</button></div>
-        <p className="muted small" style={{ textAlign: 'center' }}>{me.user.name} · {me.user.role === 'owner' ? 'Dueño' : me.user.position === 'encargado' ? 'Encargado' : 'Empleado'}</p>
+        <p className="muted small" style={{ textAlign: 'center' }}>{productOf(me.business.giro).subtitle ? `${productOf(me.business.giro).subtitle} · ` : ''}{me.user.name} · {me.user.role === 'owner' ? 'Dueño' : me.user.position === 'encargado' ? 'Encargado' : 'Empleado'}</p>
       </div>
     </div>
   )

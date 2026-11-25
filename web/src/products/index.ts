@@ -28,6 +28,10 @@ export interface Product {
   hide: string[]
   /** Bloque principal del Inicio: la agenda de hoy (servicios) o la caja y el surtido (tienda). */
   home: 'agenda' | 'tienda' | 'base'
+  /** Línea que aclara a qué negocio sirve el producto (cuando el nombre solo no basta). */
+  subtitle?: string
+  /** Pantallas de uso ocasional de este producto: van en «Otras herramientas» del menú, no a la vista. */
+  secondary?: string[]
   /** Color de la barra del navegador en celular. */
   themeColor: string
 }
@@ -70,7 +74,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     quick: ['caja', 'productos', 'clientes', 'comisiones', 'devoluciones'], hide: [], home: 'base', themeColor: '#140f16',
   },
   access: {
-    id: 'access', name: 'NEXORA Acceso', short: 'Acceso', tagline: 'Entradas, pases y limpieza por turno', giros: ['banos'],
+    id: 'access', name: 'NEXORA Acceso', short: 'Acceso', tagline: 'Entradas, pases y limpieza por turno', giros: ['banos'], subtitle: 'Baños y accesos', secondary: ['compras', 'clientes', 'lealtad'],
     quick: ['entradas', 'caja', 'escanear', 'productos', 'reportes'], hide: [], home: 'base', themeColor: '#f1f5fa',
   },
   tour: {
@@ -94,7 +98,7 @@ export const PRODUCTS: Record<ProductId, Product> = {
     quick: ['caja', 'mesas', 'carne', 'pedidos', 'precios'], hide: [], home: 'base', themeColor: '#151110',
   },
   greens: {
-    id: 'greens', name: 'NEXORA Mercado', short: 'Mercado', tagline: 'Precio del día, báscula, merma y pedidos', giros: ['verduleria'],
+    id: 'greens', name: 'NEXORA Mercado', short: 'Mercado', tagline: 'Precio del día, báscula, merma y pedidos', giros: ['verduleria'], subtitle: 'Frutas y verduras',
     quick: ['caja', 'precios', 'pedidos', 'cierre', 'compras'], hide: [], home: 'base', themeColor: '#f6f7f0',
   },
 }

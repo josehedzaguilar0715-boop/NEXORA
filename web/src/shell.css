@@ -78,3 +78,15 @@
 main:focus { outline: none; }
 :root :focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; box-shadow: none; }
 :root .rail-item:focus-visible, :root .bottom-btn:focus-visible { outline-offset: -2px; }
+
+/* Otras herramientas: lo ocasional, recogido para que el menú diario sea corto. */
+.rail-mas > summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; min-height: 40px; }
+.rail-mas > summary::-webkit-details-marker { display: none; }
+.rail-mas > summary::after { content: '▸'; font-size: 0.9rem; transition: transform 0.15s; }
+.rail-mas[open] > summary::after { transform: rotate(90deg); }
+.rail-mas > summary:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 2px; border-radius: 8px; }
+.brand2-txt small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rail-mas > summary::marker { content: ''; font-size: 0; }
+.rail-mas > summary { padding-right: 12px; }
+.rail-mas > summary::before, .rail-mas[open] > summary::before { content: none; }

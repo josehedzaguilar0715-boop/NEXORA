@@ -38,4 +38,16 @@ describe('primeros pasos por giro', () => {
     s.advance(61 * 86_400_000); s.longLived()
     expect(await pasos(s, o.token)).toBeUndefined()
   })
+
+  it('lugar turístico pide tarifas y su primer horario (no productos)', async () => {
+    const s = setup()
+    const o = await s.registerOwner()
+    s.setGiro('turistico')
+    await s.call('PATCH', '/business', { token: o.token, body: { forcePasswordChange: false } })
+    const p = await pasos(s, o.token)
+    const labels = p.items.map((i: any) => i.label)
+    expect(labels).toContain('Agrega tus tarifas y boletos')
+    expect(labels).toContain('Crea tu primer horario con aforo')
+    expect(labels).not.toContain('Agrega tus productos')
+  })
 })

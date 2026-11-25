@@ -122,10 +122,13 @@ export function todayTasks(db: Db, u: UserRow, now: Date): Task[] {
       if (agenda) {
         steps.push({ label: 'Da de alta tus servicios', sub: 'Con su precio y duración.', screen: 'configurar', done: count('SELECT COUNT(*) n FROM services WHERE business_id = ? AND active = 1') > 0 })
         steps.push({ label: `Marca quién atiende citas y su horario`, sub: 'Sin horario no aparecen horas libres.', screen: 'usuarios', done: count('SELECT COUNT(*) n FROM users WHERE business_id = ? AND active = 1 AND in_agenda = 1') > 0 })
+      } else if (has('turistico', 'banos')) {
+        steps.push({ label: 'Agrega tus tarifas y boletos', sub: 'Cada tipo de entrada con su precio.', screen: 'configurar', done: count('SELECT COUNT(*) n FROM services WHERE business_id = ? AND active = 1') > 0 })
+        if (has('turistico')) steps.push({ label: 'Crea tu primer horario con aforo', sub: 'Para vender boletos con QR.', screen: 'taquilla', done: count('SELECT COUNT(*) n FROM tours WHERE business_id = ?') > 0 })
       } else {
         steps.push({ label: 'Agrega tus productos', sub: 'Uno por uno, con el lector o importando tu lista.', screen: 'productos', done: count('SELECT COUNT(*) n FROM products WHERE business_id = ? AND active = 1') > 0 })
       }
-      if (has('palapa', 'restaurante')) steps.push({ label: 'Arma tus mesas', sub: 'Para abrir cuentas por mesa.', screen: 'configurar', done: count('SELECT COUNT(*) n FROM dining_tables WHERE business_id = ?') > 0 })
+      if (has('palapa', 'restaurante', 'taqueria')) steps.push({ label: 'Arma tus mesas', sub: 'Para abrir cuentas por mesa.', screen: 'configurar', done: count('SELECT COUNT(*) n FROM dining_tables WHERE business_id = ?') > 0 })
       steps.push({ label: 'Haz tu primera venta', sub: 'Abre la caja con tu fondo y cobra.', screen: 'caja', done: count("SELECT COUNT(*) n FROM sales WHERE business_id = ? AND status = 'completada'") > 0 })
       steps.push({ label: 'Da de alta a tu personal (opcional)', sub: 'Cada quien con su usuario y sus permisos.', screen: 'usuarios', done: count('SELECT COUNT(*) n FROM users WHERE business_id = ? AND active = 1') > 1 })
       const left = steps.filter((s) => !s.done)
