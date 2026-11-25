@@ -41,6 +41,7 @@ for (const u of quien) {
     page.on('response', (r: any) => { if (r.url().includes('/api/') && r.status() >= 500) api.push(`${r.status()} ${new URL(r.url()).pathname}`) })
     await page.goto(base + '/#/inicio'); await page.waitForTimeout(1200)
     const claves: string[] = await page.evaluate(() => [...new Set([...document.querySelectorAll('.rail-item')].map((a) => (a as HTMLAnchorElement).getAttribute('href') ?? ''))].filter((h) => h.startsWith('#/')))
+    if (!claves.length) console.log(`⚠ [${u.giro}/${u.role}/${vn}] el menú salió vacío (url: ${page.url().replace(base, '')}, texto: ${(await page.locator('body').innerText()).slice(0, 60).replace(/\n/g, ' ')})`)
     // «Otras herramientas» está recogido: se abre para que sus entradas también se recorran.
     for (const h of claves) {
       await page.goto(base + '/' + h); await page.waitForTimeout(700); revisiones++
