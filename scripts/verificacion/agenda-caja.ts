@@ -41,7 +41,7 @@ const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 } })
 await ctx.addInitScript((t: string) => { (window as any).__name = (f: unknown) => f; sessionStorage.setItem('nx_intro', '1'); localStorage.setItem('nx_token', t) }, T)
 const page = await ctx.newPage(); const errs: string[] = []
 page.on('pageerror', (e: Error) => errs.push(e.message))
-await page.goto(base + '/#/agenda'); await page.waitForTimeout(1200)
+await page.goto(base + '/#/agenda'); await page.waitForTimeout(1200); await page.getByRole('button', { name: 'Lista', exact: true }).click(); await page.waitForTimeout(500)
 if (dia && dia !== hoy) { await page.locator('input[type=date]').first().fill(dia).catch(() => {}); await page.waitForTimeout(800) }
 const terminar = page.getByRole('button', { name: /^Terminar/ }).first()
 ok(await terminar.count() > 0, 'la agenda ofrece «Terminar»')
