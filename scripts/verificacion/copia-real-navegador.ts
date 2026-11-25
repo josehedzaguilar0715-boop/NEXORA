@@ -26,7 +26,8 @@ const exp = new Date(Date.now() + 3_600_000 * 6).toISOString()
 const tokenOf = (u: string) => { const t = `nav-${u}`; db.prepare('INSERT OR IGNORE INTO sessions (id, user_id, token_hash, created_at, last_seen_at, expires_at) VALUES (?,?,?,?,?,?)').run(`nav-${u}`, u, sha256(t), exp, exp, exp); return t }
 const users = db.prepare(`SELECT u.id, u.role, b.giro, b.id bid FROM users u JOIN businesses b ON b.id = u.business_id WHERE u.active = 1 AND b.status NOT IN ('suspendido') AND u.must_change_password = 0 ORDER BY b.created_at, u.role DESC`).all() as { id: string; role: string; giro: string; bid: string }[]
 // Un dueño y un empleado/encargado por negocio.
-const vistos = new Set<string>(); const quien = users.filter((u) => { const k = `${u.bid}/${u.role}`; if (vistos.has(k)) return false; vistos.add(k); return true })
+const vistos = new Set<string>(); const SOLO = (process.env.SOLO ?? '').split(',').filter(Boolean)
+const quien = users.filter((u) => !SOLO.length || SOLO.includes(u.giro)).filter((u) => { const k = `${u.bid}/${u.role}`; if (vistos.has(k)) return false; vistos.add(k); return true })
 const browser = await chromium.launch()
 const VP = { escritorio: { width: 1366, height: 900 }, celular: { width: 390, height: 844 } } as const
 let revisiones = 0, fallas = 0, usuarios = 0

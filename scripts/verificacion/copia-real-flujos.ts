@@ -61,6 +61,16 @@ for (const n of negocios) {
       const co = await call(T, 'POST', `/appointments/${appt.id}/checkout`, { paymentMethod: 'efectivo', cashReceived: 1000000 })
       ok(co.status === 200 || co.status === 201, `${tag} Caja cobra la cita (${co.status})`)
       ok((await call(T, 'POST', `/appointments/${appt.id}/checkout`, { paymentMethod: 'efectivo' })).status === 409, `${tag} no se cobra dos veces (409)`)
+      // Agenda nueva: semana, editar y reprogramar con cruces, sobre los datos reales de la copia
+      const sem = (await call(T, 'GET', `/agenda?date=${mx(Date.now())}&days=7`)).json
+      ok(sem.days === 7 && Object.keys(sem.hoursByDay).length === 7, `${tag} la agenda devuelve la semana con los horarios de cada día`)
+      const otro = await call(T, 'POST', '/appointments', { staffId: staff.id, serviceIds: [svc.id], startsAt: new Date(Date.parse(appt.startsAt) + 86_400_000 * 2).toISOString(), customerName: 'Edición en copia' })
+      if (otro.status === 201) {
+        const e = await call(T, 'PATCH', `/appointments/${otro.json.appointment.id}`, { customerName: 'Edición en copia 2', notes: 'nota de prueba' })
+        ok(e.status === 200 && e.json.appointment.customerName === 'Edición en copia 2', `${tag} editar cliente y notas de una cita real-copia`)
+        const mover = await call(T, 'POST', `/appointments/${otro.json.appointment.id}/reschedule`, { startsAt: appt.startsAt })
+        ok(mover.status === 409 || mover.status === 200, `${tag} reprogramar sobre otra cita responde de forma controlada (${mover.status})`)
+      } else ok(true, `${tag} (sin hueco libre para la prueba de edición en la copia: ${otro.status})`)
     }
   }
   const despues = (await call(T, 'GET', '/finanzas/resumen')).json

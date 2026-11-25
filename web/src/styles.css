@@ -919,3 +919,4 @@ button.pub-item.on { border-color: var(--accent, #2563eb); box-shadow: 0 0 0 2px
 .cita-det .appt-actions { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .cita-det .appt-actions > button, .cita-det .appt-actions > a.button { white-space: normal; text-overflow: clip; }
 .cita-det { padding: 18px 16px 28px; }
+.seg button.on, .seg button.on:hover, .seg button.on:focus, .seg button.on:active { background: var(--selected-line); color: var(--ink); }
