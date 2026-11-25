@@ -48,3 +48,7 @@ Seguimiento: revisión automática a las 16:08 UTC (con reversión a `51773d59�
 
 ### Revisión de las 15:55 UTC (tarea programada del lanzamiento anterior)
 Cloudflare desde las 15:03 UTC (evolución y Agenda): **395 eventos, 0 de nivel error**; producción sirve `9a0ff173…` al 100 %. No hubo motivo de reversión (y, de haberlo, el destino correcto era `51773d59…`, no `34191efa…`).
+
+### Revisión de las 16:09 UTC (tarea programada de la Agenda)
+- Cloudflare desde las 15:46 UTC: **36 eventos, 0 de nivel error**; producción sigue sirviendo `9a0ff173…` al 100 %. Sin motivo de reversión.
+- «Verificar despliegue»: **no se pudo repetir** a las 16:09 UTC porque la API de GitHub Actions devolvió error 500 (disparo y repetición de ejecución). La última verificación externa en verde es la de las 15:48 UTC, posterior al despliegue.
