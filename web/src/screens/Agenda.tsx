@@ -77,6 +77,17 @@ export function Agenda({ me }: { me: Me }) {
   const [detalle, setDetalle] = useState<string | null>(null)
   const [fotos, setFotos] = useState(false)
   const [msg, setMsg] = useState<{ ok?: string; err?: string }>({})
+  // Una cita nunca se esconde: si su profesional ya no atiende en la agenda (o se desactivó), aparece en su propia columna.
+  const staffVista = useMemo<Staff[]>(() => {
+    const conocidos = new Set(staff.map((x) => x.id))
+    const extra = new Map<string, Staff>()
+    for (const a of data.appointments) {
+      const id = a.staffId ?? 'sin-asignar'
+      if (conocidos.has(id) || extra.has(id)) continue
+      extra.set(id, { id, name: a.staffId ? `${a.staffName ?? 'Profesional'} (ya no atiende)` : 'Sin profesional' })
+    }
+    return [...staff, ...extra.values()]
+  }, [staff, data.appointments])
   const load = async () => {
     setData(await api('GET', `/agenda?date=${inicio}&days=${rango}`))
     setStaff((await api<any>('GET', '/agenda/staff')).staff)
@@ -84,7 +95,7 @@ export function Agenda({ me }: { me: Me }) {
   }
   useEffect(() => { void load().catch((e) => setMsg({ err: e.message })) }, [inicio, rango])
   // En la semana se ve a una persona a la vez: si no hay una elegida, la propia (si atiende) o la primera.
-  useEffect(() => { if (modo === 'semana' && staffSel === 'todos' && staff.length) setStaffSel(staff.find((x) => x.id === me.user.id)?.id ?? staff[0]!.id) }, [modo, staff.length])
+  useEffect(() => { if (modo === 'semana' && staffSel === 'todos' && staffVista.length) setStaffSel(staffVista.find((x) => x.id === me.user.id)?.id ?? staffVista[0]!.id) }, [modo, staffVista.length])
   const act = (id: string, path: string, body?: unknown) => async () => {
     try { await api('POST', `/appointments/${id}/${path}`, body); setMsg({}); await load() } catch (e) { setMsg({ err: (e as Error).message }) }
   }
@@ -133,11 +144,11 @@ export function Agenda({ me }: { me: Me }) {
         const porCobrar = vivas.filter((x) => x.toCharge).length
         return <p className="agenda-resumen" aria-live="polite"><span className="agenda-resumen-n"><b>{vivas.length}</b> {vivas.length === 1 ? 'cita' : 'citas'}{rango === 7 ? ' esta semana' : ''}</span>{porConfirmar > 0 && <span className="estado warn">{porConfirmar} por confirmar</span>}{porCobrar > 0 && <span className="estado ok">{porCobrar} por cobrar</span>}</p>
       })()}
-      {vista === 'cal' && staff.length > 0 && (
+      {vista === 'cal' && staffVista.length > 0 && (
         <div className="cal-filtros">
           <div className="row chips" role="group" aria-label="Profesional">
             {modo === 'dia' && <button className={staffSel === 'todos' ? 'on' : ''} aria-pressed={staffSel === 'todos'} onClick={() => setStaffSel('todos')}>Todos</button>}
-            {staff.map((x) => <button key={x.id} className={staffSel === x.id ? 'on' : ''} aria-pressed={staffSel === x.id} onClick={() => setStaffSel(x.id)}><Avatar staff={x} size={24} />{x.name}</button>)}
+            {staffVista.map((x) => <button key={x.id} className={staffSel === x.id ? 'on' : ''} aria-pressed={staffSel === x.id} onClick={() => setStaffSel(x.id)}><Avatar staff={x} size={24} />{x.name}</button>)}
             {esDueno && <button className="foto-btn" onClick={() => setFotos(true)}>Fotos del equipo</button>}
           </div>
         </div>
@@ -147,13 +158,13 @@ export function Agenda({ me }: { me: Me }) {
       {msg.ok && <p className="okmsg" role="status">{msg.ok}</p>}
       {vista === 'cal' ? (
         <>
-          <Calendario view={modo} date={date} days={dias} staff={staff} staffSel={staffSel} appointments={data.appointments} blocks={data.blocks} hoursByDay={data.hoursByDay ?? {}}
+          <Calendario view={modo} date={date} days={dias} staff={staffVista} staffSel={staffSel} appointments={data.appointments} blocks={data.blocks} hoursByDay={data.hoursByDay ?? {}}
             onNew={(staffId, d, time) => setForm({ walkIn: false, staffId, time, date: d })} onOpen={(a) => setDetalle(a.id)} onMove={(a, to) => void mover(a, to)} onDay={(d) => { setDate(d); setModo('dia'); setStaffSel('todos') }} />
           <Leyenda />
         </>
       ) : (
       <div className="agenda-cols">
-        {staff.map((st) => {
+        {staffVista.map((st) => {
           const hours = (data.hours ?? []).filter((h) => h.staffId === st.id)
           const appts = data.appointments.filter((a) => a.staffId === st.id)
           const blocks = data.blocks.filter((b) => b.staffId === st.id)
@@ -186,7 +197,7 @@ export function Agenda({ me }: { me: Me }) {
       )}
       <Recordatorios />
       {me.modules?.includes('recordatorios') && <Retoques />}
-      {staff.length === 0 && <p className="card">Nadie está en la agenda todavía. En <a href="#/usuarios">Personal</a> abre a cada persona → «Horario de agenda» y marca «Atiende citas». Los servicios se dan de alta en <a href="#/configurar">Configurar negocio</a> → Servicios.</p>}
+      {staffVista.length === 0 && <p className="card">Nadie está en la agenda todavía. En <a href="#/usuarios">Personal</a> abre a cada persona → «Horario de agenda» y marca «Atiende citas». Los servicios se dan de alta en <a href="#/configurar">Configurar negocio</a> → Servicios.</p>}
       {form && <NuevaCita walkIn={form.walkIn} preset={form.staffId ? { staffId: form.staffId, time: form.time } : undefined} date={form.date ?? date} staff={staff} services={services} onClose={() => setForm(null)} onSaved={() => { const d = form.date; setForm(null); setMsg({ ok: 'Cita guardada.' }); if (d && d !== date && rango === 1) setDate(d); void load() }} />}
       {abierta && <DetalleCita a={abierta} me={me} staff={staff} services={services} wa={wa(abierta)} onClose={() => setDetalle(null)} onChanged={async (m) => { setMsg({ ok: m }); await load() }} onError={(e) => setMsg({ err: e })} />}
       {fotos && <FotosEquipo staff={staff} onClose={() => setFotos(false)} onSaved={() => void load()} />}
