@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { applyPublicProduct } from '../products'
 import { api, h12, mxn } from '../api'
 import { confirmAsk } from '../Dialog'
+import { EncabezadoNegocio } from '../PerfilPublico'
+import { Foto } from '../ilustraciones'
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())
 const STATUS: Record<string, string> = { pendiente: 'Por confirmar: te avisaremos', confirmada: 'Confirmada', en_atencion: 'En atención', atendida: 'Atendida', cancelada: 'Cancelada', no_asistio: 'No asistió' }
@@ -25,16 +27,26 @@ export function Reservar({ code }: { code: string }) {
   }
   if (!info) return <main className="login">{err ? <p className="error">{err}</p> : <p className="muted">Cargando…</p>}</main>
   return (
-    <main className="login" style={{ maxWidth: 720 }}>
-      {info.business.logoUrl && <img src={info.business.logoUrl} alt={`Logotipo de ${info.business.name}`} style={{ maxHeight: 72, maxWidth: 200, objectFit: 'contain' }} />}
-      <h1>{info.business.name}</h1>
-      {info.hours?.length > 0 && <p className="muted small">Horario: {info.hours.map((h: any) => `${['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][h.weekday]} ${h.start}–${h.end}`).join(' · ')}</p>}
-      <p className="muted">Reserva tu cita</p>
+    <main className="pub-wrap">
+      <EncabezadoNegocio business={info.business} profile={info.profile} horarioAuto={info.hours?.length > 0 ? info.hours.map((h: any) => `${['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][h.weekday]} ${h.start}–${h.end}`).join(' · ') : undefined} />
+      <h2 style={{ margin: 0 }}>Reserva tu cita</h2>
       <div className="card">
         <h2>1. ¿Qué te vas a hacer?</h2>
-        <div className="results">{info.services.map((s: any) => (
-          <button key={s.id} className={f.serviceIds.includes(s.id) ? 'primary' : ''} onClick={() => setF({ ...f, time: '', serviceIds: f.serviceIds.includes(s.id) ? f.serviceIds.filter((x) => x !== s.id) : [...f.serviceIds, s.id] })}>{s.name}<small>{mxn(s.price)} · {s.duration} min</small></button>
-        ))}</div>
+        {[...new Set(info.services.map((x: any) => x.category ?? ''))].map((cat) => (
+          <div key={String(cat)} className="pub-seccion">
+            {cat ? <h3 style={{ margin: '8px 0 0', textTransform: 'capitalize' }}>{String(cat)}</h3> : null}
+            <div className="pub-grid">{info.services.filter((x: any) => (x.category ?? '') === cat).map((x: any) => {
+              const on = f.serviceIds.includes(x.id)
+              return (
+                <button key={x.id} type="button" aria-pressed={on} className={`pub-item ${on ? 'on' : ''}`} onClick={() => setF({ ...f, time: '', serviceIds: on ? f.serviceIds.filter((y) => y !== x.id) : [...f.serviceIds, x.id] })}>
+                  <Foto url={x.imageUrl} giro={info.business.giro} alto={110} radio={12} />
+                  <span><b>{x.name}</b><small>{x.duration ? `${x.duration} min` : ''}</small></span>
+                  <span className="pub-precio">{mxn(x.price)}</span>
+                </button>
+              )
+            })}</div>
+          </div>
+        ))}
         <h2 style={{ marginTop: 16 }}>2. ¿Con quién?</h2>
         <div className="row chips">{[{ id: 'any', name: 'El primero disponible' }, ...info.staff].map((s: any) => <button key={s.id} className={f.staffId === s.id ? 'primary' : ''} onClick={() => setF({ ...f, staffId: s.id, time: '' })}>{s.name}</button>)}</div>
         <h2 style={{ marginTop: 16 }}>3. Día y hora</h2>

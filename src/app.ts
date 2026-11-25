@@ -15,6 +15,7 @@ import { layaways } from './layaways.js'
 import { reset } from './reset.js'
 import { campaigns, publicCampaigns } from './campaigns.js'
 import { today } from './today.js'
+import { escaparate, publicEscaparate } from './escaparate.js'
 import { notifications } from './notifications.js'
 import { publicLinks } from './publiclinks.js'
 import { dashboard } from './dashboard.js'
@@ -59,6 +60,7 @@ export function createApp(deps: Deps) {
   app.route('/', publicCommon)
   app.route('/', publicCampaigns)
   app.route('/', publicAgenda)
+  app.route('/', publicEscaparate)
   app.route('/', publicReceipts)
   app.route('/', publicTourism)
   app.route('/', admin as unknown as Hono<Env>)
@@ -100,6 +102,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', reset)
   protectedApp.route('/', campaigns)
   protectedApp.route('/', today)
+  protectedApp.route('/', escaparate)
   protectedApp.route('/', dashboard)
   protectedApp.route('/', notifications)
   protectedApp.route('/', publicLinks)

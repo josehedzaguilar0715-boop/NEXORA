@@ -756,3 +756,27 @@ table.list tr.strike td b { text-decoration: line-through; }
 
 /* Aviso de renovación (prueba o mensualidad por vencer). */
 .renew-notice { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); margin-bottom: 12px; }
+
+/* Escaparate público (reservas, menú y listas) */
+.pub-wrap { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; display: flex; flex-direction: column; gap: 16px; }
+.perfil-pub { display: flex; flex-direction: column; gap: 12px; }
+.perfil-pub-id { display: flex; gap: 14px; align-items: center; }
+.perfil-pub-id h1 { margin: 0; }
+.perfil-pub-id p { margin: 4px 0 0; color: var(--muted); }
+.perfil-logo { width: 64px; height: 64px; border-radius: 14px; object-fit: contain; background: #fff; border: 1px solid var(--line, #e3e7ee); flex: none; }
+.perfil-datos { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); }
+.perfil-datos li { display: flex; align-items: center; gap: 6px; }
+.pub-seccion { display: flex; flex-direction: column; gap: 10px; }
+.pub-seccion > h2 { margin: 6px 0 0; }
+.pub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.pub-item { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line, #e3e7ee); border-radius: 16px; background: var(--card, #fff); text-align: left; font: inherit; color: inherit; }
+button.pub-item { cursor: pointer; }
+button.pub-item.on { border-color: var(--accent, #2563eb); box-shadow: 0 0 0 2px var(--accent, #2563eb) inset; }
+.pub-item b { display: block; }
+.pub-item small { color: var(--muted); display: block; }
+.pub-precio { font-weight: 700; }
+.pub-lista { display: flex; flex-direction: column; }
+.pub-fila { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line, #e3e7ee); }
+.pub-fila:first-child { border-top: 0; }
+.pub-fila > div { flex: 1; min-width: 0; }
+.pub-pie { text-align: center; color: var(--muted); font-size: 0.9rem; }

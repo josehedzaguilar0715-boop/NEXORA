@@ -140,7 +140,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
   const canEdit = can(me, 'configure_catalog')
   const [f, setF] = useState({
     name: p?.name ?? '', barcode: p?.barcode ?? '', unit: p?.unit ?? 'pieza', price: p ? String(p.price / 100) : '', minStock: String(p?.minStock ?? 0), categoryId: p?.categoryId ?? '',
-    authCode: '', brand: p?.attrs?.brand ?? '', fragrance: p?.attrs?.fragrance ?? '', sizeMl: p?.attrs?.sizeMl ? String(p.attrs.sizeMl) : '', presentation: p?.attrs?.presentation ?? 'regular',
+    authCode: '', imagenUrl: p?.attrs?.imagenUrl ?? '', brand: p?.attrs?.brand ?? '', fragrance: p?.attrs?.fragrance ?? '', sizeMl: p?.attrs?.sizeMl ? String(p.attrs.sizeMl) : '', presentation: p?.attrs?.presentation ?? 'regular',
     trackStock: p ? p.trackStock !== false : true, trackExpiry: !!p?.trackExpiry, stock: '', cost: p?.lastCost ? String(Math.round(p.lastCost) / 100) : '', margin: (p as any)?.marginBp != null ? String((p as any).marginBp / 100) : '',
     packOn: !!p?.pack, packName: p?.pack?.name ?? 'Bolsa', packSize: p?.pack ? String(p.pack.size) : '', packCost: p?.pack && p.lastCost ? String(Math.round(p.lastCost * p.pack.size) / 100) : '',
     wholesale: p?.tiers?.length === 1 ? String(p.tiers[0]!.price / 100) : '', wholesaleMin: p?.tiers?.length === 1 ? String(p.tiers[0]!.minQuantity) : '',
@@ -150,12 +150,15 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
   const [confirmDel, setConfirmDel] = useState(false)
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   const attrs = perfume ? { ...(p?.attrs ?? {}), brand: f.brand || undefined, fragrance: f.fragrance || undefined, sizeMl: Number(f.sizeMl) || undefined, presentation: f.presentation } : undefined
+  // Foto por dirección (https): se guarda junto a los demás atributos sin borrarlos. Solo se toca si cambió.
+  const imagenCambio = f.imagenUrl.trim() !== (p?.attrs?.imagenUrl ?? '')
+  const attrsOut = attrs ? { ...attrs, imagenUrl: f.imagenUrl.trim() || undefined } : imagenCambio ? { ...(p?.attrs ?? {}), imagenUrl: f.imagenUrl.trim() || undefined } : undefined
   const priceChanged = !!p && toCents(f.price) !== p.price
   const save = async () => {
     try {
       if (!f.name.trim()) throw new Error('Escribe el nombre del producto.')
       if (f.price.trim() === '' || Number.isNaN(toCents(f.price))) throw new Error('Escribe el precio de venta.')
-      const common = { name: f.name, barcode: f.barcode || null, price: toCents(f.price), minStock: Number(f.minStock) || 0, categoryId: f.categoryId || null, trackExpiry: f.trackExpiry, ...(attrs ? { attrs } : {}), ...(f.trackStock && f.cost.trim() !== '' ? { cost: toCents(f.cost) } : {}), marginBp: f.margin.trim() === '' ? null : Math.round(Number(f.margin) * 100) }
+      const common = { name: f.name, barcode: f.barcode || null, price: toCents(f.price), minStock: Number(f.minStock) || 0, categoryId: f.categoryId || null, trackExpiry: f.trackExpiry, ...(attrsOut ? { attrs: attrsOut } : {}), ...(f.trackStock && f.cost.trim() !== '' ? { cost: toCents(f.cost) } : {}), marginBp: f.margin.trim() === '' ? null : Math.round(Number(f.margin) * 100) }
       const packSize = Math.round(Number(f.packSize))
       if (f.packOn && f.unit === 'pieza' && !(packSize >= 2)) throw new Error(`Escribe cuántas piezas trae cada ${f.packName.toLowerCase()} (2 o más).`)
       const pack = f.packOn && f.unit === 'pieza' ? { name: f.packName, size: packSize } : null
@@ -195,6 +198,7 @@ function Datos({ me, p, categories, onSaved }: { me: Me; p: P | null; categories
     <div className="form-sections">
       <h3 className="form-h">Lo básico</h3>
       <label>Nombre<input value={f.name} onChange={set('name')} autoFocus={!p} disabled={!canEdit} /></label>
+      <label>Foto (dirección https de la imagen, opcional)<input value={f.imagenUrl} onChange={set('imagenUrl')} placeholder="https://…" disabled={!canEdit} /></label>
       <label>Código de barras</label>
       <div className="row"><input aria-label="Código de barras" value={f.barcode} onChange={set('barcode')} onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()} placeholder="Escanéalo o escríbelo" disabled={!canEdit} />{canEdit && <ScanButton onCode={(c) => setF((x) => ({ ...x, barcode: c }))} />}</div>
       {perfume && (<>

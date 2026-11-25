@@ -59,7 +59,7 @@ function Servicios({ me }: { me: Me }) {
   const agenda = hasGiro(me, ...AGENDA)
   const papel = hasGiro(me, 'papeleria')
   const unas = hasGiro(me, 'unas')
-  const empty = { id: '', name: '', price: '', orig: -1, authCode: '', durationMin: agenda ? '30' : '', extraBlockMin: '', category: '', machineId: '', sheetsPerUnit: '1', cost: '' }
+  const empty = { id: '', name: '', price: '', orig: -1, authCode: '', durationMin: agenda ? '30' : '', extraBlockMin: '', category: '', machineId: '', sheetsPerUnit: '1', cost: '', imagenUrl: '', attrsPrev: {} as Record<string, any> }
   const [list, setList] = useState<any[]>([])
   const [machines, setMachines] = useState<any[]>([])
   const [f, setF] = useState(empty)
@@ -76,14 +76,14 @@ function Servicios({ me }: { me: Me }) {
       name: f.name, price: toCents(f.price), category: f.category || null, cost: f.cost.trim() ? toCents(f.cost) : 0,
       ...(f.id && toCents(f.price) !== f.orig ? { authCode: f.authCode } : {}),
       durationMin: f.durationMin ? Number(f.durationMin) : null,
-      ...(unas ? { attrs: { extraBlockMin: Number(f.extraBlockMin) || 0 } } : {}),
+      ...(unas || f.imagenUrl.trim() !== (f.attrsPrev.imagenUrl ?? '') ? { attrs: { ...f.attrsPrev, ...(unas ? { extraBlockMin: Number(f.extraBlockMin) || 0 } : {}), imagenUrl: f.imagenUrl.trim() || undefined } } : {}),
       ...(papel ? { machineId: f.machineId || null, sheetsPerUnit: f.machineId ? Number(f.sheetsPerUnit) || 1 : 0 } : {}),
     }
     if (f.id) await api('PATCH', `/services/${f.id}`, body)
     else await api('POST', '/services', body)
     setF(empty); await load()
   }, f.id ? 'Servicio actualizado.' : 'Servicio agregado.')
-  const edit = (s: any) => setF({ id: s.id, name: s.name, price: String(s.price / 100), orig: s.price, authCode: '', durationMin: s.durationMin ? String(s.durationMin) : '', extraBlockMin: s.attrs?.extraBlockMin ? String(s.attrs.extraBlockMin) : '', category: s.category ?? '', machineId: s.machineId ?? '', sheetsPerUnit: String(s.sheetsPerUnit || 1), cost: s.cost ? String(s.cost / 100) : '' })
+  const edit = (s: any) => setF({ id: s.id, name: s.name, price: String(s.price / 100), orig: s.price, authCode: '', durationMin: s.durationMin ? String(s.durationMin) : '', extraBlockMin: s.attrs?.extraBlockMin ? String(s.attrs.extraBlockMin) : '', category: s.category ?? '', machineId: s.machineId ?? '', sheetsPerUnit: String(s.sheetsPerUnit || 1), cost: s.cost ? String(s.cost / 100) : '', imagenUrl: s.attrs?.imagenUrl ?? '', attrsPrev: s.attrs ?? {} })
   const shown = list.filter((s) => showOff || s.active)
   const noun = agenda || papel ? 'servicio' : 'tarifa'
   return (
@@ -117,6 +117,7 @@ function Servicios({ me }: { me: Me }) {
           {me.access?.costs && f.cost.trim() !== '' && <ProfitLine price={toCents(f.price)} cost={toCents(f.cost)} margin={0} />}
           <p className="muted small" style={{ marginTop: -4 }}>Si el servicio gasta {agenda ? 'productos del inventario' : 'insumos del inventario'}, se descuentan solos al cobrar. Las comisiones del personal se restan aparte.</p>
           {unas && <label>Tiempo de secado que bloquea la agenda (min)<input inputMode="numeric" value={f.extraBlockMin} onChange={set('extraBlockMin')} placeholder="0" /></label>}
+          <label>Foto (dirección https de la imagen, opcional)<input value={f.imagenUrl} onChange={set('imagenUrl')} placeholder="https://…" /></label>
           <label>{unas ? 'Técnica' : papel ? 'Tipo (copias, impresión, engargolado…)' : 'Categoría (opcional)'}<input value={f.category} onChange={set('category')} /></label>
           {f.id && toCents(f.price) !== f.orig && <label>Código de autorización (cambio de precio)<input type="password" value={f.authCode} onChange={set('authCode')} /></label>}
           {papel && (

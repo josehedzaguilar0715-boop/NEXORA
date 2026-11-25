@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { randomBytes } from 'node:crypto'
 import { z } from 'zod'
+import { imagenSegura, perfilPublico } from './escaparate.js'
 import { audit } from './audit.js'
 import { moduleOn } from './common.js'
 import { body, hasPerm, ownerOnly, parse, requirePerm, type C, type Deps, type Env, type UserRow } from './context.js'
@@ -378,13 +379,13 @@ function publicBusiness(c: C) {
 publicAgenda.get('/public/book/:code', (c) => {
   const { db } = c.get('deps')
   const b = publicBusiness(c)
-  const services = (db.prepare('SELECT id, name, price, category FROM services WHERE business_id = ? AND active = 1 ORDER BY category, name').all(b.id) as { id: string }[]).map((s) => ({ ...s, duration: serviceDuration(db, s.id) })).filter((s) => s.duration > 0)
+  const services = (db.prepare('SELECT id, name, price, category, attrs FROM services WHERE business_id = ? AND active = 1 ORDER BY category, name').all(b.id) as { id: string; attrs: string }[]).map(({ attrs, ...s }) => ({ ...s, imageUrl: imagenSegura((() => { try { return JSON.parse(attrs).imagenUrl } catch { return null } })()), duration: serviceDuration(db, s.id) })).filter((s) => s.duration > 0)
   const staff = agendaStaff(db, b.id)
   // Horario del negocio: el más amplio de quienes atienden, por día de la semana.
   const rows = db.prepare(`SELECT weekday, MIN(start) start, MAX(end) end FROM staff_schedules WHERE user_id IN (${staff.map(() => '?').join(',') || "''"}) GROUP BY weekday ORDER BY weekday`).all(...staff.map((x) => x.id)) as { weekday: number; start: string; end: string }[]
   const logo = (db.prepare('SELECT logo_url FROM businesses WHERE id = ?').get(b.id) as { logo_url: string | null }).logo_url
   // Solo identidad del negocio, servicios, horario y nombre público de quien atiende: nada interno ni personal.
-  return c.json({ business: { name: b.name, phone: b.phone, giro: b.giro, logoUrl: logo }, hours: rows, services, staff: staff.map((s) => ({ id: s.id, name: publicStaffName(db, s.id, s.name) })) })
+  return c.json({ business: { name: b.name, phone: b.phone, giro: b.giro, logoUrl: logo }, profile: perfilPublico(db, b.id), hours: rows, services, staff: staff.map((s) => ({ id: s.id, name: publicStaffName(db, s.id, s.name) })) })
 })
 
 publicAgenda.get('/public/book/:code/availability', (c) => {

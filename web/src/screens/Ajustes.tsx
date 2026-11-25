@@ -4,6 +4,7 @@ import { api, cache, mxn, outbox, toCents, publicSlug, setPublicSlugCache } from
 import { hasGiro, type Me } from '../App'
 import { giroLabel, vocab } from '../giros'
 import { WhatsAppShare } from './Descargar'
+import { MiEscaparate } from './MiEscaparate'
 
 const MODULES: Record<string, string> = { membresias: 'Membresías y paquetes', promociones: 'Promociones', fidelidad: 'Puntos o sellos', asistencia: 'Asistencia con QR', reservas: 'Reservas y venta por link', recordatorios: 'Recordatorios (solo prepara el mensaje)' }
 
@@ -30,6 +31,7 @@ export function Ajustes({ me }: { me: Me }) {
   return (
     <div className="grid2">
       <MiCuenta me={me} />
+      {me.user.role === 'owner' && <MiEscaparate me={me} />}
       <section className="card">
         <h2>Negocio y ticket</h2>
         <label>Nombre<input value={biz.name} onChange={(e) => setBiz({ ...biz, name: e.target.value })} /></label>
