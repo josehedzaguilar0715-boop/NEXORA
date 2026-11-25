@@ -45,3 +45,6 @@ Autorización expresa del propietario (25-nov-2026) para publicar la mejora de A
 | Incidencias | Ninguna (el único tropiezo fue un error 500 de GitHub al disparar el flujo directamente; se resolvió repitiendo la ejecución) |
 
 Seguimiento: revisión automática a las 16:08 UTC (con reversión a `51773d59…` si hubiese errores repetidos) y comparación del respaldo de las 09:17 UTC del 26-nov.
+
+### Revisión de las 15:55 UTC (tarea programada del lanzamiento anterior)
+Cloudflare desde las 15:03 UTC (evolución y Agenda): **395 eventos, 0 de nivel error**; producción sirve `9a0ff173…` al 100 %. No hubo motivo de reversión (y, de haberlo, el destino correcto era `51773d59…`, no `34191efa…`).
