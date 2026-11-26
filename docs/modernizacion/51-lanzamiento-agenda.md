@@ -59,3 +59,15 @@ Cloudflare desde las 15:03 UTC (evolución y Agenda): **395 eventos, 0 de nivel 
 - **Prueba con los datos reales (copia):** la cita aparece como bloque en el calendario y en la lista, en escritorio y celular (`scripts/verificacion/fenix-cita.ts`); el resto de pruebas siguen en verde (agenda en navegador, e2e, tipos).
 - **Despliegue:** `585fbef6-17a6-4edd-b7ac-27cc39e8363a` (commit `7ebfa7ffee15d9f811106bf22e6ee21614ab5d7a`), 100 % del tráfico desde las 16:25 UTC; anterior `9a0ff173…`. Sin migraciones ni cambios de datos.
 - **Pendiente de configuración (lo hace el dueño, no el sistema):** para poder agendar nuevas citas, alguien debe estar marcado como «Atiende citas» con su horario en Personal → Horario de agenda.
+
+## Comparación del primer respaldo automático posterior (26-nov 09:40 UTC, solo lectura)
+| Comprobación | Resultado |
+|---|---|
+| Respaldo `nexora-2026-11-26T09-17.json.gz` | Existe, **sin cifrar** (la llave aún no está instalada), gzip válido, esquema 48 |
+| Cifras frente al del 25-nov 09:17 | Negocios 11 → 11, productos 172 → 172, **ventas 99 → 103**, usuarios 22 → 23, citas 6 |
+| Pérdidas | **Ninguna.** Dos tablas marcadas, ambas por actividad normal: `expenses` (1 gasto **anulado** por su negocio el 25-nov 15:22 UTC, con bitácora `gasto.anulado`; la fila se conserva con fecha, autor y motivo) y `push_subscriptions` (suscripciones de notificaciones; tabla viva). El usuario nuevo corresponde a un alta registrada en la bitácora (25-nov 19:02 UTC) |
+| Restauración en base aislada | Integridad ok, 0 referencias rotas, 11 negocios, 23 usuarios, 103 ventas, esquema 48, `error_log` con 0 filas |
+| «Verificar despliegue» (GitHub, 09:41 UTC) | **Producción y staging en verde** |
+| Cloudflare desde el despliegue `69db41bc` (25-nov 18:02 UTC) | 3,826 eventos, **0 de nivel error** |
+| Producción | Sirve `69db41bc-b137-4304-a3ff-cced67e063be` al 100 % |
+| `BACKUP_KEY` | Sigue sin instalarse (único pendiente de seguridad) |
