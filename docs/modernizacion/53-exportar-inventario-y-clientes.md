@@ -12,3 +12,15 @@ Sin migraciones, sin cambios de roles, permisos, planes ni precios. Solo lectura
 - Cada descarga queda en la bitácora (`inventario.exportado`, `clientes.exportado`).
 - Código: `src/exportar.ts` (CSV/XLSX/PDF sin dependencias), `src/inventario-export.ts`, `src/clientes-export.ts`, `web/src/ExportarMenu.tsx`. Pruebas: `test/inventario-export.test.ts`, `test/clientes-export.test.ts` (archivos leídos con openpyxl, LibreOffice, `pdfinfo` y `pdftotext`).
 - Se corrigió además un nombre de archivo mal formado en la primera versión del inventario.
+
+## Publicación (autorizada por el dueño: «cuando termines subes a production»)
+
+| Dato | Valor |
+|---|---|
+| Commit publicado | `237fd684d5391c6751fd032b67bdacbe2ac0513f` (rama `exportar-inventario`) |
+| Worker | `nexora` (producción; no se tocó `nexora-staging`) |
+| Version ID | `2971a08b-b7c7-404f-bef3-a8a9037a94b8` |
+| Reversión | `69db41bc-b137-4304-a3ff-cced67e063be` |
+| Bindings | Durable Object `NEXORA`, KV `BACKUPS` `c8d9a9b0…`; cron `17 9 * * *` intacto |
+| Verificación | workflow «Verificar despliegue» #12: éxito; 364 pruebas en verde antes de publicar |
+| Datos reales | no se generaron ni se descargaron exportaciones con datos reales; el dueño de cada negocio hace la primera |
