@@ -16,6 +16,7 @@ import { reset } from './reset.js'
 import { campaigns, publicCampaigns } from './campaigns.js'
 import { today } from './today.js'
 import { inventarioExport } from './inventario-export.js'
+import { clientesExport } from './clientes-export.js'
 import { plano } from './plano.js'
 import { escaparate, publicEscaparate } from './escaparate.js'
 import { notifications } from './notifications.js'
@@ -96,6 +97,7 @@ export function createApp(deps: Deps) {
   protectedApp.route('/', taqueria)
   protectedApp.route('/', inventory)
   protectedApp.route('/', inventarioExport)
+  protectedApp.route('/', clientesExport)
   protectedApp.route('/', finance)
   protectedApp.route('/', accounting)
   protectedApp.route('/', finanzas)

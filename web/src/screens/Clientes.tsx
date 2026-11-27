@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, mxn, toCents } from '../api'
+import { ExportarMenu } from '../ExportarMenu'
 import { ask, askCode, confirmAsk } from '../Dialog'
 import { can, FIADO_GIROS, hasGiro, type Me } from '../App'
 import { cardWhatsApp } from './MiTarjeta'
@@ -29,6 +30,7 @@ export function Clientes({ me }: { me: Me }) {
     <div className="page">
       <div className="toolbar">
         <div className="row search"><input aria-label="Buscar cliente" placeholder="Buscar por nombre o teléfono…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        {can(me, 'view_reports') && <ExportarMenu label="Exportar clientes" path="/customers-export" opciones={[{ label: 'Excel: clientes e historial de sellos', query: 'format=xlsx' }, { label: 'PDF: clientes e historial de sellos', query: 'format=pdf' }, { label: 'CSV: lista de clientes', query: 'format=csv' }, { label: 'CSV: historial de sellos', query: 'format=csv&parte=historial' }]} />}
         <button className="primary" onClick={() => setAdding(true)}>+ Nuevo cliente</button>
       </div>
       {fiado && <div className="kpis mini">{rec.total !== undefined && <div><span className="muted">Te deben en total</span><b>{mxn(rec.total)}</b></div>}<div><span className="muted">Clientes con saldo</span><b>{rec.customers.length}</b></div></div>}

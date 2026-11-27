@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { ScanButton } from '../Scanner'
-import { api, mxn, toCents, ensureSynced, auth } from '../api'
+import { api, mxn, toCents, ensureSynced } from '../api'
+import { ExportarMenu } from '../ExportarMenu'
 import { confirmAsk } from '../Dialog'
 import { Sheet } from '../Sheet'
 import { can, type Me, hasGiro } from '../App'
@@ -28,7 +29,6 @@ export function Productos({ me }: { me: Me }) {
   const costs = !!me.access?.costs // costos y márgenes: permiso aparte
   const [list, setList] = useState<P[]>([])
   const [q, setQ] = useState('')
-  const [exporting, setExporting] = useState<'' | 'xlsx' | 'csv' | 'pdf'>('')
   const [filter, setFilter] = useState<Filter>('todos')
   const [edit, setEdit] = useState<{ p: P | null; tab?: string } | null>(null)
   const [alerts, setAlerts] = useState<{ low: any[]; expiring: any[] }>({ low: [], expiring: [] })
@@ -57,29 +57,11 @@ export function Productos({ me }: { me: Me }) {
   const counts: Record<Filter, number> = { todos: list.filter((p) => p.active !== false).length, surtir: alerts.low.length, caducar: expIds.size, eliminados: list.filter((p) => p.active === false).length }
   const LABEL: Record<Filter, string> = { todos: 'Todos', surtir: 'Por surtir', caducar: 'Por caducar', eliminados: 'Eliminados' }
 
-  const exportar = async (f: 'xlsx' | 'csv' | 'pdf') => {
-    setExporting(f)
-    try {
-      const res = await fetch(`/api/inventory/export?format=${f}`, { headers: { authorization: `Bearer ${auth.token}` } })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error?.message ?? 'No se pudo generar el archivo.')
-      const blob = await res.blob()
-      const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? `inventario.${f}`
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
-    } catch (e) { alert((e as Error).message) } finally { setExporting('') }
-  }
-
   return (
     <div className="page">
       <div className="toolbar">
         <div className="row search"><input aria-label="Buscar producto" placeholder="Buscar por nombre o código…" value={q} onChange={(e) => setQ(e.target.value)} /><ScanButton onCode={(c) => setQ(c)} /></div>
-        <details className="menu-exportar" style={{ position: 'relative' }}>
-          <summary className="btn" role="button" aria-label="Exportar inventario" style={{ listStyle: 'none', cursor: 'pointer' }}>⬇ Exportar inventario</summary>
-          <div className="card" style={{ position: 'absolute', zIndex: 20, right: 0, minWidth: 220, padding: 8, display: 'grid', gap: 6 }}>
-            {([['xlsx', 'Excel (.xlsx)'], ['csv', 'CSV (para otro sistema)'], ['pdf', 'PDF (para imprimir)']] as const).map(([f, l]) => (
-              <button key={f} disabled={exporting !== ''} onClick={(e) => { void exportar(f); (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open') }}>{exporting === f ? 'Generando…' : l}</button>
-            ))}
-          </div>
-        </details>
+        <ExportarMenu label="Exportar inventario" path="/inventory/export" opciones={[{ label: 'Excel (.xlsx)', query: 'format=xlsx' }, { label: 'CSV (para otro sistema)', query: 'format=csv' }, { label: 'PDF (para imprimir)', query: 'format=pdf' }]} />
         {alerts.low.length > 0 && <button onClick={() => setOrder(true)}>🛒 Armar pedido ({alerts.low.length})</button>}
         {canEdit && <button className="primary" onClick={() => setEdit({ p: null })}>+ Nuevo producto</button>}
       </div>
